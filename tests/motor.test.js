@@ -6,7 +6,9 @@ import {
   baseDasAtividades,
   calcularRitmos,
   calcularVdot,
+  detalharSessao,
   diaDaSemana,
+  escolherDiasDeTreino,
   estimarVdot,
   formatarRitmo,
   gerarPlano,
@@ -14,6 +16,7 @@ import {
   proximaSegunda,
   segundaDaSemana,
   somarDias,
+  treinosPorSemana,
 } from '../src/motor.js';
 
 const perfil = { idade: 35, pesoKg: 72, alturaCm: 178, lesaoRecente: false, diasSemana: [2, 4, 6, 0], diaLongo: 0 };
@@ -168,6 +171,100 @@ test('treino forte nunca fica no dia seguinte ou anterior ao longão', () => {
         assert.notEqual(f.data, somarDias(longo.data, -1));
       }
     }
+  }
+});
+
+const seisDiasLivres = [1, 3, 4, 5, 6, 0];
+const perfilIniciante = { idade: 39, pesoKg: 98, alturaCm: 171, lesaoRecente: false, diasSemana: seisDiasLivres, diaLongo: 0 };
+const planoIniciante = () => gerarPlano(parametros({
+  perfil: perfilIniciante,
+  objetivo: { distanciaKm: 10, dataProva: '2027-03-14' },
+  base: { kmSemana: 12, longoKm: 10 },
+  vdot: 28.5,
+}));
+
+test('iniciante com seis dias livres treina três, nunca em dias seguidos', () => {
+  const semana1 = planoIniciante().sessoes.filter((s) => s.semana === 1);
+  assert.equal(semana1.length, 3);
+  for (let i = 1; i < semana1.length; i++) {
+    assert.notEqual(semana1[i].data, somarDias(semana1[i - 1].data, 1));
+  }
+  assert.equal(diaDaSemana(semana1.at(-1).data), 0, 'longão continua no dia escolhido');
+});
+
+test('primeira semana parte do volume real, sem salto por ter muitos dias livres', () => {
+  const total = planoIniciante().sessoes.filter((s) => s.semana === 1).reduce((t, s) => t + s.distanciaKm, 0);
+  assert.ok(total <= 12.5, `semana 1 com ${total} km`);
+});
+
+test('em volume baixo, treino forte não passa do longão da semana', () => {
+  for (const sessoes of Map.groupBy(planoIniciante().sessoes, (s) => s.semana).values()) {
+    const longo = sessoes.find((s) => s.tipo === 'longo');
+    if (!longo) continue;
+    for (const f of sessoes.filter((s) => ['limiar', 'intervalado', 'ritmo'].includes(s.tipo))) {
+      assert.ok(f.distanciaKm <= longo.distanciaKm, `${f.data}: forte ${f.distanciaKm}, longão ${longo.distanciaKm}`);
+    }
+  }
+});
+
+test('dias de treino só aumentam quando o volume sustenta', () => {
+  assert.equal(treinosPorSemana(12, false, 6), 3);
+  assert.equal(treinosPorSemana(25, false, 6), 4);
+  assert.equal(treinosPorSemana(40, false, 6), 5);
+  assert.equal(treinosPorSemana(60, false, 7), 6);
+  assert.equal(treinosPorSemana(60, true, 7), 4);
+  assert.equal(treinosPorSemana(25, true, 7), 3);
+  assert.equal(treinosPorSemana(60, false, 3), 3);
+});
+
+test('sempre sobra pelo menos um dia de descanso, mesmo com todos os dias livres', () => {
+  const plano = gerarPlano(parametros({
+    perfil: { ...perfil, diasSemana: [0, 1, 2, 3, 4, 5, 6] },
+    objetivo: { distanciaKm: 42.2, dataProva: '2027-06-06' },
+    base: { kmSemana: 70, longoKm: 25 },
+  }));
+  for (const sessoes of Map.groupBy(plano.sessoes, (s) => s.semana).values()) {
+    assert.ok(sessoes.length <= 6);
+  }
+});
+
+test('o dia depois do longão é descanso sempre que há escolha', () => {
+  const { dias, diaLongo } = escolherDiasDeTreino(seisDiasLivres, 0, 4);
+  assert.equal(diaLongo, 0);
+  assert.ok(!dias.includes(1), `dias ${dias}`);
+  assert.equal(escolherDiasDeTreino([1, 3, 5], 0, 3).diaLongo, 5, 'longão vai para o último dia livre');
+});
+
+test('detalhes somam tempo, distância e zonas do treino com repetições', () => {
+  const ritmo = { de: 300, ate: 340 };
+  const sessao = {
+    tipo: 'limiar',
+    distanciaKm: 7,
+    blocos: [
+      { rotulo: 'Aquecimento', repeticoes: 1, passos: [{ km: 2, ritmo, zona: 'leve' }] },
+      { rotulo: 'Principal', repeticoes: 3, passos: [{ km: 1, ritmo: 260, zona: 'limiar' }, { minutos: 1, ritmo, zona: 'recuperacao' }] },
+    ],
+  };
+  const d = detalharSessao(sessao, 45);
+  assert.equal(d.tempoSeg, 2 * 320 + 3 * 260 + 3 * 60);
+  assert.ok(Math.abs(d.distanciaKm - (2 + 3 + (3 * 60) / 320)) < 0.001);
+  assert.ok(Math.abs(d.ritmoMedio - d.tempoSeg / d.distanciaKm) < 0.001);
+  assert.deepEqual(d.zonas.map((z) => z.codigo), ['Z1', 'Z2', 'Z4']);
+  assert.ok(Math.abs(d.zonas.reduce((t, z) => t + z.fracao, 0) - 1) < 0.001);
+});
+
+test('detalhes da prova trazem a previsão pelo nível atual', () => {
+  const d = detalharSessao({ tipo: 'prova', distanciaKm: 10, blocos: [] }, 45);
+  assert.ok(Math.abs(d.tempoSeg - preverTempoSeg(45, 10)) < 0.1);
+  assert.equal(d.zonas.length, 0);
+});
+
+test('todo treino gerado tem tempo e pace válidos nos detalhes', () => {
+  const plano = planoIniciante();
+  for (const s of plano.sessoes) {
+    const d = detalharSessao(s, plano.vdot);
+    assert.ok(d.tempoSeg > 0 && Number.isFinite(d.ritmoMedio), s.id);
+    assert.ok(Math.abs(d.distanciaKm - s.distanciaKm) <= 1, `${s.id}: ${d.distanciaKm} para ${s.distanciaKm}`);
   }
 });
 

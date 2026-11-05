@@ -2,8 +2,10 @@
 //
 // Fisiologia: fórmulas de Daniels & Gilbert ("Oxygen Power", 1979), a base das
 // tabelas VDOT do livro "Daniels' Running Formula".
-// Progressão: regras simples e conservadoras. Não há evidência forte de um limite
-// semanal "certo" de aumento de carga, então os limites aqui são prudência, não ciência exata.
+// Progressão e frequência: regras simples e conservadoras. A literatura não define um limite
+// "certo" de aumento nem de dias por semana (Buist 2008; Fredette 2022), então os números são
+// prudência, não ciência exata. IMC acima de 30, idade de 45 a 65 anos e lesão prévia entram
+// como fatores de risco observados em iniciantes (Nielsen 2013).
 
 const DISTANCIA_MARATONA = 42.195;
 
@@ -137,7 +139,7 @@ export function avaliarPrudencia({ idade, pesoKg, alturaCm, lesaoRecente }) {
   const motivos = [];
   const imc = pesoKg && alturaCm ? pesoKg / (alturaCm / 100) ** 2 : null;
   if (lesaoRecente) motivos.push('lesão recente informada');
-  if (idade >= 55) motivos.push('recuperação mais longa a partir dos 55 anos');
+  if (idade >= 45) motivos.push('idade a partir de 45 anos, com maior risco de lesão em quem está começando');
   if (imc !== null && imc >= 30) motivos.push(`IMC ${imc.toFixed(1).replace('.', ',')}, maior impacto nas articulações`);
   return { prudente: motivos.length > 0, motivos, imc: imc === null ? null : Math.round(imc * 10) / 10 };
 }
@@ -154,6 +156,9 @@ const KM_MAX_POR_DIA_DE_TREINO = 14;
 const LEVE_MAX_DO_LONGO = 0.75;
 const LONGO_MAX_MINUTOS = 180;
 const KM_MINIMO_PARA_INTERVALADO = 25;
+const MAXIMO_TREINOS_POR_SEMANA = 6;
+const MAXIMO_TREINOS_PRUDENTE = 4;
+const KM_MINIMO_POR_SEMANA = 9;
 
 function fracaoDoLongo(dias, distancia) {
   if (distancia === 42.2) return dias <= 4 ? 0.5 : 0.4;
@@ -177,6 +182,40 @@ function fasesDoPlano(totalSemanas, tamanhoPolimento) {
 
 const ordemNaSemana = (dia) => (dia + 6) % 7; // segunda = 0 ... domingo = 6
 
+// Quanto o volume atual sustenta. Os dias livres são só o limite: nunca uma obrigação.
+export function treinosPorSemana(kmSemana, prudente, disponiveis) {
+  let treinos = kmSemana < 20 ? 3 : kmSemana < 35 ? 4 : kmSemana < 55 ? 5 : 6;
+  if (prudente) treinos = Math.min(treinos, kmSemana < 30 ? 3 : 4);
+  return Math.min(treinos, disponiveis, MAXIMO_TREINOS_POR_SEMANA);
+}
+
+function combinacoes(itens, tamanho) {
+  if (tamanho === 0) return [[]];
+  return itens.flatMap((item, i) => combinacoes(itens.slice(i + 1), tamanho - 1).map((resto) => [item, ...resto]));
+}
+
+// Distribui os treinos com o maior descanso possível entre eles e preserva o dia seguinte ao longão.
+export function escolherDiasDeTreino(disponiveis, diaLongo, quantidade) {
+  const ordenados = [...disponiveis].sort((a, b) => ordemNaSemana(a) - ordemNaSemana(b));
+  const longo = ordenados.includes(diaLongo) ? diaLongo : ordenados[ordenados.length - 1];
+  const outros = ordenados.filter((d) => d !== longo);
+  const intervalo = (de, ate) => (ordemNaSemana(ate) - ordemNaSemana(de) + 7) % 7 || 7;
+
+  let melhor = null;
+  let melhorNota = -1;
+  for (const grupo of combinacoes(outros, quantidade - 1)) {
+    const dias = [...grupo, longo].sort((a, b) => ordemNaSemana(a) - ordemNaSemana(b));
+    const intervalos = dias.map((d, i) => intervalo(d, dias[(i + 1) % dias.length]));
+    const depoisDoLongo = intervalo(longo, dias[(dias.indexOf(longo) + 1) % dias.length]);
+    const nota = Math.min(...intervalos) * 10 + (depoisDoLongo >= 2 ? 1 : 0);
+    if (nota > melhorNota) {
+      melhor = dias;
+      melhorNota = nota;
+    }
+  }
+  return { dias: melhor, diaLongo: longo };
+}
+
 function dataNaSemana(segunda, dia) {
   return somarDias(segunda, ordemNaSemana(dia));
 }
@@ -189,7 +228,7 @@ function sessaoLeve(data, km, ritmos, nome = 'Corrida leve', porque = 'Constrói
     nome,
     distanciaKm: km,
     porque,
-    blocos: [{ rotulo: nome, repeticoes: 1, passos: [{ km, ritmo: ritmos.leve }] }],
+    blocos: [{ rotulo: nome, repeticoes: 1, passos: [{ km, ritmo: ritmos.leve, zona: 'leve' }] }],
   };
 }
 
@@ -201,7 +240,7 @@ function sessaoLongo(data, km, ritmos) {
     nome: 'Longão',
     distanciaKm: km,
     porque: 'Aumenta a resistência. O ritmo é confortável: a distância é o objetivo.',
-    blocos: [{ rotulo: 'Longão', repeticoes: 1, passos: [{ km, ritmo: ritmos.leve }] }],
+    blocos: [{ rotulo: 'Longão', repeticoes: 1, passos: [{ km, ritmo: ritmos.leve, zona: 'leve' }] }],
   };
 }
 
@@ -210,10 +249,14 @@ const DESAQUECIMENTO_KM = 1.5;
 const KM_POR_MINUTO_TROTE = 0.15;
 
 function sessaoQualidade(data, fase, distanciaProva, kmSemana, ritmos) {
-  const volumeForte = Math.min(8, Math.max(3, Math.round(kmSemana * 0.08)));
-  const aquecimento = { rotulo: 'Aquecimento', repeticoes: 1, passos: [{ km: AQUECIMENTO_KM, ritmo: ritmos.leve }] };
-  const desaquecimento = { rotulo: 'Desaquecimento', repeticoes: 1, passos: [{ km: DESAQUECIMENTO_KM, ritmo: ritmos.leve }] };
-  const trote = (minutos) => ({ minutos, ritmo: ritmos.leve });
+  // Em volume baixo a sessão encolhe, para não ficar maior que o longão da semana.
+  const volumeBaixo = kmSemana < KM_MINIMO_PARA_INTERVALADO;
+  const volumeForte = volumeBaixo ? 2 : Math.min(8, Math.max(3, Math.round(kmSemana * 0.08)));
+  const kmAquecimento = volumeBaixo ? 1.5 : AQUECIMENTO_KM;
+  const kmDesaquecimento = volumeBaixo ? 1 : DESAQUECIMENTO_KM;
+  const aquecimento = { rotulo: 'Aquecimento', repeticoes: 1, passos: [{ km: kmAquecimento, ritmo: ritmos.leve, zona: 'leve' }] };
+  const desaquecimento = { rotulo: 'Desaquecimento', repeticoes: 1, passos: [{ km: kmDesaquecimento, ritmo: ritmos.leve, zona: 'leve' }] };
+  const trote = (minutos) => ({ minutos, ritmo: ritmos.leve, zona: 'recuperacao' });
 
   let tipo;
   let nome;
@@ -226,20 +269,20 @@ function sessaoQualidade(data, fase, distanciaProva, kmSemana, ritmos) {
     tipo = 'ritmo';
     nome = `${kmForte} km no ritmo de maratona`;
     porque = 'Acostuma o corpo ao ritmo da prova.';
-    principal = { rotulo: 'Ritmo de maratona', repeticoes: 1, passos: [{ km: kmForte, ritmo: ritmos.maratona }] };
+    principal = { rotulo: 'Ritmo de maratona', repeticoes: 1, passos: [{ km: kmForte, ritmo: ritmos.maratona, zona: 'maratona' }] };
   } else if (fase === 'pico' && distanciaProva !== 21.1 && kmSemana >= KM_MINIMO_PARA_INTERVALADO) {
     const repeticoes = Math.min(6, volumeForte);
     kmForte = repeticoes + repeticoes * 2 * KM_POR_MINUTO_TROTE;
     tipo = 'intervalado';
     nome = `${repeticoes} x 1 km intervalado`;
     porque = 'Treina o VO2máx, que é a capacidade máxima de usar oxigênio.';
-    principal = { rotulo: 'Principal', repeticoes, passos: [{ km: 1, ritmo: ritmos.intervalado }, trote(2)] };
+    principal = { rotulo: 'Principal', repeticoes, passos: [{ km: 1, ritmo: ritmos.intervalado, zona: 'intervalado' }, trote(2)] };
   } else {
     kmForte = volumeForte + volumeForte * KM_POR_MINUTO_TROTE;
     tipo = 'limiar';
     nome = `${volumeForte} x 1 km no limiar`;
     porque = 'Eleva o ritmo que você sustenta por muito tempo.';
-    principal = { rotulo: 'Principal', repeticoes: volumeForte, passos: [{ km: 1, ritmo: ritmos.limiar }, trote(1)] };
+    principal = { rotulo: 'Principal', repeticoes: volumeForte, passos: [{ km: 1, ritmo: ritmos.limiar, zona: 'limiar' }, trote(1)] };
   }
 
   return {
@@ -247,7 +290,7 @@ function sessaoQualidade(data, fase, distanciaProva, kmSemana, ritmos) {
     data,
     tipo,
     nome,
-    distanciaKm: meioKm(AQUECIMENTO_KM + DESAQUECIMENTO_KM + kmForte),
+    distanciaKm: meioKm(kmAquecimento + kmDesaquecimento + kmForte),
     porque,
     blocos: [aquecimento, principal, desaquecimento],
   };
@@ -269,11 +312,10 @@ function diasDeQualidade(dias, diaLongo, quantidade) {
   return escolhidos;
 }
 
-function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limiteLongo, semQualidade, indice }) {
-  const { perfil, objetivo } = parametros;
+function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limiteLongo, semQualidade, indice, dias, diaLongo }) {
+  const { objetivo } = parametros;
   const prova = objetivo.dataProva;
   const distancia = objetivo.distanciaKm;
-  const dias = [...perfil.diasSemana].sort((a, b) => ordemNaSemana(a) - ordemNaSemana(b));
   const ehSemanaDaProva = prova && segundaDaSemana(prova) === segunda;
 
   if (ehSemanaDaProva) {
@@ -296,7 +338,6 @@ function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limi
     return sessoes;
   }
 
-  const diaLongo = dias.includes(perfil.diaLongo) ? perfil.diaLongo : dias[dias.length - 1];
   const longoMax = LONGO_MAX_KM[distancia] ?? LONGO_MAX_KM.padrao;
   const longoPeloTempo = (LONGO_MAX_MINUTOS * 60) / ritmos.leve.ate;
   const kmLongo = meioKm(Math.min(km * fracaoDoLongo(dias.length, distancia), longoMax, limiteLongo, longoPeloTempo));
@@ -352,11 +393,15 @@ export function gerarPlano(parametros) {
   const prudencia = parametros.prudencia ?? avaliarPrudencia(perfil);
   const taxa = prudencia.prudente ? 0.05 : 0.1;
   const cicloRecuperacao = prudencia.prudente ? 3 : 4;
-  const picoPossivel = Math.min(PICO_KM[distancia] ?? PICO_KM.padrao, perfil.diasSemana.length * KM_MAX_POR_DIA_DE_TREINO);
+  const treinosMaximos = Math.min(
+    perfil.diasSemana.length,
+    prudencia.prudente ? MAXIMO_TREINOS_PRUDENTE : MAXIMO_TREINOS_POR_SEMANA,
+  );
+  const picoPossivel = Math.min(PICO_KM[distancia] ?? PICO_KM.padrao, treinosMaximos * KM_MAX_POR_DIA_DE_TREINO);
   const pico = Math.max(picoPossivel, base.kmSemana);
   const ritmos = calcularRitmos(vdot);
 
-  let carga = Math.max(base.kmSemana, perfil.diasSemana.length * 3);
+  let carga = Math.max(base.kmSemana, KM_MINIMO_POR_SEMANA);
   let limiteLongo = Math.max(base.longoKm || 0, 5) + 1;
   let primeira = true;
   const sessoes = [];
@@ -377,6 +422,8 @@ export function gerarPlano(parametros) {
     const km = fase === 'polimento' ? carga * usados[i - treino] : recuperacao ? carga * 0.75 : carga;
     const prudenteNoInicio = prudencia.prudente && i < 3;
     const bloqueada = parametros.semQualidadeAte && segunda < parametros.semQualidadeAte;
+    const treinos = treinosPorSemana(carga, prudencia.prudente, perfil.diasSemana.length);
+    const { dias, diaLongo } = escolherDiasDeTreino(perfil.diasSemana, perfil.diaLongo, treinos);
 
     sessoes.push(
       ...montarSemana({
@@ -389,12 +436,59 @@ export function gerarPlano(parametros) {
         limiteLongo,
         semQualidade: prudenteNoInicio || bloqueada,
         indice: i,
+        dias,
+        diaLongo,
       }).map((s) => ({ ...s, semana: i + 1, fase, recuperacao })),
     );
     primeira = false;
   }
 
   return { inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes };
+}
+
+// ---------- Detalhes de um treino ----------
+
+// Divisão didática por ritmo, derivada do VDOT. Não usa frequência cardíaca.
+export const ZONAS = {
+  recuperacao: { codigo: 'Z1', nome: 'Recuperação', sensacao: 'Trote bem solto, para recuperar.' },
+  leve: { codigo: 'Z2', nome: 'Leve', sensacao: 'Confortável: dá para conversar em frases completas.' },
+  maratona: { codigo: 'Z3', nome: 'Ritmo de maratona', sensacao: 'Firme, mas sustentável por muito tempo.' },
+  limiar: { codigo: 'Z4', nome: 'Limiar', sensacao: 'Confortavelmente difícil: só dá para falar poucas palavras.' },
+  intervalado: { codigo: 'Z5', nome: 'Intervalado', sensacao: 'Forte: difícil falar durante o esforço.' },
+};
+
+const ritmoCentral = (ritmo) => (typeof ritmo === 'number' ? ritmo : (ritmo.de + ritmo.ate) / 2);
+
+// Estimativa usando o meio de cada faixa de ritmo.
+export function detalharSessao(sessao, vdot) {
+  if (sessao.tipo === 'prova') {
+    const tempoSeg = preverTempoSeg(vdot, sessao.distanciaKm);
+    return { distanciaKm: sessao.distanciaKm, tempoSeg, ritmoMedio: tempoSeg / sessao.distanciaKm, blocos: [], zonas: [] };
+  }
+
+  const porZona = new Map();
+  let distanciaKm = 0;
+  let tempoSeg = 0;
+
+  const blocos = sessao.blocos.map((bloco) => ({
+    ...bloco,
+    passos: bloco.passos.map((passo) => {
+      const ritmo = ritmoCentral(passo.ritmo);
+      const seg = passo.km !== undefined ? passo.km * ritmo : passo.minutos * 60;
+      const km = passo.km ?? seg / ritmo;
+      distanciaKm += km * bloco.repeticoes;
+      tempoSeg += seg * bloco.repeticoes;
+      const chave = passo.zona ?? 'leve';
+      porZona.set(chave, (porZona.get(chave) ?? 0) + seg * bloco.repeticoes);
+      return { ...passo, zona: chave, tempoSeg: seg };
+    }),
+  }));
+
+  const zonas = Object.keys(ZONAS)
+    .filter((chave) => porZona.has(chave))
+    .map((chave) => ({ chave, ...ZONAS[chave], tempoSeg: porZona.get(chave), fracao: porZona.get(chave) / tempoSeg }));
+
+  return { distanciaKm, tempoSeg, ritmoMedio: tempoSeg / distanciaKm, blocos, zonas };
 }
 
 // ---------- Revisão: compara o previsto com o realizado ----------
@@ -495,7 +589,7 @@ export function aplicarRevisao({ plano, parametros, analise, hoje }) {
     inicio: plano.inicio,
     aPartirDe,
     base: {
-      kmSemana: Math.max(analise.kmSemanaReal * analise.fator, parametros.perfil.diasSemana.length * 3),
+      kmSemana: Math.max(analise.kmSemanaReal * analise.fator, KM_MINIMO_POR_SEMANA),
       longoKm: analise.longoReal,
     },
     progredirNaPrimeira: analise.acao === 'seguir',

@@ -5,6 +5,7 @@ import {
   aplicarRevisao,
   avaliarPrudencia,
   baseDasAtividades,
+  detalharSessao,
   estimarVdot,
   formatarRitmo,
   formatarTempo,
@@ -13,6 +14,7 @@ import {
   proximaSegunda,
   segundaDaSemana,
   somarDias,
+  ZONAS,
 } from './motor.js';
 
 const DIAS = [
@@ -38,6 +40,8 @@ const DIAS_DE_HISTORICO = 90;
 let estado = carregar();
 let aba = 'hoje';
 let ocupado = false;
+let sessaoAberta = null;
+let rolagemAnterior = 0;
 
 const app = document.getElementById('app');
 const abas = document.getElementById('abas');
@@ -168,7 +172,8 @@ function telaCadastro(valores = {}) {
       <section class="cartao">
         <h2>Sua rotina</h2>
         <fieldset>
-          <legend>Dias em que pode correr</legend>
+          <legend>Dias em que está livre</legend>
+          <p class="suave">A planilha usa só os dias que o seu volume sustenta e deixa descanso entre os treinos.</p>
           <div class="dias">
             ${DIAS.map((d) => `<label><input type="checkbox" name="dias" value="${d.valor}" ${diasMarcados.includes(d.valor) ? 'checked' : ''}><span>${d.curto}</span></label>`).join('')}
           </div>
@@ -228,7 +233,7 @@ async function enviarCadastro(evento) {
   const pesoKg = numero(form, 'peso');
   const alturaCm = numero(form, 'altura');
   if (!idade || !pesoKg || !alturaCm) return problema('Preencha idade, peso e altura.');
-  if (dias.length < 3) return problema('Escolha pelo menos 3 dias de corrida.');
+  if (dias.length < 3) return problema('Marque pelo menos 3 dias livres.');
   if (dataProva && !distancia) return problema('Escolha a distância da prova.');
   if (distancia && !dataProva) return problema('Informe a data da prova, ou escolha Condicionamento.');
   if (temTempo && !tempoSeg) return problema('Confira o tempo: minutos e segundos vão de 0 a 59.');
@@ -332,6 +337,7 @@ function telaHoje() {
         <p class="suave">${km(deHoje.distanciaKm)} no total</p>
         ${blocoTreino(deHoje)}
         ${realizadas.map((a) => `<p class="status feito">Feito: ${km(a.km)} em ${formatarTempo(a.seg)}</p>`).join('')}
+        <button data-abrir="${esc(deHoje.id)}">Ver detalhes</button>
       </section>`;
   } else if (proxima) {
     principal = `
@@ -339,6 +345,7 @@ function telaHoje() {
         <h2>Hoje é dia de descanso</h2>
         <p class="suave">O descanso também faz parte do treino.</p>
         <p>Próximo treino: <strong>${esc(proxima.nome)}</strong>, ${dataLonga(proxima.data)}, ${km(proxima.distanciaKm)}.</p>
+        <button data-abrir="${esc(proxima.id)}">Ver detalhes</button>
       </section>`;
   } else {
     principal = `
@@ -372,14 +379,105 @@ function linhaSessao(sessao, dia) {
   else if (sessao.data < dia) status = '<span class="status falta">Sem registro</span>';
   else status = `<span class="status">${km(sessao.distanciaKm)}</span>`;
   return `
-    <div class="sessao">
-      <div>
-        <div class="data">${dataCurta(sessao.data)}</div>
-        <div><strong>${esc(sessao.nome)}</strong></div>
+    <button class="sessao" data-abrir="${esc(sessao.id)}" aria-label="Abrir ${esc(sessao.nome)}, ${dataCurta(sessao.data)}">
+      <span>
+        <span class="data">${dataCurta(sessao.data)}</span>
+        <strong>${esc(sessao.nome)}</strong>
         ${seloTipo(sessao.tipo)}
-      </div>
-      ${status}
+      </span>
+      <span class="sessao-fim">${status}<span class="seta" aria-hidden="true">›</span></span>
+    </button>`;
+}
+
+// ---------- Detalhes do treino ----------
+
+const ritmoDe = (segundos, quilometros) => `${formatarRitmo(segundos / quilometros)}/km`;
+
+function barraDeZona(rotulo, segundos, fracao) {
+  const pct = Math.round(fracao * 100);
+  return `
+    <div class="zona">
+      <div class="zona-topo"><span>${esc(rotulo)}</span><span>${formatarTempo(segundos)} (${pct}%)</span></div>
+      <div class="barra" role="img" aria-label="${esc(rotulo)}: ${pct}% do tempo"><div style="width:${pct}%"></div></div>
     </div>`;
+}
+
+function blocoRealizado(atividade, previsto) {
+  const numeros = [
+    ['Distância', km(atividade.km)],
+    ['Tempo', formatarTempo(atividade.seg)],
+    ['Pace médio', atividade.seg ? ritmoDe(atividade.seg, atividade.km) : 'Sem dado'],
+  ];
+  const extras = [
+    atividade.fcMedia ? ['FC média', `${atividade.fcMedia} bpm`] : null,
+    atividade.fcMaxima ? ['FC máxima', `${atividade.fcMaxima} bpm`] : null,
+    atividade.subida ? ['Subida', `${Math.round(atividade.subida)} m`] : null,
+    atividade.rpe ? ['Esforço no intervals.icu', `${atividade.rpe} de 10`] : null,
+  ].filter(Boolean);
+  // Corridas guardadas por versões anteriores não têm as zonas até a próxima atualização.
+  const tempoPorZona = atividade.tempoPorZonaFc ?? [];
+  const totalZonas = tempoPorZona.reduce((t, s) => t + s, 0);
+  const zonasFc = totalZonas
+    ? tempoPorZona
+      .map((s, i) => (s > 0 ? barraDeZona(`Z${i + 1} de FC`, s, s / totalZonas) : ''))
+      .join('')
+    : '';
+
+  return `
+    <section class="cartao">
+      <h2>O que você fez</h2>
+      <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
+      <p class="suave" style="margin-top:12px">Previsto: ${km(previsto.distanciaKm)}, cerca de ${formatarTempo(previsto.tempoSeg)}, pace de ${formatarRitmo(previsto.ritmoMedio)}/km.</p>
+      ${extras.length ? `<table class="ritmos"><tbody>${extras.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${zonasFc ? `<h3>Tempo por zona de frequência cardíaca</h3>${zonasFc}<p class="suave">Zonas calculadas pelo intervals.icu.</p>` : ''}
+    </section>`;
+}
+
+function telaDetalhe(sessao) {
+  const dia = hoje();
+  const d = detalharSessao(sessao, estado.plano.vdot);
+  const realizadas = atividadeDoDia(sessao.data);
+  const numeros = [
+    ['Distância', km(Math.round(d.distanciaKm * 10) / 10)],
+    [sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado', formatarTempo(d.tempoSeg)],
+    ['Pace médio', `${formatarRitmo(d.ritmoMedio)}/km`],
+  ];
+  const passos = d.blocos.map((bloco) => `
+    <div class="bloco">
+      <h3>${esc(bloco.rotulo)}${bloco.repeticoes > 1 ? `, ${bloco.repeticoes} vezes` : ''}</h3>
+      ${bloco.passos.map((p) => `
+        <div class="passo">
+          <span class="selo">${ZONAS[p.zona].codigo}</span>
+          <span><strong>${p.km !== undefined ? km(p.km) : `${p.minutos} min`}</strong> a ${textoRitmo(p.ritmo)}<br>
+          <span class="suave">${esc(ZONAS[p.zona].nome)}, cerca de ${formatarTempo(p.tempoSeg)}</span></span>
+        </div>`).join('')}
+    </div>`).join('');
+
+  return `
+    <button class="voltar" data-acao="voltar">‹ Voltar</button>
+    <header class="topo">
+      <p class="suave">${dataLonga(sessao.data)}</p>
+      <h1>${esc(sessao.nome)}</h1>
+      ${seloTipo(sessao.tipo)}
+    </header>
+    <section class="cartao destaque">
+      <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
+      <p class="suave" style="margin-top:12px">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : 'Estimativa pelo meio das faixas de ritmo, com o seu nível atual.'}</p>
+    </section>
+    <section class="cartao">
+      <h2>Por que este treino</h2>
+      <p>${esc(sessao.porque)}</p>
+    </section>
+    ${passos ? `<section class="cartao"><h2>Passo a passo</h2>${passos}</section>` : ''}
+    ${d.zonas.length ? `
+      <section class="cartao">
+        <h2>Tempo por zona de ritmo</h2>
+        ${d.zonas.map((z) => `${barraDeZona(`${z.codigo} ${z.nome}`, z.tempoSeg, z.fracao)}<p class="suave">${esc(z.sensacao)}</p>`).join('')}
+        <p class="suave">Zonas de ritmo calculadas pelo app. São diferentes das zonas de frequência cardíaca do relógio.</p>
+      </section>` : ''}
+    ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
+    ${!realizadas.length && sessao.data < dia ? '<section class="cartao alerta">Nenhuma corrida registrada neste dia.</section>' : ''}
+    ${sessao.data <= dia && sessao.tipo !== 'prova' ? formularioAvaliacao(sessao) : ''}`;
 }
 
 function telaPlano() {
@@ -412,6 +510,13 @@ function telaPlano() {
       <p class="suave">${esc(meta)}, ${plano.totalSemanas} semanas</p>
     </header>
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
+    ${(() => {
+      const semanaVista = plano.sessoes.find((s) => s.data >= dia)?.semana;
+      const treinos = plano.sessoes.filter((s) => s.semana === semanaVista).length;
+      if (!treinos) return '';
+      const livres = estado.perfil.diasSemana.length;
+      return `<section class="cartao"><h2>Treino e descanso</h2><p>${treinos} treinos e ${7 - treinos} dias de descanso nesta etapa.</p><p class="suave">Você marcou ${livres} dias livres. Os treinos só aumentam quando o volume sustenta, com o maior intervalo possível entre eles.</p></section>`;
+    })()}
     <section class="cartao">
       <h2>Levar para o relógio</h2>
       ${estado.chaveApi
@@ -506,7 +611,10 @@ function telaAjustes() {
     </section>
     <section class="cartao">
       <h2>Como a planilha é calculada</h2>
-      <p class="suave">Ritmos pelas fórmulas de Daniels e Gilbert (VDOT). Volume sobe até 10% por semana, ou 5% no modo cuidadoso, com semanas de recuperação e polimento antes da prova. Esses limites são prudência, não garantia contra lesões. Esta planilha não substitui avaliação médica ou de um treinador.</p>
+      <p class="suave">Ritmos: fórmulas publicadas de Daniels e Gilbert (VDOT).</p>
+      <p class="suave">Modo cuidadoso: IMC acima de 30, idade a partir de 45 anos ou lesão recente, fatores de risco observados em corredores iniciantes.</p>
+      <p class="suave">Volume, dias por semana e descanso: regras próprias de prudência, porque os estudos não definem um número certo. O volume sobe até 10% por semana, ou 5% no modo cuidadoso.</p>
+      <p class="suave">Nada disso garante evitar lesões, e a planilha não substitui avaliação médica ou de um treinador.</p>
     </section>
     <button class="perigo largo" data-acao="recomecar">Começar novo ciclo</button>`;
 }
@@ -524,8 +632,9 @@ function renderAbas() {
 function render() {
   if (!estado.plano) return telaCadastro();
   renderAbas();
+  const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
   const telas = { hoje: telaHoje, plano: telaPlano, revisao: telaRevisao, ajustes: telaAjustes };
-  app.innerHTML = telas[aba]();
+  app.innerHTML = aberta ? telaDetalhe(aberta) : telas[aba]();
   window.scrollTo(0, 0);
 }
 
@@ -533,10 +642,17 @@ abas.addEventListener('click', (e) => {
   const botao = e.target.closest('[data-aba]');
   if (!botao) return;
   aba = botao.dataset.aba;
+  sessaoAberta = null;
   render();
 });
 
 const acoes = {
+  voltar: () => {
+    sessaoAberta = null;
+    render();
+    window.scrollTo(0, rolagemAnterior);
+  },
+
   enviar: (botao) => comOcupado(botao, async () => {
     await enviarAoRelogio();
     render();
@@ -586,6 +702,13 @@ const acoes = {
 };
 
 app.addEventListener('click', (e) => {
+  const abrir = e.target.closest('[data-abrir]');
+  if (abrir) {
+    rolagemAnterior = window.scrollY;
+    sessaoAberta = abrir.dataset.abrir;
+    render();
+    return;
+  }
   const botao = e.target.closest('[data-acao]');
   if (botao) acoes[botao.dataset.acao]?.(botao);
 });

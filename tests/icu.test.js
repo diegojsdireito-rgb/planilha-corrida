@@ -63,6 +63,9 @@ test('evento de treino e de prova', () => {
 test('normaliza atividade da API', () => {
   const a = normalizarAtividade({ id: 'i1', start_date_local: '2026-11-01T06:30:00', icu_distance: 8000, moving_time: 2400, race: true, icu_rpe: 7 });
   assert.deepEqual([a.data, a.km, a.seg, a.prova, a.rpe], ['2026-11-01', 8, 2400, true, 7]);
+  assert.deepEqual(a.tempoPorZonaFc, []);
+  const comZonas = normalizarAtividade({ max_heartrate: 170, total_elevation_gain: 45, icu_hr_zone_times: [60, 600] });
+  assert.deepEqual([comZonas.fcMaxima, comZonas.subida, comZonas.tempoPorZonaFc], [170, 45, [60, 600]]);
 });
 
 function clienteFalso(respostas) {

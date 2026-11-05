@@ -39,7 +39,9 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 Regras principais:
 
 - **Ritmos** saem do seu nível atual, não do tempo que você deseja.
-- **Volume** sobe até 10% por semana, ou 5% no modo cuidadoso (lesão recente, 55 anos ou mais, IMC 30 ou mais), com semanas de recuperação e polimento.
+- **Dias livres são um limite, não uma obrigação.** Os treinos por semana dependem do volume (3 abaixo de 20 km, 4 abaixo de 35 km, 5 abaixo de 55 km, no máximo 6) e são espalhados para dar o maior descanso possível. No modo cuidadoso, o limite é 4.
+- **Volume** sobe até 10% por semana, ou 5% no modo cuidadoso (lesão recente, 45 anos ou mais, IMC 30 ou mais), com semanas de recuperação e polimento.
+- **Detalhes do treino** mostram tempo e pace estimados pelo meio das faixas de ritmo, e zonas Z1 a Z5 de ritmo calculadas pelo app. Depois da corrida, trazem os dados reais e as zonas de frequência cardíaca do intervals.icu.
 - **Revisão** compara os últimos 14 dias com o previsto e só altera da próxima segunda em diante. Dor sempre reduz a carga.
 
 Esses limites são prudência, não garantia contra lesões. A planilha não substitui avaliação médica ou de um treinador.

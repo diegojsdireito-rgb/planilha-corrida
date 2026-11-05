@@ -2,7 +2,7 @@
 
 const BASE = 'https://intervals.icu/api/v1/athlete/0';
 const TIPOS_DE_CORRIDA = new Set(['Run', 'TrailRun', 'VirtualRun']);
-const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,source';
+const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,max_heartrate,total_elevation_gain,icu_hr_zone_times,source';
 
 // Texto no formato do construtor de treinos do intervals.icu. "m" significa minutos,
 // por isso distância fracionada vai em metros ("1500mtr").
@@ -50,6 +50,9 @@ export function normalizarAtividade(a) {
     prova: Boolean(a.race),
     rpe: a.icu_rpe ?? null,
     fcMedia: a.average_heartrate ?? null,
+    fcMaxima: a.max_heartrate ?? null,
+    subida: a.total_elevation_gain ?? null,
+    tempoPorZonaFc: Array.isArray(a.icu_hr_zone_times) ? a.icu_hr_zone_times : [],
     origem: a.source ?? null,
   };
 }
