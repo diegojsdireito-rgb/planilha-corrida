@@ -12,6 +12,7 @@ export const estadoInicial = () => ({
   atividades: [],
   semDados: 0,
   avaliacoes: {},
+  analises: {},
   revisoes: [],
   historicoNivel: [],
   enviados: [],

@@ -93,6 +93,15 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
       return (await chamar(url)).blob();
     },
 
+    // Pace segundo a segundo. Fica nulo se a corrida não tiver o dado, como em esteira sem sensor.
+    async streamsDaCorrida(id) {
+      const url = `${BASE_ATIVIDADE}/${encodeURIComponent(id)}/streams.json?types=time,velocity_smooth`;
+      const lista = await (await chamar(url)).json();
+      const dados = (tipo) => lista.find((s) => s.type === tipo)?.data ?? null;
+      const velocidade = dados('velocity_smooth');
+      return velocidade?.length ? { tempo: dados('time'), velocidade } : null;
+    },
+
     // Atividades que vieram só do Strava chegam sem dados pela API, por decisão do Strava.
     async atividades(de, ate) {
       const lista = await pedir(`/activities?oldest=${de}&newest=${ate}&fields=${CAMPOS_ATIVIDADE}`);

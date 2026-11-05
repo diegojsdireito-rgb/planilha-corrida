@@ -1,3 +1,4 @@
+import { compararComPrevisto, ORDEM_DAS_ZONAS, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
 import {
@@ -66,7 +67,7 @@ let analisePendente = null;
 let gradePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 13;
+const VERSAO_APP = 14;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -196,6 +197,7 @@ async function atualizarPorGesto() {
   if (novas <= 0) mostrarAviso('Nenhuma corrida nova.');
   else mostrarAviso(novas === 1 ? 'Nova corrida recebida.' : `${novas} novas corridas recebidas.`);
   await enviarAutomaticamente();
+  await analisarRecentes();
 }
 
 async function salvarArquivo(conteudo, nome, tipo) {
@@ -504,7 +506,7 @@ function heroiDoTreino(sessao, sobretitulo, realizadas = []) {
         <div><b>${formatarTempo(d.tempoSeg)}</b><span>${sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado'}</span></div>
         <div><b>${formatarRitmo(d.ritmoMedio)}/km</b><span>Pace médio</span></div>
       </div>
-      ${realizadas.map((a) => `<p class="heroi-feito">Feito: ${km(a.km)} em ${formatarTempo(a.seg)}</p>`).join('')}
+      ${realizadas.map((a) => `<p class="heroi-feito" data-feito="${esc(a.id)}">${esc(textoFeito(a, sessao))}</p>`).join('')}
       <button data-abrir="${esc(sessao.id)}">Ver treino</button>
     </section>`;
 }
@@ -638,6 +640,129 @@ function barraDeZona(rotulo, segundos, fracao, chave) {
       <div class="zona-topo"><span>${esc(rotulo)}</span><span>${formatarTempo(segundos)} (${pct}%)</span></div>
       <div class="barra" role="img" aria-label="${esc(rotulo)}: ${pct}% do tempo"><div style="width:${pct}%"></div></div>
     </div>`;
+}
+
+const NOMES_DAS_ZONAS = {
+  lento: 'Mais lento que o leve',
+  leve: 'Z2 Leve',
+  maratona: 'Z3 Ritmo de maratona',
+  limiar: 'Z4 Limiar',
+  intervalado: 'Z5 Intervalado',
+};
+
+const DIAS_DE_ANALISE_AUTOMATICA = 14;
+const MAXIMO_DE_ANALISES_POR_VEZ = 5;
+const analisesEmAndamento = new Set();
+const errosDeAnalise = new Map();
+const pct = (fracao) => `${Math.round(fracao * 100)}%`;
+
+function blocoAnalise(atividade, sessao, previsto) {
+  const atributo = `data-analise="${esc(atividade.id)}"`;
+  const analise = estado.analises[atividade.id];
+  const atual = analise?.vdot === estado.plano.vdot ? analise : null;
+
+  if (errosDeAnalise.has(atividade.id)) {
+    return `
+      <section class="cartao" ${atributo}>
+        <h2>Análise do treino</h2>
+        <p class="erro">${esc(errosDeAnalise.get(atividade.id))}</p>
+        <button data-analisar="${esc(atividade.id)}">Tentar de novo</button>
+      </section>`;
+  }
+  if (!atual) return `<section class="cartao" ${atributo}><h2>Análise do treino</h2><p class="suave">Analisando a corrida...</p></section>`;
+  if (atual.semDados || !atual.total) {
+    return `<section class="cartao" ${atributo}><h2>Análise do treino</h2><p class="suave">Esta corrida não tem pace segundo a segundo. Corridas em esteira sem sensor costumam vir assim.</p></section>`;
+  }
+
+  const comparacao = compararComPrevisto(atual.seg, previsto.zonas);
+  const veredito = comparacao && vereditoDoTreino(comparacao);
+  const partes = comparacao && [['abaixo', 'Abaixo', comparacao.abaixo], ['dentro', 'Na meta', comparacao.dentro], ['acima', 'Acima', comparacao.acima]];
+  const anaerobico = atual.anaerobico / atual.total;
+
+  return `
+    <section class="cartao" ${atributo}>
+      <p class="sobretitulo">Análise do treino</p>
+      ${comparacao ? `
+        <h2>${esc(veredito.titulo)}</h2>
+        <p class="meta-numero"><b>${pct(comparacao.dentro)}</b> do tempo na meta</p>
+        <div class="meta-barra" role="img" aria-label="${partes.map(([, nome, f]) => `${nome}: ${pct(f)}`).join(', ')}">
+          ${partes.map(([classe, , f]) => (f > 0 ? `<i class="${classe}" style="flex:${f}"></i>` : '')).join('')}
+        </div>
+        <div class="meta-legenda">
+          ${partes.map(([classe, nome, f]) => `<span><i class="${classe}"></i>${nome} <b>${pct(f)}</b></span>`).join('')}
+        </div>
+        ${veredito.tendencia ? `<p class="suave">${esc(veredito.tendencia)}</p>` : ''}
+        ${sessao.tipo === 'prova' ? '' : `<p class="suave">Distância: ${km(Math.round(atividade.km * 10) / 10)} de ${km(previsto.distanciaKm)} previstos (${pct(atividade.km / previsto.distanciaKm)}).</p>`}` : '<h2>Como você correu</h2>'}
+      <h3>Tempo em cada ritmo</h3>
+      ${ORDEM_DAS_ZONAS.filter((z) => atual.seg[z] > 0).map((z) => barraDeZona(NOMES_DAS_ZONAS[z], atual.seg[z], atual.seg[z] / atual.total, z)).join('')}
+      <h3>Aeróbico e anaeróbico (estimativa)</h3>
+      <div class="numeros numeros-2">
+        <div><b>${pct(1 - anaerobico)}</b><span>Aeróbico</span></div>
+        <div><b>${pct(anaerobico)}</b><span>Anaeróbico</span></div>
+      </div>
+      ${atual.parado >= 60 ? `<p class="suave" style="margin-top:12px">Parado por ${formatarTempo(atual.parado)}, fora destas contas.</p>` : ''}
+      <p class="suave" style="margin-top:12px">Calculado pelo pace do GPS e pelo seu nível. Anaeróbico aqui é o tempo no pace de intervalado ou mais rápido, uma aproximação: não mede o esforço do corpo, e subidas ou calor pesam sem mudar o pace. O Training Effect do Garmin não vem por esta conexão.</p>
+    </section>`;
+}
+
+async function carregarAnalise(atividade) {
+  if (analisesEmAndamento.has(atividade.id)) return;
+  analisesEmAndamento.add(atividade.id);
+  errosDeAnalise.delete(atividade.id);
+  const vdot = estado.plano.vdot;
+  try {
+    const dados = await criarCliente({ chave: estado.chaveApi }).streamsDaCorrida(atividade.id);
+    estado.analises = {
+      ...estado.analises,
+      [atividade.id]: dados ? { vdot, ...temposPorZona({ ...dados, ritmos: estado.plano.ritmos }) } : { vdot, semDados: true },
+    };
+    guardar();
+  } catch (erro) {
+    errosDeAnalise.set(atividade.id, erro.message);
+  } finally {
+    analisesEmAndamento.delete(atividade.id);
+  }
+  // Troca só este cartão, para a tela não voltar ao topo enquanto a pessoa lê.
+  const id = CSS.escape(String(atividade.id));
+  const sessao = estado.plano.sessoes.find((s) => s.data === atividade.data);
+  const cartao = document.querySelector(`[data-analise="${id}"]`);
+  if (cartao && sessao) cartao.outerHTML = blocoAnalise(atividade, sessao, detalharSessao(sessao, estado.plano.vdot));
+  const feito = document.querySelector(`[data-feito="${id}"]`);
+  if (feito && sessao) feito.textContent = textoFeito(atividade, sessao);
+}
+
+const analisePronta = (atividade) => estado.analises[atividade.id]?.vdot === estado.plano.vdot;
+
+function pedirAnalises(sessao) {
+  if (!estado.chaveApi) return;
+  for (const atividade of atividadeDoDia(sessao.data)) {
+    if (atividade.id && !analisePronta(atividade) && !errosDeAnalise.has(atividade.id)) carregarAnalise(atividade);
+  }
+}
+
+// Baixa sozinho o pace das corridas recentes, uma por vez. Uma falha aqui fica em silêncio:
+// a análise é tentada de novo na próxima abertura ou ao abrir o treino.
+async function analisarRecentes() {
+  if (!estado.chaveApi || !estado.plano || !navigator.onLine) return;
+  const limite = somarDias(hoje(), -DIAS_DE_ANALISE_AUTOMATICA);
+  const pendentes = estado.atividades
+    .filter((a) => a.id && a.data >= limite && !analisePronta(a))
+    .slice(-MAXIMO_DE_ANALISES_POR_VEZ);
+  for (const atividade of pendentes) {
+    await carregarAnalise(atividade);
+    if (errosDeAnalise.has(atividade.id)) {
+      errosDeAnalise.delete(atividade.id);
+      return;
+    }
+  }
+}
+
+function textoFeito(atividade, sessao) {
+  const base = `Feito: ${km(atividade.km)} em ${formatarTempo(atividade.seg)}`;
+  const analise = estado.analises[atividade.id];
+  if (!analise?.total || !analisePronta(atividade)) return base;
+  const comparacao = compararComPrevisto(analise.seg, detalharSessao(sessao, estado.plano.vdot).zonas);
+  return comparacao ? `${base}, ${pct(comparacao.dentro)} na meta` : base;
 }
 
 function blocoRealizado(atividade, previsto) {
@@ -856,6 +981,8 @@ function telaDetalhe(sessao) {
       <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : 'Estimativa pelo meio das faixas de ritmo, com o seu nível atual.'}</p>
     </section>
     ${blocoMudarDia(sessao, dia)}
+    ${estado.chaveApi ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}
+    ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
     <section class="cartao">
       <h2>Por que este treino</h2>
       <p>${esc(sessao.porque)}</p>
@@ -867,7 +994,6 @@ function telaDetalhe(sessao) {
         ${d.zonas.map((z) => `${barraDeZona(`${z.codigo} ${z.nome}`, z.tempoSeg, z.fracao, z.chave)}<p class="suave">${esc(z.sensacao)}</p>`).join('')}
         <p class="suave">Zonas de ritmo calculadas pelo app. São diferentes das zonas de frequência cardíaca do relógio.</p>
       </section>` : ''}
-    ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
     ${!realizadas.length && sessao.data < dia ? '<section class="cartao alerta">Nenhuma corrida registrada neste dia.</section>' : ''}
     ${sessao.data <= dia && sessao.tipo !== 'prova' ? formularioAvaliacao(sessao) : ''}`;
 }
@@ -1177,6 +1303,7 @@ function render() {
   const telas = { hoje: telaHoje, plano: telaPlano, evolucao: telaEvolucao, revisao: telaRevisao, ajustes: telaAjustes };
   app.innerHTML = aberta ? telaDetalhe(aberta) : telas[aba]();
   window.scrollTo(0, 0);
+  if (aberta) pedirAnalises(aberta);
 }
 
 abas.addEventListener('click', (e) => {
@@ -1340,6 +1467,14 @@ app.addEventListener('click', (e) => {
     render();
     return;
   }
+  const analisar = e.target.closest('[data-analisar]');
+  if (analisar) {
+    const sessao = estado.plano.sessoes.find((s) => s.id === sessaoAberta);
+    const atividade = atividadeDoDia(sessao.data).find((a) => String(a.id) === analisar.dataset.analisar);
+    analisar.disabled = true;
+    carregarAnalise(atividade);
+    return;
+  }
   const mudar = e.target.closest('[data-mudar-dia]');
   if (mudar) {
     mudarDia(mudar.dataset.mudarDia);
@@ -1436,6 +1571,7 @@ if ('serviceWorker' in navigator) {
 async function aoAbrir() {
   await atualizarSeNecessario();
   await enviarAutomaticamente();
+  await analisarRecentes();
 }
 
 document.addEventListener('visibilitychange', () => {

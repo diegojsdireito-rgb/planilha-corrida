@@ -15,6 +15,7 @@
   --serie: #c8421f;
   --sombra: 0 1px 2px rgba(24, 27, 34, .05), 0 8px 24px rgba(24, 27, 34, .06);
   --barra-abas: rgba(255, 255, 255, .82);
+  --z-lento: #5b5bd6;
   --z-recuperacao: #4fa89b;
   --z-leve: #1f9d8b;
   --z-maratona: #e2a11f;
@@ -42,6 +43,7 @@
     --sombra: none;
     --barra-abas: rgba(25, 28, 35, .82);
     --z-longo: #8f8ff0;
+    --z-lento: #7474e8;
   }
 }
 
@@ -390,6 +392,19 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .cor-maratona { --cor-zona: var(--z-maratona); }
 .cor-limiar { --cor-zona: var(--z-limiar); }
 .cor-intervalado { --cor-zona: var(--z-intervalado); }
+
+.cor-lento { --cor-zona: var(--z-lento); }
+.numeros-2 { grid-template-columns: repeat(2, 1fr); }
+.meta-numero { margin: 2px 0 10px; color: var(--suave); font-size: .92rem; }
+.meta-numero b { font-family: var(--titulos); font-size: 2.2rem; font-weight: 800; letter-spacing: -.02em; color: var(--texto); font-variant-numeric: tabular-nums; }
+.meta-barra { display: flex; gap: 2px; height: 12px; border-radius: 99px; overflow: hidden; }
+.meta-barra i, .meta-legenda i { background: var(--z-leve); }
+.meta-barra i.abaixo, .meta-legenda i.abaixo { background: var(--z-lento); }
+.meta-barra i.acima, .meta-legenda i.acima { background: var(--serie); }
+.meta-legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0; font-size: .85rem; color: var(--suave); }
+.meta-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.meta-legenda i { width: 10px; height: 10px; border-radius: 3px; }
+.meta-legenda b { color: var(--texto); font-variant-numeric: tabular-nums; }
 
 .mudar-dia summary { display: flex; align-items: center; min-height: 28px; font-weight: 700; color: var(--marca); cursor: pointer; }
 .mudar-dia[open] summary { margin-bottom: 8px; }
