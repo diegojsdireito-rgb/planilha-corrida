@@ -15,6 +15,7 @@ import {
   proximaSegunda,
   segundaDaSemana,
   somarDias,
+  VERSAO_REGRAS,
   ZONAS,
 } from './motor.js';
 
@@ -43,6 +44,17 @@ let aba = 'hoje';
 let ocupado = false;
 let sessaoAberta = null;
 let rolagemAnterior = 0;
+let cadastroAnterior = {};
+
+// Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
+const VERSAO_APP = 7;
+
+const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
+  <section class="cartao alerta">
+    <h2>Esta planilha usa regras antigas</h2>
+    <p>Ela pode ter treinos em todos os dias livres e aumento rápido de volume. Gere de novo para usar a organização atual de treino e descanso. Seu cadastro continua preenchido.</p>
+    <button class="principal" data-acao="recomecar">Gerar planilha de novo</button>
+  </section>`);
 
 const app = document.getElementById('app');
 const abas = document.getElementById('abas');
@@ -214,6 +226,7 @@ function telaCadastro(valores = {}) {
 
       <p id="erro-cadastro" class="erro" role="alert"></p>
       <button class="principal largo" type="submit">Gerar minha planilha</button>
+      <p class="suave" style="margin-top:12px;text-align:center">Versão ${VERSAO_APP}</p>
     </form>`;
 }
 
@@ -361,6 +374,7 @@ function telaHoje() {
       <p class="suave">${dataLonga(dia)}</p>
       <h1>Hoje</h1>
     </header>
+    ${avisoPlanilhaAntiga()}
     ${principal}
     <section class="cartao">
       <h2>Esta semana</h2>
@@ -510,6 +524,7 @@ function telaPlano() {
       <h1>Minha planilha</h1>
       <p class="suave">${esc(meta)}, ${plano.totalSemanas} semanas</p>
     </header>
+    ${avisoPlanilhaAntiga()}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
     ${(() => {
       const semanaVista = plano.sessoes.find((s) => s.data >= dia)?.semana;
@@ -621,7 +636,8 @@ function telaAjustes() {
       <p class="suave">Volume, dias por semana e descanso: regras próprias de prudência, porque os estudos não definem um número certo. O volume sobe até 10% por semana, ou 5% no modo cuidadoso.</p>
       <p class="suave">Nada disso garante evitar lesões, e a planilha não substitui avaliação médica ou de um treinador.</p>
     </section>
-    <button class="perigo largo" data-acao="recomecar">Começar novo ciclo</button>`;
+    <button class="perigo largo" data-acao="recomecar">Começar novo ciclo</button>
+    <p class="suave" style="margin-top:12px;text-align:center">Versão ${VERSAO_APP}</p>`;
 }
 
 // ---------- Estrutura ----------
@@ -638,7 +654,7 @@ function renderAbas() {
 }
 
 function render() {
-  if (!estado.plano) return telaCadastro();
+  if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
   const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
   const telas = { hoje: telaHoje, plano: telaPlano, revisao: telaRevisao, ajustes: telaAjustes };
@@ -716,8 +732,19 @@ const acoes = {
   },
 
   recomecar: () => {
-    if (!window.confirm('Começar um novo ciclo apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu. Continuar?')) return;
-    const { chaveApi, atividades, enviados, semDados } = estado;
+    if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
+    const { chaveApi, atividades, enviados, semDados, perfil, objetivo } = estado;
+    cadastroAnterior = {
+      idade: perfil.idade,
+      peso: perfil.pesoKg,
+      altura: perfil.alturaCm,
+      lesao: perfil.lesaoRecente,
+      dias: perfil.diasSemana,
+      diaLongo: perfil.diaLongo,
+      distancia: objetivo.distanciaKm === null ? '' : objetivo.distanciaKm,
+      dataProva: objetivo.dataProva,
+    };
+    sessaoAberta = null;
     estado = { ...estadoInicial(), chaveApi, atividades, enviados, semDados };
     guardar();
     aba = 'hoje';

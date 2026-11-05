@@ -7,6 +7,9 @@
 // prudência, não ciência exata. IMC acima de 30, idade de 45 a 65 anos e lesão prévia entram
 // como fatores de risco observados em iniciantes (Nielsen 2013).
 
+// Suba quando a geração mudar: planilhas salvas com outra versão pedem para ser refeitas.
+export const VERSAO_REGRAS = 2;
+
 const DISTANCIA_MARATONA = 42.195;
 
 export const RITMOS_POR_FRACAO = {
@@ -443,7 +446,7 @@ export function gerarPlano(parametros) {
     primeira = false;
   }
 
-  return { inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes };
+  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes };
 }
 
 // ---------- Detalhes de um treino ----------

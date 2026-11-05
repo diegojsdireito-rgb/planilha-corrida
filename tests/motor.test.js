@@ -17,6 +17,7 @@ import {
   segundaDaSemana,
   somarDias,
   treinosPorSemana,
+  VERSAO_REGRAS,
 } from '../src/motor.js';
 
 const perfil = { idade: 35, pesoKg: 72, alturaCm: 178, lesaoRecente: false, diasSemana: [2, 4, 6, 0], diaLongo: 0 };
@@ -266,6 +267,13 @@ test('todo treino gerado tem tempo e pace válidos nos detalhes', () => {
     assert.ok(d.tempoSeg > 0 && Number.isFinite(d.ritmoMedio), s.id);
     assert.ok(Math.abs(d.distanciaKm - s.distanciaKm) <= 1, `${s.id}: ${d.distanciaKm} para ${s.distanciaKm}`);
   }
+});
+
+test('planilha guarda a versão das regras, inclusive depois da revisão', () => {
+  const plano = gerarPlano(parametros());
+  assert.equal(plano.versaoRegras, VERSAO_REGRAS);
+  const analise = analisarRevisao({ plano, atividades: atividadesCom(plano, 1), hoje: HOJE });
+  assert.equal(aplicarRevisao({ plano, parametros: parametros(), analise, hoje: HOJE }).versaoRegras, VERSAO_REGRAS);
 });
 
 test('sem prova, gera 12 semanas', () => {
