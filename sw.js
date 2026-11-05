@@ -1,6 +1,6 @@
 // Abre sem internet. Só guarda os arquivos do próprio app: nada do intervals.icu passa por aqui.
 
-const VERSAO = 'corrida-v5';
+const VERSAO = 'corrida-v6';
 const ARQUIVOS = [
   './',
   'index.html',
@@ -8,6 +8,7 @@ const ARQUIVOS = [
   'manifest.webmanifest',
   'src/app.js',
   'src/armazenamento.js',
+  'src/gestos.js',
   'src/icu.js',
   'src/motor.js',
   'icones/icone-180.png',

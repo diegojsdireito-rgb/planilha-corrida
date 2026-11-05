@@ -53,6 +53,15 @@ main {
   padding: calc(16px + env(safe-area-inset-top)) 16px calc(88px + env(safe-area-inset-bottom));
 }
 
+#app { touch-action: pan-y pinch-zoom; }
+.entra-direita { animation: entra-direita .18s ease-out; }
+.entra-esquerda { animation: entra-esquerda .18s ease-out; }
+@keyframes entra-direita { from { transform: translateX(32px); opacity: .4; } }
+@keyframes entra-esquerda { from { transform: translateX(-32px); opacity: .4; } }
+@media (prefers-reduced-motion: reduce) {
+  .entra-direita, .entra-esquerda { animation: none; }
+}
+
 h1 { font-size: 1.6rem; line-height: 1.2; margin: 8px 0 4px; }
 h2 { font-size: 1.1rem; margin: 0 0 8px; }
 p { margin: 0 0 8px; }

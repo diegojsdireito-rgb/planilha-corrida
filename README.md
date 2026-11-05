@@ -33,6 +33,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/motor.js` | Ritmos (VDOT de Daniels e Gilbert), geração da planilha e revisão. Só funções puras. |
 | `src/icu.js` | Leitura de corridas e envio de treinos ao intervals.icu. |
 | `src/armazenamento.js` | Dados no aparelho e cópia de segurança. |
+| `src/gestos.js` | Deslizar para trocar de aba e voltar de um treino. |
 | `src/app.js` | Telas. |
 | `sw.js` | Permite abrir sem internet. Ao mudar arquivos do app, troque a `VERSAO`. |
 

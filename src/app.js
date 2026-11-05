@@ -1,4 +1,5 @@
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
+import { abaDoGesto, ligarGestos } from './gestos.js';
 import { criarCliente } from './icu.js';
 import {
   analisarRevisao,
@@ -583,6 +584,10 @@ function telaAjustes() {
   return `
     <header class="topo"><h1>Ajustes</h1></header>
     <section class="cartao">
+      <h2>Gestos</h2>
+      <p class="suave">Deslize para os lados para trocar de aba. Dentro de um treino, deslize para a direita para voltar.</p>
+    </section>
+    <section class="cartao">
       <h2>Seu nível atual</h2>
       <p>VDOT <strong>${String(plano.vdot).replace('.', ',')}</strong></p>
       ${estado.origemVdot ? `<p class="suave">Base: ${esc(estado.origemVdot)}</p>` : ''}
@@ -621,8 +626,11 @@ function telaAjustes() {
 
 // ---------- Estrutura ----------
 
+const ITENS_ABAS = [['hoje', 'Hoje'], ['plano', 'Planilha'], ['revisao', 'Revisão'], ['ajustes', 'Ajustes']];
+const ORDEM_ABAS = ITENS_ABAS.map(([id]) => id);
+
 function renderAbas() {
-  const itens = [['hoje', 'Hoje'], ['plano', 'Planilha'], ['revisao', 'Revisão'], ['ajustes', 'Ajustes']];
+  const itens = ITENS_ABAS;
   abas.hidden = false;
   abas.innerHTML = itens
     .map(([id, nome]) => `<button data-aba="${id}" ${aba === id ? 'aria-current="page"' : ''}>${nome}</button>`)
@@ -646,12 +654,28 @@ abas.addEventListener('click', (e) => {
   render();
 });
 
-const acoes = {
-  voltar: () => {
-    sessaoAberta = null;
+function voltarDoTreino() {
+  sessaoAberta = null;
+  render();
+  window.scrollTo(0, rolagemAnterior);
+}
+
+// Dentro de um treino, só voltar. Nas abas, trocar para a vizinha.
+ligarGestos(app, {
+  podeIniciar: () => Boolean(estado.plano) && !ocupado,
+  temDestino: (direcao) => (sessaoAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
+  aoDeslizar: (direcao) => {
+    if (sessaoAberta) {
+      voltarDoTreino();
+      return;
+    }
+    aba = abaDoGesto(ORDEM_ABAS, aba, direcao);
     render();
-    window.scrollTo(0, rolagemAnterior);
   },
+});
+
+const acoes = {
+  voltar: voltarDoTreino,
 
   enviar: (botao) => comOcupado(botao, async () => {
     await enviarAoRelogio();
