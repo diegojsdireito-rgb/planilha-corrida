@@ -1,6 +1,6 @@
 // Abre sem internet. Só guarda os arquivos do próprio app: nada do intervals.icu passa por aqui.
 
-const VERSAO = 'corrida-v3';
+const VERSAO = 'corrida-v4';
 const ARQUIVOS = [
   './',
   'index.html',
@@ -16,7 +16,11 @@ const ARQUIVOS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSAO)
+      .then((c) => c.addAll(ARQUIVOS.map((a) => new Request(a, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -30,8 +34,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // O GitHub Pages permite reaproveitar arquivos por 10 minutos: "no-cache" sempre confere a versão.
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: 'no-cache' })
       .then((resposta) => {
         if (resposta.ok) {
           const copia = resposta.clone();
