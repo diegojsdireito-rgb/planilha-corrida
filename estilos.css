@@ -38,6 +38,7 @@
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
+html, body { max-width: 100%; overflow-x: hidden; }
 
 body {
   margin: 0;
@@ -76,6 +77,8 @@ label small { display: block; font-weight: 400; color: var(--suave); }
 .linha > *, .linha3 > * { min-width: 0; }
 
 input[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; }
+input::-webkit-date-and-time-value { text-align: left; }
+.cartao { min-width: 0; max-width: 100%; }
 
 input, select {
   display: block;

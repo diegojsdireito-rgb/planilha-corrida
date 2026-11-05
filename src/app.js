@@ -155,15 +155,13 @@ function telaCadastro(valores = {}) {
 
       <section class="cartao">
         <h2>Seu objetivo</h2>
-        <div class="linha">
-          <label>Objetivo
-            <select name="distancia">
-              ${[['', 'Condicionamento'], ['5', '5 km'], ['10', '10 km'], ['21.1', 'Meia maratona'], ['42.2', 'Maratona']]
-                .map(([valor, nome]) => `<option value="${valor}" ${String(v.distancia ?? '10') === valor ? 'selected' : ''}>${nome}</option>`).join('')}
-            </select>
-          </label>
-          <label>Data da prova<input name="dataProva" type="date" value="${esc(v.dataProva ?? '')}"></label>
-        </div>
+        <label>Objetivo
+          <select name="distancia">
+            ${[['', 'Condicionamento'], ['5', '5 km'], ['10', '10 km'], ['21.1', 'Meia maratona'], ['42.2', 'Maratona']]
+              .map(([valor, nome]) => `<option value="${valor}" ${String(v.distancia ?? '10') === valor ? 'selected' : ''}>${nome}</option>`).join('')}
+          </select>
+        </label>
+        <label>Data da prova<input name="dataProva" type="date" value="${esc(v.dataProva ?? '')}"></label>
         <p class="suave">Sem prova marcada, a planilha terá 12 semanas.</p>
       </section>
 
