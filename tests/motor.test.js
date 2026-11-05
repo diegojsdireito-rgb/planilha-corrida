@@ -14,6 +14,7 @@ import {
   gerarPlano,
   preverTempoSeg,
   proximaSegunda,
+  reanalisarPlano,
   segundaDaSemana,
   somarDias,
   treinosPorSemana,
@@ -274,6 +275,38 @@ test('planilha guarda a versão das regras, inclusive depois da revisão', () =>
   assert.equal(plano.versaoRegras, VERSAO_REGRAS);
   const analise = analisarRevisao({ plano, atividades: atividadesCom(plano, 1), hoje: HOJE });
   assert.equal(aplicarRevisao({ plano, parametros: parametros(), analise, hoje: HOJE }).versaoRegras, VERSAO_REGRAS);
+});
+
+test('nova análise usa as corridas reais e devolve a comparação', () => {
+  const plano = gerarPlano(parametros({ base: { kmSemana: 12, longoKm: 6 }, vdot: 30 }));
+  const atividades = [
+    { data: '2026-11-02', km: 12, seg: 12 * 360 },
+    { data: '2026-11-04', km: 8, seg: 8 * 330 },
+    { data: '2026-10-28', km: 20, seg: 20 * 370 },
+  ];
+  const r = reanalisarPlano({ plano, parametros: parametros(), atividades, hoje: '2026-11-05' });
+  assert.equal(r.base.kmSemana, 10);
+  assert.equal(r.base.longoKm, 20);
+  assert.ok(r.depois.vdot > r.antes.vdot, `${r.antes.vdot} para ${r.depois.vdot}`);
+  assert.equal(r.aPartirDe, INICIO, 'planilha que não começou é refeita inteira');
+  assert.equal(r.plano.sessoes.at(-1).tipo, 'prova');
+  assert.equal(plano.vdot, 30, 'a planilha original não é alterada');
+});
+
+test('nova análise não muda treinos passados nem a semana em andamento', () => {
+  const plano = gerarPlano(parametros());
+  const atividades = [{ data: '2026-11-20', km: 10, seg: 3000, prova: false }];
+  const r = reanalisarPlano({ plano, parametros: parametros(), atividades, hoje: '2026-11-25' });
+  assert.equal(r.aPartirDe, '2026-11-30');
+  const antes = plano.sessoes.filter((s) => s.data < r.aPartirDe);
+  assert.deepEqual(r.plano.sessoes.filter((s) => s.data < r.aPartirDe), antes);
+  assert.equal(new Set(r.plano.sessoes.map((s) => s.id)).size, r.plano.sessoes.length);
+  assert.ok(r.plano.sessoes.filter((s) => s.data >= r.aPartirDe).length > 0);
+});
+
+test('nova análise não se aplica a planilha já encerrada', () => {
+  const plano = gerarPlano(parametros());
+  assert.equal(reanalisarPlano({ plano, parametros: parametros(), atividades: [], hoje: '2027-03-01' }), null);
 });
 
 test('sem prova, gera 12 semanas', () => {

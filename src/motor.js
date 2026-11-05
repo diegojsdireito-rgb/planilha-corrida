@@ -113,7 +113,7 @@ export function estimarVdot({ atividades = [], tempoInformado = null, hoje }) {
     if (a.data < limite || a.km < 3 || !a.seg) continue;
     candidatos.push({
       vdot: calcularVdot(a.km, a.seg),
-      origem: `${a.prova ? 'prova' : 'melhor corrida recente'} de ${a.data} (${a.km.toFixed(1)} km em ${formatarTempo(a.seg)})`,
+      origem: `${a.prova ? 'prova' : 'melhor corrida recente'} de ${a.data.slice(8, 10)}/${a.data.slice(5, 7)} (${a.km.toFixed(1).replace('.', ',')} km em ${formatarTempo(a.seg)})`,
     });
   }
 
@@ -575,6 +575,33 @@ export function analisarRevisao({ plano, atividades, avaliacoes = {}, hoje }) {
     motivos,
     kmSemanaReal: Math.round((kmRealizados / 2) * 10) / 10,
     longoReal: Math.round(Math.max(0, ...realizadas.map((a) => a.km)) * 10) / 10,
+  };
+}
+
+function resumoDaSemana(sessoes, segunda) {
+  const fim = somarDias(segunda, 7);
+  const lista = sessoes.filter((s) => s.data >= segunda && s.data < fim);
+  return { treinos: lista.length, km: lista.reduce((t, s) => t + s.distanciaKm, 0) };
+}
+
+// Refaz a estimativa com as corridas atuais. Não altera nada: devolve a planilha nova e a comparação.
+export function reanalisarPlano({ plano, parametros, atividades, tempoInformado, hoje }) {
+  const aPartirDe = hoje < plano.inicio ? plano.inicio : proximaSegunda(hoje);
+  const ultimaData = plano.sessoes[plano.sessoes.length - 1]?.data;
+  if (!ultimaData || aPartirDe > ultimaData) return null;
+
+  const estimativa = estimarVdot({ atividades, tempoInformado, hoje });
+  const base = baseDasAtividades(atividades, hoje);
+  const novo = gerarPlano({ ...parametros, vdot: estimativa.vdot, inicio: plano.inicio, aPartirDe, base });
+  const sessoes = [...plano.sessoes.filter((s) => s.data < aPartirDe), ...novo.sessoes];
+
+  return {
+    plano: { ...novo, sessoes },
+    origem: estimativa.origem,
+    base,
+    aPartirDe,
+    antes: { vdot: plano.vdot, ...resumoDaSemana(plano.sessoes, aPartirDe) },
+    depois: { vdot: estimativa.vdot, ...resumoDaSemana(sessoes, aPartirDe) },
   };
 }
 

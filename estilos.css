@@ -255,6 +255,7 @@ h3 { font-size: .95rem; margin: 12px 0 6px; }
 .tabela-grafico summary { min-height: 44px; display: flex; align-items: center; color: var(--marca); font-size: .9rem; font-weight: 600; cursor: pointer; }
 .ritmos th { padding: 6px 0; text-align: left; font-size: .85rem; color: var(--suave); }
 .ritmos th:last-child { text-align: right; }
+.comparacao th:not(:first-child), .comparacao td:not(:first-child) { text-align: right; font-weight: 600; white-space: nowrap; padding-left: 12px; }
 
 #aviso {
   position: fixed;

@@ -46,6 +46,7 @@ Regras principais:
 - **Dias livres são um limite, não uma obrigação.** Os treinos por semana dependem do volume (3 abaixo de 20 km, 4 abaixo de 35 km, 5 abaixo de 55 km, no máximo 6) e são espalhados para dar o maior descanso possível. No modo cuidadoso, o limite é 4.
 - **Volume** sobe até 10% por semana, ou 5% no modo cuidadoso (lesão recente, 45 anos ou mais, IMC 30 ou mais), com semanas de recuperação e polimento.
 - **Detalhes do treino** mostram tempo e pace estimados pelo meio das faixas de ritmo, e zonas Z1 a Z5 de ritmo calculadas pelo app. Depois da corrida, trazem os dados reais e as zonas de frequência cardíaca do intervals.icu.
+- **Atualizar análise** recalcula nível e volume pelas corridas reais e mostra o antes e depois. Só muda a planilha com confirmação, e nunca os treinos passados ou a semana em andamento.
 - **Revisão** compara os últimos 14 dias com o previsto e só altera da próxima segunda em diante. Dor sempre reduz a carga.
 
 Esses limites são prudência, não garantia contra lesões. A planilha não substitui avaliação médica ou de um treinador.

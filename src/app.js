@@ -24,6 +24,7 @@ import {
   gerarPlano,
   preverTempoSeg,
   proximaSegunda,
+  reanalisarPlano,
   segundaDaSemana,
   somarDias,
   VERSAO_REGRAS,
@@ -57,9 +58,10 @@ let ocupado = false;
 let sessaoAberta = null;
 let rolagemAnterior = 0;
 let cadastroAnterior = {};
+let analisePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 8;
+const VERSAO_APP = 9;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -776,19 +778,56 @@ const TITULOS_ACAO = {
   manter: 'Segurar a carga por uma semana',
   reduzir: 'Reduzir para recuperar',
   semDados: 'Ainda é cedo para revisar',
+  analise: 'Análise atualizada com suas corridas',
 };
+
+function blocoAtualizarAnalise() {
+  if (!estado.chaveApi) return '';
+  if (!analisePendente) {
+    return `
+      <section class="cartao">
+        <h2>Atualizar análise</h2>
+        <p class="suave">Busca suas corridas, recalcula seu nível e volume e mostra como a planilha ficaria. Nada muda antes da sua confirmação.</p>
+        <button class="principal" data-acao="atualizar-analise">Atualizar análise</button>
+      </section>`;
+  }
+  const { antes, depois, base, origem, aPartirDe } = analisePendente;
+  const nivel = (v) => String(v).replace('.', ',');
+  const linhas = [
+    ['Nível (VDOT)', nivel(antes.vdot), nivel(depois.vdot)],
+    ['Treinos na semana', antes.treinos, depois.treinos],
+    ['Volume na semana', km(antes.km), km(depois.km)],
+  ];
+  return `
+    <section class="cartao destaque">
+      <h2>Nova análise</h2>
+      <p class="suave">Mudanças a partir de ${dataCurta(aPartirDe)}. Treinos anteriores continuam iguais.</p>
+      <table class="ritmos comparacao">
+        <thead><tr><th></th><th>Hoje</th><th>Nova</th></tr></thead>
+        <tbody>${linhas.map(([nome, a, b]) => `<tr><td>${nome}</td><td>${a}</td><td>${b}</td></tr>`).join('')}</tbody>
+      </table>
+      <p class="suave" style="margin-top:12px">Base: ${km(base.kmSemana)} por semana nos últimos 28 dias, maior corrida de ${km(base.longoKm)}. Nível: ${esc(origem)}.</p>
+      <p class="suave">Confira se a corrida usada no nível está certa. Erro de GPS pode inflar a estimativa.</p>
+      <div class="botoes">
+        <button class="principal" data-acao="aplicar-analise">Aplicar à planilha</button>
+        <button data-acao="cancelar-analise">Manter como está</button>
+      </div>
+    </section>`;
+}
 
 function telaRevisao() {
   const dia = hoje();
   const analise = analisarRevisao({ plano: estado.plano, atividades: estado.atividades, avaliacoes: estado.avaliacoes, hoje: dia });
   const mudaRitmo = analise.novoVdot !== estado.plano.vdot;
-  const podeAplicar = (analise.acao !== 'semDados' || mudaRitmo) && estado.revisoes.at(-1)?.data !== dia;
+  const revisadaHoje = estado.revisoes.some((r) => r.data === dia && r.acao !== 'analise');
+  const podeAplicar = (analise.acao !== 'semDados' || mudaRitmo) && !revisadaHoje;
 
   return `
     <header class="topo">
       <h1>Revisão</h1>
       <p class="suave">Compara os últimos 14 dias com o previsto. Só muda da próxima segunda em diante.</p>
     </header>
+    ${blocoAtualizarAnalise()}
     ${estado.chaveApi ? `
       <section class="cartao">
         <p class="suave">${estado.ultimaSincronizacao ? `Atualizado em ${new Date(estado.ultimaSincronizacao).toLocaleString('pt-BR')}` : 'Corridas ainda não atualizadas.'}</p>
@@ -800,7 +839,7 @@ function telaRevisao() {
       <h2>${TITULOS_ACAO[analise.acao]}</h2>
       <ul class="motivos">${analise.motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
       ${podeAplicar ? '<button class="principal" data-acao="aplicar-revisao">Aplicar à planilha</button>' : ''}
-      ${estado.revisoes.at(-1)?.data === dia ? '<p class="suave">Revisão de hoje já aplicada.</p>' : ''}
+      ${revisadaHoje ? '<p class="suave">Revisão de hoje já aplicada.</p>' : ''}
     </section>
     ${estado.revisoes.length ? `
       <section class="cartao">
@@ -928,6 +967,44 @@ const acoes = {
     render();
     mostrarAviso('Treinos enviados ao intervals.icu.');
   }),
+
+  'atualizar-analise': (botao) => comOcupado(botao, async () => {
+    await sincronizar();
+    if (!estado.atividades.length) {
+      render();
+      mostrarAviso('Nenhuma corrida encontrada. Confira a conexão do Garmin no intervals.icu.');
+      return;
+    }
+    const dia = hoje();
+    analisePendente = reanalisarPlano({
+      plano: estado.plano,
+      parametros: parametrosAtuais(),
+      atividades: estado.atividades,
+      tempoInformado: estado.tempoInformado,
+      hoje: dia,
+    });
+    render();
+    if (!analisePendente) mostrarAviso('Esta planilha já terminou. Comece um novo ciclo nos Ajustes.');
+  }),
+
+  'cancelar-analise': () => {
+    analisePendente = null;
+    render();
+  },
+
+  'aplicar-analise': () => {
+    const { plano, origem } = analisePendente;
+    const dia = hoje();
+    estado.plano = plano;
+    estado.origemVdot = origem;
+    estado.historicoNivel = registrarNivel(estado.historicoNivel, dia, plano.vdot);
+    estado.revisoes.push({ data: dia, acao: 'analise', motivos: [] });
+    analisePendente = null;
+    guardar();
+    render();
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Planilha atualizada. Envie os treinos de novo em Planilha.' : 'Planilha atualizada.');
+    setTimeout(enviarAutomaticamente);
+  },
 
   sincronizar: (botao) => comOcupado(botao, async () => {
     await sincronizar();
