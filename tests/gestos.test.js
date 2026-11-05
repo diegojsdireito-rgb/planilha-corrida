@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { abaDoGesto, interpretarGesto } from '../src/gestos.js';
+import { abaDoGesto, distanciaDaPuxada, interpretarGesto, interpretarPuxada, puxadaCompleta } from '../src/gestos.js';
+
+test('puxar para baixo só começa com movimento vertical claro', () => {
+  assert.equal(interpretarPuxada({ dx: 0, dy: 3 }), 'decidir');
+  assert.equal(interpretarPuxada({ dx: 2, dy: 30 }), 'puxar');
+  assert.equal(interpretarPuxada({ dx: 0, dy: -5 }), 'desistir');
+});
+
+test('movimento lateral fica com a troca de aba, nunca com a puxada', () => {
+  assert.equal(interpretarPuxada({ dx: 40, dy: 12 }), 'desistir');
+  assert.equal(interpretarPuxada({ dx: -11, dy: 11 }), 'desistir');
+});
+
+test('a puxada tem resistência, teto e só atualiza depois do limite', () => {
+  assert.equal(distanciaDaPuxada(100), 45);
+  assert.equal(distanciaDaPuxada(-50), 0);
+  assert.equal(distanciaDaPuxada(2000), 110);
+  assert.equal(puxadaCompleta(100), false);
+  assert.equal(puxadaCompleta(160), true);
+});
 
 test('deslize longo e horizontal define a direção', () => {
   assert.equal(interpretarGesto({ dx: -120, dy: 10, ms: 600 }), 'esquerda');

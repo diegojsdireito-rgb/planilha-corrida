@@ -9,7 +9,7 @@ import {
   resumoSemanal,
   zonasDoPeriodo,
 } from './estatisticas.js';
-import { abaDoGesto, ligarGestos } from './gestos.js';
+import { abaDoGesto, ligarGestos, ligarPuxada } from './gestos.js';
 import { barrasDeVolume, linhaDeEvolucao } from './graficos.js';
 import { criarCliente, eventoDaSessao } from './icu.js';
 import {
@@ -61,7 +61,7 @@ let cadastroAnterior = {};
 let analisePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 10;
+const VERSAO_APP = 11;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -168,6 +168,28 @@ async function atualizarSeNecessario() {
   const digitando = document.activeElement?.matches('input, select, textarea');
   if (!digitando) render();
   mostrarAviso(novas === 1 ? 'Nova corrida recebida.' : `${novas} novas corridas recebidas.`);
+}
+
+async function atualizarPorGesto() {
+  if (!estado.chaveApi) {
+    mostrarAviso('Conecte o intervals.icu nos Ajustes para trazer suas corridas.');
+    return;
+  }
+  const antes = estado.atividades.length;
+  ocupado = true;
+  try {
+    await sincronizar();
+  } catch (erro) {
+    mostrarAviso(erro.message);
+    return;
+  } finally {
+    ocupado = false;
+  }
+  const novas = estado.atividades.length - antes;
+  if (!document.activeElement?.matches('input, select, textarea')) render();
+  if (novas <= 0) mostrarAviso('Nenhuma corrida nova.');
+  else mostrarAviso(novas === 1 ? 'Nova corrida recebida.' : `${novas} novas corridas recebidas.`);
+  await enviarAutomaticamente();
 }
 
 async function salvarArquivo(conteudo, nome, tipo) {
@@ -896,7 +918,7 @@ function telaAjustes() {
     <header class="topo"><h1>Ajustes</h1></header>
     <section class="cartao">
       <h2>Gestos</h2>
-      <p class="suave">Deslize para os lados para trocar de aba. Dentro de um treino, deslize para a direita para voltar.</p>
+      <p class="suave">Deslize para os lados para trocar de aba. Dentro de um treino, deslize para a direita para voltar. No topo da tela, puxe para baixo para buscar corridas novas.</p>
     </section>
     <section class="cartao">
       <h2>Seu nível atual</h2>
@@ -990,6 +1012,11 @@ ligarGestos(app, {
     aba = abaDoGesto(ORDEM_ABAS, aba, direcao);
     render();
   },
+});
+
+ligarPuxada(app, document.getElementById('puxada'), {
+  podeIniciar: () => Boolean(estado.plano) && !ocupado,
+  aoAtualizar: atualizarPorGesto,
 });
 
 const acoes = {
