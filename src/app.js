@@ -30,6 +30,7 @@ import {
   VERSAO_REGRAS,
   ZONAS,
 } from './motor.js';
+import { anelDeProgresso, diasAte, diasDaSemana, fasesDoPlano, icone, MARCA, perfilDoTreino } from './visual.js';
 
 const DIAS = [
   { valor: 1, curto: 'Seg', nome: 'Segunda' },
@@ -61,7 +62,7 @@ let cadastroAnterior = {};
 let analisePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 11;
+const VERSAO_APP = 12;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -90,7 +91,8 @@ const dataCurta = (data) =>
 const dataLonga = (data) =>
   new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 
-const km = (valor) => `${Number(valor).toFixed(1).replace('.', ',').replace(',0', '')} km`;
+const numeroKm = (valor) => Number(valor).toFixed(1).replace('.', ',').replace(',0', '');
+const km = (valor) => `${numeroKm(valor)} km`;
 
 function guardar() {
   if (!salvar(estado)) mostrarAviso('Não consegui salvar neste aparelho. Exporte uma cópia de segurança nos Ajustes.');
@@ -272,22 +274,28 @@ function textoEnvioAutomatico() {
 function telaBoasVindas() {
   abas.hidden = true;
   app.innerHTML = `
-    <header class="topo">
+    <section class="heroi">
+      <svg class="heroi-arte" viewBox="0 0 320 96" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <circle cx="160" cy="84" r="46" fill="#f2b134"/>
+        <circle cx="160" cy="84" r="66" fill="#f2b134" opacity=".16"/>
+        <path d="M0 84h320v12H0Z" fill="#e4572e"/>
+        <path d="M150 84h20l14 12h-48Z" fill="#14171f"/>
+      </svg>
       <h1>Run Glória</h1>
-      <p class="suave">Monta seus treinos e ajusta a planilha pelo que você realmente correu.</p>
-    </header>
+      <p>Monta seus treinos e ajusta a planilha pelo que você realmente correu.</p>
+    </section>
     <section class="cartao alerta">
-      <h2>Antes de começar</h2>
+      <div class="titulo-icone">${icone('aviso')}<h2>Antes de começar</h2></div>
       <p>A planilha é gerada por regras automáticas. Ela não substitui avaliação médica nem o acompanhamento de um treinador, e não garante evitar lesões.</p>
       <p>Se tiver dor, doença ou alguma restrição, procure orientação profissional antes de seguir os treinos.</p>
     </section>
     <section class="cartao">
-      <h2>Seus dados</h2>
+      <div class="titulo-icone">${icone('dados')}<h2>Seus dados</h2></div>
       <p>Cadastro, planilha e corridas ficam só neste aparelho. Quem criou o app não recebe nada disso.</p>
       <p>Por isso, se trocar de celular ou apagar os dados do navegador, a planilha se perde. Exporte uma cópia de segurança em Ajustes.</p>
     </section>
     <section class="cartao">
-      <h2>Instalar no iPhone</h2>
+      <div class="titulo-icone">${icone('instalar')}<h2>Instalar no iPhone</h2></div>
       <p>No Safari, toque em Compartilhar e depois em Adicionar à Tela de Início. Abra o app sempre por esse ícone.</p>
     </section>
     <button class="principal largo" data-acao="ciente">Entendi, começar</button>
@@ -301,6 +309,7 @@ function telaCadastro(valores = {}) {
   const v = { idade: '', peso: '', altura: '', kmSemana: '', longo: '', distanciaTempo: '5', chave: estado.chaveApi, ...valores };
   const diasMarcados = valores.dias ?? [2, 4, 6, 0];
   app.innerHTML = `
+    <div class="marca">${MARCA}Run Glória</div>
     <header class="topo">
       <h1>Vamos montar sua planilha</h1>
       <p class="suave">Seus dados ficam só neste aparelho.</p>
@@ -459,29 +468,18 @@ async function enviarCadastro(evento) {
 
 // ---------- Hoje ----------
 
-function blocoTreino(sessao) {
-  if (sessao.tipo === 'prova') {
-    return `<p>${esc(sessao.porque)}</p><p class="suave">Previsão pelo seu nível atual: <strong>${formatarTempo(preverTempoSeg(estado.plano.vdot, sessao.distanciaKm))}</strong>.</p>`;
-  }
-  const linhas = sessao.blocos.map((bloco) => {
-    const prefixo = bloco.repeticoes > 1 ? `${bloco.repeticoes} x ` : '';
-    const passos = bloco.passos.map((p) => `${p.km !== undefined ? km(p.km) : `${p.minutos} min de trote`} a ${textoRitmo(p.ritmo)}`).join(' + ');
-    return `<li><span>${esc(bloco.rotulo)}</span><strong>${prefixo}${passos}</strong></li>`;
-  });
-  return `<ul class="passos">${linhas.join('')}</ul><p class="suave">${esc(sessao.porque)}</p>`;
-}
+const classeTipo = (tipo) => ({ leve: 't-leve', longo: 't-longo', ritmo: 't-ritmo', limiar: 't-forte', intervalado: 't-forte', prova: 't-prova' })[tipo];
 
-const seloTipo = (tipo) => {
-  const classe = ['limiar', 'intervalado', 'ritmo'].includes(tipo) ? 'forte' : tipo === 'longo' ? 'longo' : tipo === 'prova' ? 'prova' : '';
-  return `<span class="selo ${classe}">${ROTULOS[tipo]}</span>`;
-};
+const seloTipo = (tipo) => `<span class="selo ${classeTipo(tipo)}">${ROTULOS[tipo]}</span>`;
 
 function formularioAvaliacao(sessao) {
   const nota = estado.avaliacoes[sessao.id] ?? { esforco: 5, dor: false };
   return `
     <form class="cartao" data-avaliar="${esc(sessao.id)}">
+      <p class="sobretitulo">${esc(sessao.nome)}, ${dataCurta(sessao.data)}</p>
       <h2>Como foi?</h2>
-      <label>Esforço: <output>${nota.esforco}</output> de 10
+      <label>
+        <span class="nota-esforco">Esforço <span><output>${nota.esforco}</output> <small>de 10</small></span></span>
         <input type="range" name="esforco" min="1" max="10" value="${nota.esforco}">
       </label>
       <label class="marcar"><input type="checkbox" name="dor" ${nota.dor ? 'checked' : ''}> Senti dor</label>
@@ -489,61 +487,119 @@ function formularioAvaliacao(sessao) {
     </form>`;
 }
 
+function heroiDoTreino(sessao, sobretitulo, realizadas = []) {
+  const d = detalharSessao(sessao, estado.plano.vdot);
+  return `
+    <section class="heroi ${classeTipo(sessao.tipo)}">
+      <p class="sobretitulo">${esc(sobretitulo)}</p>
+      <p class="heroi-numero">${numeroKm(sessao.distanciaKm)}<small>km</small></p>
+      <h2>${esc(sessao.nome)}</h2>
+      ${seloTipo(sessao.tipo)}
+      ${perfilDoTreino(d)}
+      <div class="heroi-dados">
+        <div><b>${formatarTempo(d.tempoSeg)}</b><span>${sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado'}</span></div>
+        <div><b>${formatarRitmo(d.ritmoMedio)}/km</b><span>Pace médio</span></div>
+      </div>
+      ${realizadas.map((a) => `<p class="heroi-feito">Feito: ${km(a.km)} em ${formatarTempo(a.seg)}</p>`).join('')}
+      <button data-abrir="${esc(sessao.id)}">Ver treino</button>
+    </section>`;
+}
+
+function blocoDaSemana(dia) {
+  const { plano } = estado;
+  const antesDoInicio = dia < plano.inicio;
+  const segunda = antesDoInicio ? plano.inicio : segundaDaSemana(dia);
+  const fim = somarDias(segunda, 7);
+  const sessoes = plano.sessoes.filter((s) => s.data >= segunda && s.data < fim);
+  if (!sessoes.length) return '';
+  const previsto = sessoes.reduce((t, s) => t + s.distanciaKm, 0);
+  const atividades = estado.atividades.filter((a) => a.data >= segunda && a.data < fim);
+  const feito = atividades.reduce((t, a) => t + a.km, 0);
+  const dias = diasDaSemana({ segunda, sessoes, atividades, hoje: dia });
+  const feitos = dias.filter((d) => d.sessao && d.situacao === 'feito').length;
+
+  const celulas = dias.map((d) => {
+    const nome = DIAS[(new Date(`${d.data}T12:00:00Z`).getUTCDay() + 6) % 7].curto;
+    const marca = { feito: '✓', perdido: '–', descanso: '·' }[d.situacao] ?? numeroKm(d.sessao.distanciaKm);
+    const classes = `dia ${d.situacao} ${d.ehHoje ? 'hoje' : ''} ${d.sessao ? classeTipo(d.sessao.tipo) : ''}`;
+    const conteudo = `<span class="dia-nome">${nome}</span><span class="dia-marca">${marca}</span>`;
+    if (!d.sessao) return `<div class="${classes}" role="img" aria-label="${nome}: ${d.situacao === 'feito' ? `corrida de ${km(d.km)}` : 'descanso'}">${conteudo}</div>`;
+    return `<button class="${classes}" data-abrir="${esc(d.sessao.id)}" aria-label="${nome}: ${esc(d.sessao.nome)}, ${km(d.sessao.distanciaKm)}">${conteudo}</button>`;
+  }).join('');
+
+  return `
+    <section class="cartao">
+      <div class="semana-topo">
+        ${anelDeProgresso(previsto ? feito / previsto : 0, 'Parte do volume da semana já corrida')}
+        <div>
+          <h2>${antesDoInicio ? 'Sua primeira semana' : 'Sua semana'}</h2>
+          <p><span class="cartao-numero">${numeroKm(Math.round(feito * 10) / 10)}</span> <span class="suave">de ${km(Math.round(previsto * 10) / 10)}</span></p>
+          <p class="suave">${feitos} de ${sessoes.length} treinos</p>
+        </div>
+      </div>
+      <div class="dias-semana">${celulas}</div>
+      ${estado.chaveApi ? '' : '<p class="suave" style="margin:10px 0 0">Conecte o intervals.icu nos Ajustes para contar suas corridas.</p>'}
+    </section>`;
+}
+
+function blocoDoObjetivo(dia) {
+  const { plano, objetivo } = estado;
+  const atual = plano.sessoes.find((s) => s.data >= dia) ?? plano.sessoes[plano.sessoes.length - 1];
+  const prova = objetivo.distanciaKm && objetivo.dataProva >= dia;
+  const barras = fasesDoPlano(plano.sessoes).map(({ semanas }) => {
+    const completas = semanas.filter((n) => n < atual.semana).length + (semanas.includes(atual.semana) ? 0.5 : 0);
+    return `<div class="fase" style="flex:${semanas.length}"><i style="width:${(completas / semanas.length) * 100}%"></i></div>`;
+  }).join('');
+  const dias = prova ? diasAte(dia, objetivo.dataProva) : 0;
+  return `
+    <section class="cartao">
+      <p class="sobretitulo">${prova ? `Prova de ${String(objetivo.distanciaKm).replace('.', ',')} km` : 'Condicionamento'}</p>
+      <h2>${prova ? (dias === 0 ? 'É hoje!' : `Falta${dias > 1 ? 'm' : ''} ${dias} dia${dias > 1 ? 's' : ''}`) : `Semana ${atual.semana} de ${plano.totalSemanas}`}</h2>
+      <div class="fases" role="img" aria-label="Avanço pelas fases da planilha">${barras}</div>
+      <p class="suave" style="margin:0">Fase de ${FASES[atual.fase].toLowerCase()}${prova ? `, semana ${atual.semana} de ${plano.totalSemanas}` : ''}${atual.recuperacao ? ', semana de recuperação' : ''}</p>
+    </section>`;
+}
+
 function telaHoje() {
   const dia = hoje();
-  const { sessoes } = estado.plano;
+  const { sessoes, inicio } = estado.plano;
   const deHoje = sessoes.find((s) => s.data === dia);
   const proxima = sessoes.find((s) => s.data > dia);
-  const segunda = segundaDaSemana(dia);
-  const fim = somarDias(segunda, 7);
-  const previsto = sessoes.filter((s) => s.data >= segunda && s.data < fim).reduce((t, s) => t + s.distanciaKm, 0);
-  const feito = estado.atividades.filter((a) => a.data >= segunda && a.data < fim).reduce((t, a) => t + a.km, 0);
-  const pct = previsto ? Math.min(100, Math.round((feito / previsto) * 100)) : 0;
   const ultimaPassada = [...sessoes].reverse().find((s) => s.data < dia && s.data >= somarDias(dia, -7));
   const avaliar = deHoje ?? ultimaPassada;
-  const realizadas = deHoje ? atividadeDoDia(dia) : [];
 
   let principal;
   if (deHoje) {
-    principal = `
-      <section class="cartao destaque">
-        ${seloTipo(deHoje.tipo)}
-        <p class="treino-titulo">${esc(deHoje.nome)}</p>
-        <p class="suave">${km(deHoje.distanciaKm)} no total</p>
-        ${blocoTreino(deHoje)}
-        ${realizadas.map((a) => `<p class="status feito">Feito: ${km(a.km)} em ${formatarTempo(a.seg)}</p>`).join('')}
-        <button data-abrir="${esc(deHoje.id)}">Ver detalhes</button>
-      </section>`;
+    principal = heroiDoTreino(deHoje, 'Treino de hoje', atividadeDoDia(dia));
   } else if (proxima) {
+    const antesDoInicio = dia < inicio;
     principal = `
-      <section class="cartao">
-        <h2>Hoje é dia de descanso</h2>
-        <p class="suave">O descanso também faz parte do treino.</p>
+      <section class="heroi">
+        <p class="sobretitulo">${antesDoInicio ? 'Preparação' : 'Dia de descanso'}</p>
+        <h2>${antesDoInicio ? `Sua planilha começa ${dataLonga(inicio)}` : 'Recuperar também é treinar'}</h2>
         <p>Próximo treino: <strong>${esc(proxima.nome)}</strong>, ${dataLonga(proxima.data)}, ${km(proxima.distanciaKm)}.</p>
-        <button data-abrir="${esc(proxima.id)}">Ver detalhes</button>
+        <button data-abrir="${esc(proxima.id)}">Ver próximo treino</button>
       </section>`;
   } else {
     principal = `
-      <section class="cartao destaque">
+      <section class="heroi t-prova">
+        <p class="sobretitulo">Ciclo completo</p>
         <h2>Planilha concluída</h2>
         <p>Parabéns. Quando quiser, comece um novo ciclo nos Ajustes.</p>
       </section>`;
   }
 
   return `
+    <div class="marca">${MARCA}Run Glória</div>
     <header class="topo">
-      <p class="suave">${dataLonga(dia)}</p>
+      <p class="sobretitulo">${dataLonga(dia)}</p>
       <h1>Hoje</h1>
     </header>
     ${avisoPlanilhaAntiga()}
     ${principal}
-    <section class="cartao">
-      <h2>Esta semana</h2>
-      <p>${km(feito)} de ${km(previsto)}</p>
-      <div class="barra" role="img" aria-label="${pct}% do volume da semana"><div style="width:${pct}%"></div></div>
-      ${estado.chaveApi ? '' : '<p class="suave" style="margin-top:8px">Conecte o intervals.icu nos Ajustes para contar suas corridas.</p>'}
-    </section>
-    ${avaliar && avaliar.tipo !== 'prova' ? `<p class="suave">Avaliando: ${esc(avaliar.nome)}, ${dataCurta(avaliar.data)}</p>${formularioAvaliacao(avaliar)}` : ''}`;
+    ${blocoDaSemana(dia)}
+    ${blocoDoObjetivo(dia)}
+    ${avaliar && avaliar.tipo !== 'prova' ? formularioAvaliacao(avaliar) : ''}`;
 }
 
 // ---------- Plano ----------
@@ -554,14 +610,16 @@ function linhaSessao(sessao, dia) {
   if (feitas.length) status = `<span class="status feito">${km(feitas.reduce((t, a) => t + a.km, 0))} feitos</span>`;
   else if (sessao.data < dia) status = '<span class="status falta">Sem registro</span>';
   else status = `<span class="status">${km(sessao.distanciaKm)}</span>`;
+  const quando = new Date(`${sessao.data}T12:00:00Z`);
   return `
-    <button class="sessao" data-abrir="${esc(sessao.id)}" aria-label="Abrir ${esc(sessao.nome)}, ${dataCurta(sessao.data)}">
-      <span>
-        <span class="data">${dataCurta(sessao.data)}</span>
+    <button class="sessao ${classeTipo(sessao.tipo)}" data-abrir="${esc(sessao.id)}" aria-label="Abrir ${esc(sessao.nome)}, ${dataCurta(sessao.data)}">
+      <span class="sessao-data"><small>${DIAS[(quando.getUTCDay() + 6) % 7].curto}</small><b>${quando.getUTCDate()}</b></span>
+      <span class="sessao-faixa"></span>
+      <span class="sessao-corpo">
         <strong>${esc(sessao.nome)}</strong>
-        ${seloTipo(sessao.tipo)}
+        <span class="suave">${ROTULOS[sessao.tipo]}</span>
       </span>
-      <span class="sessao-fim">${status}<span class="seta" aria-hidden="true">›</span></span>
+      <span class="sessao-fim">${status}${icone('seta')}</span>
     </button>`;
 }
 
@@ -569,10 +627,10 @@ function linhaSessao(sessao, dia) {
 
 const ritmoDe = (segundos, quilometros) => `${formatarRitmo(segundos / quilometros)}/km`;
 
-function barraDeZona(rotulo, segundos, fracao) {
+function barraDeZona(rotulo, segundos, fracao, chave) {
   const pct = Math.round(fracao * 100);
   return `
-    <div class="zona">
+    <div class="zona ${chave ? `cor-${chave}` : ''}">
       <div class="zona-topo"><span>${esc(rotulo)}</span><span>${formatarTempo(segundos)} (${pct}%)</span></div>
       <div class="barra" role="img" aria-label="${esc(rotulo)}: ${pct}% do tempo"><div style="width:${pct}%"></div></div>
     </div>`;
@@ -633,7 +691,7 @@ function telaEvolucao() {
       <button data-acao="sincronizar">Atualizar corridas</button>
     </section>` : '';
 
-  const cabecalho = `<header class="topo"><h1>Evolução</h1><p class="suave">Suas corridas e seu nível ao longo do tempo.</p></header>`;
+  const cabecalho = `<header class="topo"><p class="sobretitulo">Seu progresso</p><h1>Evolução</h1><p class="suave">Suas corridas e seu nível ao longo do tempo.</p></header>`;
   const previsoes = [[5, '5 km'], [10, '10 km'], [21.1, 'Meia maratona'], [42.2, 'Maratona']]
     .map(([distancia, nome]) => `<tr><td>${nome}</td><td>${formatarTempo(preverTempoSeg(plano.vdot, distancia))}</td></tr>`)
     .join('');
@@ -677,15 +735,15 @@ function telaEvolucao() {
   ];
 
   return `${cabecalho}
-    <section class="cartao destaque">
-      <h2>Últimos 28 dias</h2>
-      <div class="numeros">
-        <div><b>${km(Math.round(atual.km * 10) / 10)}</b><span>Distância</span></div>
+    <section class="heroi">
+      <p class="sobretitulo">Últimos 28 dias</p>
+      <p class="heroi-numero">${numeroKm(Math.round(atual.km * 10) / 10)}<small>km</small></p>
+      <div class="heroi-dados">
         <div><b>${atual.corridas}</b><span>Corridas</span></div>
         <div><b>${formatarTempo(atual.seg)}</b><span>Tempo</span></div>
+        ${adesao === null ? '' : `<div><b>${Math.round(adesao * 100)}%</b><span>Do previsto</span></div>`}
       </div>
-      <p class="suave" style="margin-top:12px">${comparacao(atual.km, anterior.km)}.</p>
-      ${adesao === null ? '' : `<p class="suave">Você cumpriu ${Math.round(adesao * 100)}% do volume previsto.</p>`}
+      <p style="margin:14px 0 0">${comparacao(atual.km, anterior.km)}.</p>
     </section>
     <section class="cartao">
       <h2>Volume por semana (km)</h2>
@@ -740,23 +798,22 @@ function telaDetalhe(sessao) {
     <div class="bloco">
       <h3>${esc(bloco.rotulo)}${bloco.repeticoes > 1 ? `, ${bloco.repeticoes} vezes` : ''}</h3>
       ${bloco.passos.map((p) => `
-        <div class="passo">
-          <span class="selo">${ZONAS[p.zona].codigo}</span>
+        <div class="passo cor-${p.zona}">
+          <span class="chip-zona">${ZONAS[p.zona].codigo}</span>
           <span><strong>${p.km !== undefined ? km(p.km) : `${p.minutos} min`}</strong> a ${textoRitmo(p.ritmo)}<br>
           <span class="suave">${esc(ZONAS[p.zona].nome)}, cerca de ${formatarTempo(p.tempoSeg)}</span></span>
         </div>`).join('')}
     </div>`).join('');
 
   return `
-    <button class="voltar" data-acao="voltar">‹ Voltar</button>
-    <header class="topo">
-      <p class="suave">${dataLonga(sessao.data)}</p>
+    <section class="heroi ${classeTipo(sessao.tipo)}">
+      <button class="voltar" data-acao="voltar">‹ Voltar</button>
+      <p class="sobretitulo">${dataLonga(sessao.data)}</p>
       <h1>${esc(sessao.nome)}</h1>
       ${seloTipo(sessao.tipo)}
-    </header>
-    <section class="cartao destaque">
+      ${perfilDoTreino(d)}
       <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
-      <p class="suave" style="margin-top:12px">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : 'Estimativa pelo meio das faixas de ritmo, com o seu nível atual.'}</p>
+      <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : 'Estimativa pelo meio das faixas de ritmo, com o seu nível atual.'}</p>
     </section>
     <section class="cartao">
       <h2>Por que este treino</h2>
@@ -766,7 +823,7 @@ function telaDetalhe(sessao) {
     ${d.zonas.length ? `
       <section class="cartao">
         <h2>Tempo por zona de ritmo</h2>
-        ${d.zonas.map((z) => `${barraDeZona(`${z.codigo} ${z.nome}`, z.tempoSeg, z.fracao)}<p class="suave">${esc(z.sensacao)}</p>`).join('')}
+        ${d.zonas.map((z) => `${barraDeZona(`${z.codigo} ${z.nome}`, z.tempoSeg, z.fracao, z.chave)}<p class="suave">${esc(z.sensacao)}</p>`).join('')}
         <p class="suave">Zonas de ritmo calculadas pelo app. São diferentes das zonas de frequência cardíaca do relógio.</p>
       </section>` : ''}
     ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
@@ -782,16 +839,23 @@ function telaPlano() {
   const semanaAtual = segundaDaSemana(dia);
   const meta = objetivo.distanciaKm ? `Prova de ${objetivo.distanciaKm} km em ${dataCurta(objetivo.dataProva)}` : 'Condicionamento';
   const futuras = plano.sessoes.filter((s) => s.data >= dia).length;
+  const totalDaSemana = (sessoes) => sessoes.reduce((t, s) => t + s.distanciaKm, 0);
+  const maiorSemana = Math.max(...[...semanas.values()].map(totalDaSemana));
 
   const lista = [...semanas.values()].map((sessoes) => {
     const primeira = sessoes[0];
-    const total = sessoes.reduce((t, s) => t + s.distanciaKm, 0);
+    const total = totalDaSemana(sessoes);
     const atual = segundaDaSemana(primeira.data) === semanaAtual;
     const aberta = atual || (dia < plano.inicio && primeira.semana === semanas.keys().next().value);
     return `
       <details class="semana ${atual ? 'atual' : ''}" ${aberta ? 'open' : ''}>
         <summary>
-          <span><strong>Semana ${primeira.semana}</strong> <span class="suave">${FASES[primeira.fase]}${primeira.recuperacao ? ', recuperação' : ''}</span></span>
+          <span class="semana-numero" aria-label="Semana ${primeira.semana}">${primeira.semana}</span>
+          <span class="semana-info">
+            <strong>${FASES[primeira.fase]}${primeira.recuperacao ? ', recuperação' : ''}</strong>
+            <span class="suave">${sessoes.length} treinos</span>
+            <span class="semana-carga"><i style="width:${(total / maiorSemana) * 100}%"></i></span>
+          </span>
           <span class="status">${km(Math.round(total * 2) / 2)}</span>
         </summary>
         ${sessoes.map((s) => linhaSessao(s, dia)).join('')}
@@ -800,11 +864,14 @@ function telaPlano() {
 
   return `
     <header class="topo">
+      <p class="sobretitulo">Seu ciclo</p>
       <h1>Minha planilha</h1>
       <p class="suave">${esc(meta)}, ${plano.totalSemanas} semanas</p>
     </header>
     ${avisoPlanilhaAntiga()}
+    ${blocoDoObjetivo(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
+    ${lista}
     ${(() => {
       const semanaVista = plano.sessoes.find((s) => s.data >= dia)?.semana;
       const treinos = plano.sessoes.filter((s) => s.semana === semanaVista).length;
@@ -821,8 +888,7 @@ function telaPlano() {
            ${estado.ultimoEnvio ? `<p class="suave">Último envio: ${new Date(estado.ultimoEnvio).toLocaleString('pt-BR')}</p>` : ''}
            <button data-acao="enviar" ${futuras ? '' : 'disabled'}>Enviar toda a planilha agora (${futuras})</button>`
         : '<p class="suave">Conecte o intervals.icu nos Ajustes para enviar os treinos.</p>'}
-    </section>
-    ${lista}`;
+    </section>`;
 }
 
 // ---------- Revisão ----------
@@ -878,6 +944,7 @@ function telaRevisao() {
 
   return `
     <header class="topo">
+      <p class="sobretitulo">Últimos 14 dias</p>
       <h1>Revisão</h1>
       <p class="suave">Compara os últimos 14 dias com o previsto. Só muda da próxima segunda em diante.</p>
     </header>
@@ -889,7 +956,7 @@ function telaRevisao() {
       </section>` : `
       <section class="cartao alerta">Sem o intervals.icu conectado, a revisão não enxerga suas corridas. Conecte nos Ajustes.</section>`}
     ${estado.semDados ? `<section class="cartao alerta">${estado.semDados} corrida(s) vieram sem dados, provavelmente porque entraram pelo Strava. Conecte o Garmin diretamente no intervals.icu.</section>` : ''}
-    <section class="cartao ${analise.acao === 'reduzir' ? 'alerta' : ''}">
+    <section class="cartao veredito ${analise.acao}">
       <h2>${TITULOS_ACAO[analise.acao]}</h2>
       <ul class="motivos">${analise.motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
       ${podeAplicar ? '<button class="principal" data-acao="aplicar-revisao">Aplicar à planilha</button>' : ''}
@@ -915,16 +982,19 @@ function telaAjustes() {
     ['Intervalado', textoRitmo(r.intervalado)],
   ];
   return `
-    <header class="topo"><h1>Ajustes</h1></header>
+    <header class="topo"><p class="sobretitulo">Sua conta neste aparelho</p><h1>Ajustes</h1></header>
+    <section class="heroi">
+      <p class="sobretitulo">Seu nível atual (VDOT)</p>
+      <p class="heroi-numero">${String(plano.vdot).replace('.', ',')}</p>
+      ${estado.origemVdot ? `<p style="margin:8px 0 0;font-size:.85rem">Base: ${esc(estado.origemVdot)}</p>` : ''}
+    </section>
+    <section class="cartao">
+      <h2>Seus ritmos</h2>
+      <table class="ritmos"><tbody>${linhasRitmo.map(([nome, valor]) => `<tr><td>${nome}</td><td>${valor}</td></tr>`).join('')}</tbody></table>
+    </section>
     <section class="cartao">
       <h2>Gestos</h2>
       <p class="suave">Deslize para os lados para trocar de aba. Dentro de um treino, deslize para a direita para voltar. No topo da tela, puxe para baixo para buscar corridas novas.</p>
-    </section>
-    <section class="cartao">
-      <h2>Seu nível atual</h2>
-      <p>VDOT <strong>${String(plano.vdot).replace('.', ',')}</strong></p>
-      ${estado.origemVdot ? `<p class="suave">Base: ${esc(estado.origemVdot)}</p>` : ''}
-      <table class="ritmos"><tbody>${linhasRitmo.map(([nome, valor]) => `<tr><td>${nome}</td><td>${valor}</td></tr>`).join('')}</tbody></table>
     </section>
     <section class="cartao">
       <h2>Perfil</h2>
@@ -972,7 +1042,7 @@ function renderAbas() {
   const itens = ITENS_ABAS;
   abas.hidden = false;
   abas.innerHTML = itens
-    .map(([id, nome]) => `<button data-aba="${id}" ${aba === id ? 'aria-current="page"' : ''}>${nome}</button>`)
+    .map(([id, nome]) => `<button data-aba="${id}" ${aba === id ? 'aria-current="page"' : ''}>${icone(id)}${nome}</button>`)
     .join('');
 }
 

@@ -36,6 +36,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/envio.js` | Envio automático da semana, a partir de 3 dias antes do primeiro treino dela. Só roda com o app aberto. |
 | `src/estatisticas.js` | Números da aba Evolução e planilha CSV das corridas. |
 | `src/graficos.js` | Gráficos em SVG, sem bibliotecas. |
+| `src/visual.js` | Ícones, anel de progresso, perfil de intensidade do treino e cálculos das telas. |
 | `src/gestos.js` | Deslizar para trocar de aba e voltar de um treino; puxar no topo para atualizar. |
 | `src/app.js` | Telas. |
 | `sw.js` | Permite abrir sem internet. Ao mudar arquivos do app, troque a `VERSAO`. |
