@@ -67,7 +67,7 @@ let analisePendente = null;
 let gradePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 14;
+const VERSAO_APP = 15;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -310,6 +310,13 @@ function telaBoasVindas() {
 
 // ---------- Cadastro ----------
 
+const PASSOS_DA_CHAVE = `
+  <ol class="motivos suave">
+    <li>Crie uma conta gratuita no <a href="https://intervals.icu" target="_blank" rel="noopener">intervals.icu</a>.</li>
+    <li>Em Settings, conecte o Garmin diretamente, não pelo Strava, e ligue Upload planned workouts.</li>
+    <li>Em Settings, Developer Settings, gere a chave de API e cole aqui. Não passe essa chave a ninguém.</li>
+  </ol>`;
+
 function telaCadastro(valores = {}) {
   abas.hidden = true;
   const v = { idade: '', peso: '', altura: '', kmSemana: '', longo: '', distanciaTempo: '5', chave: estado.chaveApi, ...valores };
@@ -382,11 +389,7 @@ function telaCadastro(valores = {}) {
       <section class="cartao">
         <h2>Conexão com o Garmin (opcional)</h2>
         <p class="suave">Sem a conexão, o app funciona com o que você informar aqui, mas não recebe suas corridas nem envia treinos ao relógio.</p>
-        <ol class="motivos suave">
-          <li>Crie uma conta gratuita no <a href="https://intervals.icu" target="_blank" rel="noopener">intervals.icu</a>.</li>
-          <li>Em Settings, conecte o Garmin diretamente, não pelo Strava, e ligue Upload planned workouts.</li>
-          <li>Em Settings, Developer Settings, gere a chave de API e cole aqui. Não passe essa chave a ninguém.</li>
-        </ol>
+        ${PASSOS_DA_CHAVE}
         <label>Chave de API do intervals.icu<input name="chave" type="password" autocomplete="off" value="${esc(v.chave)}"></label>
       </section>
 
@@ -1252,6 +1255,10 @@ function telaAjustes() {
     </section>
     <form class="cartao" id="form-chave">
       <h2>Intervals.icu</h2>
+      <details class="passos-chave" ${estado.chaveApi ? '' : 'open'}>
+        <summary>Como conseguir a chave de API</summary>
+        ${PASSOS_DA_CHAVE}
+      </details>
       <label>Chave de API<input name="chave" type="password" autocomplete="off" value="${esc(estado.chaveApi)}"></label>
       <div class="botoes">
         <button class="principal" type="submit">Salvar e testar</button>

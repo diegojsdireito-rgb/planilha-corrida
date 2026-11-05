@@ -406,6 +406,9 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .meta-legenda i { width: 10px; height: 10px; border-radius: 3px; }
 .meta-legenda b { color: var(--texto); font-variant-numeric: tabular-nums; }
 
+.passos-chave { margin-bottom: 12px; }
+.passos-chave summary { display: flex; align-items: center; min-height: 44px; color: var(--marca); font-size: .92rem; font-weight: 600; cursor: pointer; }
+
 .mudar-dia summary { display: flex; align-items: center; min-height: 28px; font-weight: 700; color: var(--marca); cursor: pointer; }
 .mudar-dia[open] summary { margin-bottom: 8px; }
 .opcao-dia { display: block; width: 100%; margin-top: 8px; text-align: left; font-weight: 400; background: var(--fundo); }
