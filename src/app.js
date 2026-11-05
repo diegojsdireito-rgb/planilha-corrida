@@ -1,6 +1,17 @@
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
+import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
+import {
+  adesaoDoPeriodo,
+  calcularRecordes,
+  compararPeriodos,
+  csvDasCorridas,
+  registrarNivel,
+  resumoSemanal,
+  zonasDoPeriodo,
+} from './estatisticas.js';
 import { abaDoGesto, ligarGestos } from './gestos.js';
-import { criarCliente } from './icu.js';
+import { barrasDeVolume, linhaDeEvolucao } from './graficos.js';
+import { criarCliente, eventoDaSessao } from './icu.js';
 import {
   analisarRevisao,
   aplicarRevisao,
@@ -37,7 +48,8 @@ const ROTULOS = {
   prova: 'Prova',
 };
 const FASES = { base: 'Base', construcao: 'Construção', pico: 'Pico', polimento: 'Polimento' };
-const DIAS_DE_HISTORICO = 90;
+const DIAS_DE_HISTORICO = 365;
+const MINUTOS_ENTRE_ATUALIZACOES = 15;
 
 let estado = carregar();
 let aba = 'hoje';
@@ -47,7 +59,7 @@ let rolagemAnterior = 0;
 let cadastroAnterior = {};
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 7;
+const VERSAO_APP = 8;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -138,14 +150,97 @@ async function sincronizar(chave = estado.chaveApi) {
   guardar();
 }
 
+// A corrida chega sozinha ao intervals.icu; o app busca ao abrir e ao voltar para a tela.
+async function atualizarSeNecessario() {
+  if (!estado.chaveApi || !estado.plano || ocupado || !navigator.onLine) return;
+  const ultima = estado.ultimaSincronizacao ? new Date(estado.ultimaSincronizacao).getTime() : 0;
+  if (Date.now() - ultima < MINUTOS_ENTRE_ATUALIZACOES * 60000) return;
+  const antes = estado.atividades.length;
+  try {
+    await sincronizar();
+  } catch {
+    return; // Sem aviso: o botão Atualizar corridas continua disponível.
+  }
+  const novas = estado.atividades.length - antes;
+  if (novas <= 0) return;
+  const digitando = document.activeElement?.matches('input, select, textarea');
+  if (!digitando) render();
+  mostrarAviso(novas === 1 ? 'Nova corrida recebida.' : `${novas} novas corridas recebidas.`);
+}
+
+async function salvarArquivo(conteudo, nome, tipo) {
+  const arquivo = new File([conteudo], nome, { type: tipo });
+  // No app instalado do iPhone, o compartilhamento é o caminho confiável para salvar.
+  if (navigator.canShare?.({ files: [arquivo] })) {
+    try {
+      await navigator.share({ files: [arquivo] });
+      return;
+    } catch (erro) {
+      if (erro.name === 'AbortError') return;
+    }
+  }
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(arquivo);
+  link.download = nome;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+}
+
+const assinar = (sessao) => JSON.stringify(eventoDaSessao(sessao, formatarRitmo));
+
+// Sempre remove antes de criar, para o calendário não ficar com treinos repetidos.
+async function aplicarEnvio(enviar, remover) {
+  const ids = enviar.map((s) => s.id);
+  const trocar = [...new Set([...remover, ...ids.filter((id) => estado.enviados.includes(id) || id in estado.assinaturas)])];
+  await criarCliente({ chave: estado.chaveApi }).enviarTreinos(enviar, trocar, formatarRitmo);
+
+  const assinaturas = { ...estado.assinaturas };
+  for (const id of remover) delete assinaturas[id];
+  for (const s of enviar) assinaturas[s.id] = assinar(s);
+  estado.assinaturas = assinaturas;
+  estado.enviados = [...new Set([...estado.enviados.filter((id) => !remover.includes(id)), ...ids])];
+  estado.ultimoEnvio = new Date().toISOString();
+  guardar();
+}
+
 async function enviarAoRelogio() {
   const dia = hoje();
   const futuras = estado.plano.sessoes.filter((s) => s.data >= dia);
-  const trocar = estado.enviados.filter((id) => id.slice(3) >= dia);
-  await criarCliente({ chave: estado.chaveApi }).enviarTreinos(futuras, trocar, formatarRitmo);
-  estado.enviados = [...estado.enviados.filter((id) => id.slice(3) < dia), ...futuras.map((s) => s.id)];
-  estado.ultimoEnvio = new Date().toISOString();
-  guardar();
+  const idsFuturos = new Set(futuras.map((s) => s.id));
+  const remover = estado.enviados.filter((id) => id.slice(3) >= dia && !idsFuturos.has(id));
+  await aplicarEnvio(futuras, remover);
+}
+
+async function enviarAutomaticamente() {
+  if (!estado.envioAutomatico || !estado.chaveApi || !estado.plano || ocupado || !navigator.onLine) return;
+  if (estado.plano.versaoRegras !== VERSAO_REGRAS) return; // nunca manda planilha antiga ao relógio
+  // Envios anteriores a esta versão não têm assinatura: conta como enviado, com conteúdo a conferir.
+  const assinaturas = { ...Object.fromEntries(estado.enviados.map((id) => [id, ''])), ...estado.assinaturas };
+  const dia = hoje();
+  const { enviar, remover } = calcularEnvioAutomatico({ sessoes: estado.plano.sessoes, assinaturas, assinar, hoje: dia });
+  if (!enviar.length && !remover.length) return;
+
+  ocupado = true;
+  try {
+    await aplicarEnvio(enviar, remover);
+    estado.erroEnvioAutomatico = null;
+    guardar();
+    if (enviar.length) mostrarAviso(`${enviar.length} treino(s) enviados ao intervals.icu.`);
+  } catch (erro) {
+    estado.erroEnvioAutomatico = erro.message;
+    guardar();
+  } finally {
+    ocupado = false;
+  }
+  if (!document.activeElement?.matches('input, select, textarea')) render();
+}
+
+function textoEnvioAutomatico() {
+  if (!estado.envioAutomatico) return 'Envio automático desligado. Use o botão abaixo ou ligue em Ajustes.';
+  const assinaturas = { ...Object.fromEntries(estado.enviados.map((id) => [id, ''])), ...estado.assinaturas };
+  const proximo = proximoEnvio({ sessoes: estado.plano.sessoes, assinaturas, hoje: hoje() });
+  const quando = proximo ? `A partir de ${dataCurta(proximo)}, a próxima semana será enviada quando você abrir o app.` : 'Todos os treinos já foram enviados.';
+  return `Envio automático ligado. ${quando}`;
 }
 
 // ---------- Cadastro ----------
@@ -284,11 +379,21 @@ async function enviarCadastro(evento) {
         },
       });
 
-      estado = { ...estado, chaveApi: chave, perfil, objetivo, tempoInformado, plano, origemVdot: estimativa.origem };
+      estado = {
+        ...estado,
+        chaveApi: chave,
+        perfil,
+        objetivo,
+        tempoInformado,
+        plano,
+        origemVdot: estimativa.origem,
+        historicoNivel: registrarNivel(estado.historicoNivel, dia, plano.vdot),
+      };
       guardar();
       aba = 'plano';
       render();
       mostrarAviso('Planilha pronta.');
+      setTimeout(enviarAutomaticamente);
     } catch (falha) {
       problema(falha.message);
       throw falha;
@@ -445,7 +550,125 @@ function blocoRealizado(atividade, previsto) {
       <p class="suave" style="margin-top:12px">Previsto: ${km(previsto.distanciaKm)}, cerca de ${formatarTempo(previsto.tempoSeg)}, pace de ${formatarRitmo(previsto.ritmoMedio)}/km.</p>
       ${extras.length ? `<table class="ritmos"><tbody>${extras.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${zonasFc ? `<h3>Tempo por zona de frequência cardíaca</h3>${zonasFc}<p class="suave">Zonas calculadas pelo intervals.icu.</p>` : ''}
+      ${atividade.id && estado.chaveApi ? `
+        <h3>Baixar esta corrida</h3>
+        <div class="botoes">
+          <button data-baixar="fit" data-id="${esc(atividade.id)}" data-data="${esc(atividade.data)}">Arquivo FIT</button>
+          <button data-baixar="gpx" data-id="${esc(atividade.id)}" data-data="${esc(atividade.data)}">Arquivo GPX</button>
+        </div>` : ''}
     </section>`;
+}
+
+// ---------- Evolução ----------
+
+function comparacao(atual, anterior) {
+  if (!anterior) return 'Sem período anterior para comparar';
+  const pct = Math.round(((atual - anterior) / anterior) * 100);
+  if (pct === 0) return 'Igual aos 28 dias anteriores';
+  return `${Math.abs(pct)}% ${pct > 0 ? 'a mais' : 'a menos'} que nos 28 dias anteriores`;
+}
+
+function telaEvolucao() {
+  const dia = hoje();
+  const { atividades, plano } = estado;
+  const atualizacao = estado.chaveApi ? `
+    <section class="cartao">
+      <p class="suave">${estado.ultimaSincronizacao ? `Atualizado em ${new Date(estado.ultimaSincronizacao).toLocaleString('pt-BR')}` : 'Corridas ainda não atualizadas.'}</p>
+      <button data-acao="sincronizar">Atualizar corridas</button>
+    </section>` : '';
+
+  const cabecalho = `<header class="topo"><h1>Evolução</h1><p class="suave">Suas corridas e seu nível ao longo do tempo.</p></header>`;
+  const previsoes = [[5, '5 km'], [10, '10 km'], [21.1, 'Meia maratona'], [42.2, 'Maratona']]
+    .map(([distancia, nome]) => `<tr><td>${nome}</td><td>${formatarTempo(preverTempoSeg(plano.vdot, distancia))}</td></tr>`)
+    .join('');
+  const blocoPrevisoes = `
+    <section class="cartao">
+      <h2>Previsão de prova pelo nível atual</h2>
+      <p class="suave">VDOT ${String(plano.vdot).replace('.', ',')}. Estimativa teórica, que supõe treino específico para cada distância.</p>
+      <table class="ritmos"><tbody>${previsoes}</tbody></table>
+    </section>`;
+
+  if (!atividades.length) {
+    return `${cabecalho}
+      <section class="cartao alerta">
+        <h2>Ainda não há corridas</h2>
+        <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
+      </section>
+      ${atualizacao}${blocoPrevisoes}`;
+  }
+
+  const semanas = resumoSemanal({ atividades, plano, hoje: dia });
+  const { atual, anterior } = compararPeriodos(atividades, dia);
+  const adesao = adesaoDoPeriodo({ atividades, plano, hoje: dia });
+  const recordes = calcularRecordes(atividades);
+  const zonas = zonasDoPeriodo(atividades, dia);
+  const grafRitmo = linhaDeEvolucao(
+    semanas.map((s) => ({ data: s.segunda, valor: s.ritmo })),
+    { nome: 'Pace médio', formatar: (v) => `${formatarRitmo(v)}/km`, formatarEixo: formatarRitmo, menorEhMelhor: true, passoMinimo: 5 },
+  );
+  const grafEficiencia = linhaDeEvolucao(
+    semanas.map((s) => ({ data: s.segunda, valor: s.metrosPorBatimento })),
+    { nome: 'Metros por batimento', formatar: (v) => `${v.toFixed(2).replace('.', ',')} m`, formatarEixo: (v) => v.toFixed(2).replace('.', ','), passoMinimo: 0.02 },
+  );
+  const grafNivel = linhaDeEvolucao(
+    estado.historicoNivel.map((p) => ({ data: p.data, valor: p.vdot })),
+    { nome: 'VDOT', formatar: (v) => v.toFixed(1).replace('.', ','), passoMinimo: 0.5 },
+  );
+  const linhasRecordes = [
+    ['Maior corrida', `${km(recordes.maiorCorrida.km)}, ${dataCurta(recordes.maiorCorrida.data)}`],
+    ['Melhor pace (5 km ou mais)', recordes.melhorPace ? `${formatarRitmo(recordes.melhorPace.ritmo)}/km, ${dataCurta(recordes.melhorPace.data)}` : 'Ainda sem corrida de 5 km'],
+    ['Maior semana', `${km(recordes.maiorSemana.km)}, a partir de ${dataCurta(recordes.maiorSemana.segunda)}`],
+  ];
+
+  return `${cabecalho}
+    <section class="cartao destaque">
+      <h2>Últimos 28 dias</h2>
+      <div class="numeros">
+        <div><b>${km(Math.round(atual.km * 10) / 10)}</b><span>Distância</span></div>
+        <div><b>${atual.corridas}</b><span>Corridas</span></div>
+        <div><b>${formatarTempo(atual.seg)}</b><span>Tempo</span></div>
+      </div>
+      <p class="suave" style="margin-top:12px">${comparacao(atual.km, anterior.km)}.</p>
+      ${adesao === null ? '' : `<p class="suave">Você cumpriu ${Math.round(adesao * 100)}% do volume previsto.</p>`}
+    </section>
+    <section class="cartao">
+      <h2>Volume por semana (km)</h2>
+      ${barrasDeVolume(semanas, km)}
+    </section>
+    ${grafRitmo ? `
+      <section class="cartao">
+        <h2>Pace médio por semana</h2>
+        <p class="suave">Mais rápido fica no alto. Sem provas e corridas abaixo de 3 km.</p>
+        ${grafRitmo}
+      </section>` : ''}
+    ${grafEficiencia ? `
+      <section class="cartao">
+        <h2>Eficiência</h2>
+        <p class="suave">Metros corridos por batimento cardíaco. Subir é bom sinal, mas calor e terreno também mudam o valor.</p>
+        ${grafEficiencia}
+      </section>` : ''}
+    ${grafNivel ? `
+      <section class="cartao">
+        <h2>Nível estimado (VDOT)</h2>
+        ${grafNivel}
+      </section>` : ''}
+    ${zonas.length ? `
+      <section class="cartao">
+        <h2>Zonas de frequência cardíaca nos últimos 28 dias</h2>
+        ${zonas.map((z) => barraDeZona(`Z${z.zona}`, z.seg, z.fracao)).join('')}
+        <p class="suave">Zonas calculadas pelo intervals.icu.</p>
+      </section>` : ''}
+    <section class="cartao">
+      <h2>Recordes em 12 meses</h2>
+      <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
+    </section>
+    ${blocoPrevisoes}
+    <section class="cartao">
+      <h2>Baixar meus dados</h2>
+      <p class="suave">Planilha com ${atividades.length} corridas dos últimos 12 meses, para abrir no Excel. O arquivo FIT ou GPX de cada corrida fica nos detalhes do treino.</p>
+      <button data-acao="baixar-csv">Baixar planilha (CSV)</button>
+    </section>
+    ${atualizacao}`;
 }
 
 function telaDetalhe(sessao) {
@@ -536,9 +759,11 @@ function telaPlano() {
     <section class="cartao">
       <h2>Levar para o relógio</h2>
       ${estado.chaveApi
-        ? `<p class="suave">Envia ${futuras} treinos ao calendário do intervals.icu. Eles seguem para o Garmin se a opção "Upload planned workouts" estiver ligada lá.</p>
+        ? `<p>${esc(textoEnvioAutomatico())}</p>
+           ${estado.envioAutomatico && estado.erroEnvioAutomatico ? `<p class="erro">Último envio automático falhou: ${esc(estado.erroEnvioAutomatico)}</p>` : ''}
+           <p class="suave">Os treinos vão ao calendário do intervals.icu e seguem para o Garmin se a opção "Upload planned workouts" estiver ligada lá.</p>
            ${estado.ultimoEnvio ? `<p class="suave">Último envio: ${new Date(estado.ultimoEnvio).toLocaleString('pt-BR')}</p>` : ''}
-           <button class="principal" data-acao="enviar" ${futuras ? '' : 'disabled'}>Enviar treinos</button>`
+           <button data-acao="enviar" ${futuras ? '' : 'disabled'}>Enviar toda a planilha agora (${futuras})</button>`
         : '<p class="suave">Conecte o intervals.icu nos Ajustes para enviar os treinos.</p>'}
     </section>
     ${lista}`;
@@ -622,6 +847,11 @@ function telaAjustes() {
       </div>
     </form>
     <section class="cartao">
+      <h2>Envio automático</h2>
+      <label class="marcar"><input type="checkbox" id="envio-automatico" ${estado.envioAutomatico ? 'checked' : ''}> Enviar os treinos de cada semana</label>
+      <p class="suave">A semana vai ao relógio na primeira vez que você abrir o app, a partir de ${DIAS_DE_ANTECEDENCIA} dias antes do primeiro treino dela. O iPhone não deixa o app rodar fechado, então ele precisa ser aberto nesse período.</p>
+    </section>
+    <section class="cartao">
       <h2>Cópia de segurança</h2>
       <p class="suave">Seus dados ficam só neste aparelho. A cópia não inclui a chave de API.</p>
       <div class="botoes">
@@ -642,7 +872,7 @@ function telaAjustes() {
 
 // ---------- Estrutura ----------
 
-const ITENS_ABAS = [['hoje', 'Hoje'], ['plano', 'Planilha'], ['revisao', 'Revisão'], ['ajustes', 'Ajustes']];
+const ITENS_ABAS = [['hoje', 'Hoje'], ['plano', 'Planilha'], ['evolucao', 'Evolução'], ['revisao', 'Revisão'], ['ajustes', 'Ajustes']];
 const ORDEM_ABAS = ITENS_ABAS.map(([id]) => id);
 
 function renderAbas() {
@@ -657,7 +887,7 @@ function render() {
   if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
   const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
-  const telas = { hoje: telaHoje, plano: telaPlano, revisao: telaRevisao, ajustes: telaAjustes };
+  const telas = { hoje: telaHoje, plano: telaPlano, evolucao: telaEvolucao, revisao: telaRevisao, ajustes: telaAjustes };
   app.innerHTML = aberta ? telaDetalhe(aberta) : telas[aba]();
   window.scrollTo(0, 0);
 }
@@ -710,19 +940,16 @@ const acoes = {
     const analise = analisarRevisao({ plano: estado.plano, atividades: estado.atividades, avaliacoes: estado.avaliacoes, hoje: dia });
     estado.plano = aplicarRevisao({ plano: estado.plano, parametros: parametrosAtuais(), analise, hoje: dia });
     estado.revisoes.push({ data: dia, acao: analise.acao, motivos: analise.motivos });
+    estado.historicoNivel = registrarNivel(estado.historicoNivel, dia, estado.plano.vdot);
     guardar();
     render();
-    mostrarAviso(estado.chaveApi ? 'Planilha ajustada. Envie os treinos de novo em Planilha.' : 'Planilha ajustada.');
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Planilha ajustada. Envie os treinos de novo em Planilha.' : 'Planilha ajustada.');
+    setTimeout(enviarAutomaticamente);
   }),
 
-  exportar: () => {
-    const arquivo = new Blob([exportar(estado)], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(arquivo);
-    link.download = `planilha-corrida-${hoje()}.json`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  },
+  exportar: () => salvarArquivo(exportar(estado), `planilha-corrida-${hoje()}.json`, 'application/json'),
+
+  'baixar-csv': () => salvarArquivo(csvDasCorridas(estado.atividades), `corridas-${hoje()}.csv`, 'text/csv'),
 
   'remover-chave': () => {
     estado.chaveApi = '';
@@ -733,7 +960,7 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { chaveApi, atividades, enviados, semDados, perfil, objetivo } = estado;
+    const { chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       idade: perfil.idade,
       peso: perfil.pesoKg,
@@ -745,7 +972,7 @@ const acoes = {
       dataProva: objetivo.dataProva,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), chaveApi, atividades, enviados, semDados };
+    estado = { ...estadoInicial(), chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -760,8 +987,35 @@ app.addEventListener('click', (e) => {
     render();
     return;
   }
+  const marca = e.target.closest('[data-dica]');
+  if (marca) {
+    mostrarDica(marca);
+    return;
+  }
+  const baixar = e.target.closest('[data-baixar]');
+  if (baixar) {
+    const { baixar: formato, id, data } = baixar.dataset;
+    comOcupado(baixar, async () => {
+      const conteudo = await criarCliente({ chave: estado.chaveApi }).arquivoDaCorrida(id, formato);
+      await salvarArquivo(conteudo, `corrida-${data}.${formato}`, 'application/octet-stream');
+      render();
+    });
+    return;
+  }
   const botao = e.target.closest('[data-acao]');
   if (botao) acoes[botao.dataset.acao]?.(botao);
+});
+
+function mostrarDica(marca) {
+  const figura = marca.closest('.figura');
+  figura.querySelector('.dica').textContent = marca.dataset.dica;
+  figura.querySelector('.marcada')?.classList.remove('marcada');
+  marca.classList.add('marcada');
+}
+
+app.addEventListener('pointerover', (e) => {
+  const marca = e.pointerType === 'mouse' && e.target.closest('[data-dica]');
+  if (marca) mostrarDica(marca);
 });
 
 app.addEventListener('input', (e) => {
@@ -795,6 +1049,14 @@ app.addEventListener('submit', (e) => {
 });
 
 app.addEventListener('change', async (e) => {
+  if (e.target.id === 'envio-automatico') {
+    estado.envioAutomatico = e.target.checked;
+    estado.erroEnvioAutomatico = null;
+    guardar();
+    mostrarAviso(estado.envioAutomatico ? 'Envio automático ligado.' : 'Envio automático desligado.');
+    enviarAutomaticamente();
+    return;
+  }
   if (e.target.id !== 'importar' || !e.target.files[0]) return;
   try {
     estado = importar(await e.target.files[0].text(), estado);
@@ -811,4 +1073,14 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+async function aoAbrir() {
+  await atualizarSeNecessario();
+  await enviarAutomaticamente();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') aoAbrir();
+});
+
 render();
+aoAbrir();

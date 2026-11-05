@@ -1,6 +1,8 @@
 // Cliente do intervals.icu. A chave fica só no aparelho e vai só para intervals.icu.
 
 const BASE = 'https://intervals.icu/api/v1/athlete/0';
+const BASE_ATIVIDADE = 'https://intervals.icu/api/v1/activity';
+const CAMINHO_DO_ARQUIVO = { fit: 'fit-file', gpx: 'gpx-file' };
 const TIPOS_DE_CORRIDA = new Set(['Run', 'TrailRun', 'VirtualRun']);
 const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,max_heartrate,total_elevation_gain,icu_hr_zone_times,source';
 
@@ -63,10 +65,10 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
     'Content-Type': 'application/json',
   };
 
-  async function pedir(caminho, opcoes = {}) {
+  async function chamar(url, opcoes = {}) {
     let resposta;
     try {
-      resposta = await buscar(`${BASE}${caminho}`, { ...opcoes, headers: cabecalhos });
+      resposta = await buscar(url, { ...opcoes, headers: cabecalhos });
     } catch {
       throw new Error('Não consegui falar com o intervals.icu. Confira sua internet.');
     }
@@ -74,12 +76,22 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
       throw new Error('O intervals.icu recusou a chave. Confira a chave de API nos Ajustes.');
     }
     if (!resposta.ok) throw new Error(`O intervals.icu respondeu com erro ${resposta.status}.`);
+    return resposta;
+  }
+
+  async function pedir(caminho, opcoes = {}) {
+    const resposta = await chamar(`${BASE}${caminho}`, opcoes);
     const texto = await resposta.text();
     return texto ? JSON.parse(texto) : null;
   }
 
   return {
     testar: () => pedir(''),
+
+    async arquivoDaCorrida(id, formato) {
+      const url = `${BASE_ATIVIDADE}/${encodeURIComponent(id)}/${CAMINHO_DO_ARQUIVO[formato]}`;
+      return (await chamar(url)).blob();
+    },
 
     // Atividades que vieram só do Strava chegam sem dados pela API, por decisão do Strava.
     async atividades(de, ate) {

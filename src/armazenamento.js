@@ -12,7 +12,11 @@ export const estadoInicial = () => ({
   semDados: 0,
   avaliacoes: {},
   revisoes: [],
+  historicoNivel: [],
   enviados: [],
+  assinaturas: {},
+  envioAutomatico: true,
+  erroEnvioAutomatico: null,
   ultimaSincronizacao: null,
   ultimoEnvio: null,
 });

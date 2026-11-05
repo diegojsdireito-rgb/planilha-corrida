@@ -14,6 +14,7 @@
   --ok: #15803d;
   --forte: #c2410c;
   --longo: #1d4ed8;
+  --serie: #0d9488;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +33,7 @@
     --ok: #4ade80;
     --forte: #fb923c;
     --longo: #93b4fb;
+    --serie: #0d9488;
   }
 }
 
@@ -225,14 +227,34 @@ h3 { font-size: .95rem; margin: 12px 0 6px; }
   position: fixed;
   inset: auto 0 0 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--cartao);
   border-top: 1px solid var(--borda);
   padding-bottom: env(safe-area-inset-bottom);
 }
 #abas[hidden] { display: none; }
-#abas button { border: 0; border-radius: 0; background: none; min-height: 56px; color: var(--suave); font-size: .85rem; }
+#abas button { border: 0; border-radius: 0; background: none; min-height: 56px; padding: 8px 2px; color: var(--suave); font-size: .78rem; }
 #abas button[aria-current="page"] { color: var(--marca); box-shadow: inset 0 2px 0 var(--marca); }
+
+.figura { margin: 0; }
+.grafico { display: block; width: 100%; height: auto; margin-top: 8px; overflow: visible; }
+.g-grade { stroke: var(--borda); stroke-width: 1; }
+.g-texto { fill: var(--suave); font-size: 10px; font-variant-numeric: tabular-nums; }
+.g-destaque { fill: var(--texto); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.g-barra { fill: var(--serie); }
+.g-previsto { stroke: var(--texto); stroke-width: 2; stroke-linecap: round; }
+.g-linha { fill: none; stroke: var(--serie); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.g-ponto { fill: var(--serie); stroke: var(--cartao); stroke-width: 2; }
+.g-toque { fill: transparent; cursor: pointer; }
+.g-toque.marcada { fill: var(--texto); fill-opacity: .08; }
+.legenda { display: flex; gap: 16px; font-size: .85rem; color: var(--suave); }
+.legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.l-barra { width: 12px; height: 12px; border-radius: 3px; background: var(--serie); }
+.l-previsto { width: 14px; height: 2px; background: var(--texto); }
+.dica { min-height: 2.6em; margin: 8px 0 0; font-size: .85rem; color: var(--suave); }
+.tabela-grafico summary { min-height: 44px; display: flex; align-items: center; color: var(--marca); font-size: .9rem; font-weight: 600; cursor: pointer; }
+.ritmos th { padding: 6px 0; text-align: left; font-size: .85rem; color: var(--suave); }
+.ritmos th:last-child { text-align: right; }
 
 #aviso {
   position: fixed;

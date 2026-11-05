@@ -114,6 +114,22 @@ test('se a remoção falhar, não cria treinos em duplicidade', async () => {
   assert.equal(chamadas.length, 1);
 });
 
+test('baixa o arquivo da corrida pelo endereço da atividade', async () => {
+  const urls = [];
+  const arquivo = { tamanho: 3 };
+  const buscar = async (url) => {
+    urls.push(url);
+    return { status: 200, ok: true, blob: async () => arquivo };
+  };
+  const cliente = criarCliente({ chave: 'abc', buscar });
+  assert.equal(await cliente.arquivoDaCorrida('i123', 'fit'), arquivo);
+  await cliente.arquivoDaCorrida('i123', 'gpx');
+  assert.deepEqual(urls, [
+    'https://intervals.icu/api/v1/activity/i123/fit-file',
+    'https://intervals.icu/api/v1/activity/i123/gpx-file',
+  ]);
+});
+
 test('chave recusada gera mensagem clara', async () => {
   const { cliente } = clienteFalso([{ status: 401 }]);
   await assert.rejects(cliente.testar(), /recusou a chave/);
