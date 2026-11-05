@@ -18,13 +18,16 @@ import {
   avaliarPrudencia,
   baseDasAtividades,
   detalharSessao,
+  diasParaMudar,
   estimarVdot,
   formatarRitmo,
   formatarTempo,
   gerarPlano,
+  mudarDiaDaSessao,
   preverTempoSeg,
   proximaSegunda,
   reanalisarPlano,
+  refazerComNovosDias,
   segundaDaSemana,
   somarDias,
   VERSAO_REGRAS,
@@ -60,9 +63,10 @@ let sessaoAberta = null;
 let rolagemAnterior = 0;
 let cadastroAnterior = {};
 let analisePendente = null;
+let gradePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 12;
+const VERSAO_APP = 13;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -785,6 +789,42 @@ function telaEvolucao() {
     ${atualizacao}`;
 }
 
+function blocoMudarDia(sessao, dia) {
+  const pode = sessao.tipo !== 'prova' && sessao.data >= dia && !atividadeDoDia(sessao.data).length;
+  if (!pode) return '';
+  const opcoes = diasParaMudar({ plano: estado.plano, sessao, atividades: estado.atividades, hoje: dia });
+  return `
+    <details class="cartao mudar-dia">
+      <summary>Mudar o dia deste treino</summary>
+      ${opcoes.length ? `
+        <p class="suave">Dias livres desta semana. Fora dela, o volume calculado para cada semana mudaria.</p>
+        ${opcoes.map((o) => `
+          <button class="opcao-dia" data-mudar-dia="${o.data}">
+            <strong>${dataLonga(o.data)}</strong>
+            ${o.aviso ? `<span class="opcao-aviso">${esc(o.aviso)}</span>` : ''}
+          </button>`).join('')}`
+        : '<p class="suave" style="margin:12px 0 0">Não há outro dia livre nesta semana.</p>'}
+    </details>`;
+}
+
+function mudarDia(novaData) {
+  const sessao = estado.plano.sessoes.find((s) => s.id === sessaoAberta);
+  const novoId = `pc-${novaData}`;
+  const jaEnviada = sessao.id in estado.assinaturas || estado.enviados.includes(sessao.id);
+  estado.plano = mudarDiaDaSessao(estado.plano, sessao.id, novaData);
+  if (estado.avaliacoes[sessao.id]) {
+    const { [sessao.id]: nota, ...demais } = estado.avaliacoes;
+    estado.avaliacoes = { ...demais, [novoId]: nota };
+  }
+  // Assinatura vazia conta como conteúdo a conferir: o envio automático troca o treino no calendário já.
+  if (jaEnviada && estado.envioAutomatico) estado.assinaturas = { ...estado.assinaturas, [novoId]: '' };
+  sessaoAberta = novoId;
+  guardar();
+  render();
+  mostrarAviso(`Treino movido para ${dataLonga(novaData)}.${estado.chaveApi && jaEnviada && !estado.envioAutomatico ? ' Envie de novo em Planilha.' : ''}`);
+  setTimeout(enviarAutomaticamente);
+}
+
 function telaDetalhe(sessao) {
   const dia = hoje();
   const d = detalharSessao(sessao, estado.plano.vdot);
@@ -815,6 +855,7 @@ function telaDetalhe(sessao) {
       <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
       <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : 'Estimativa pelo meio das faixas de ritmo, com o seu nível atual.'}</p>
     </section>
+    ${blocoMudarDia(sessao, dia)}
     <section class="cartao">
       <h2>Por que este treino</h2>
       <p>${esc(sessao.porque)}</p>
@@ -899,6 +940,7 @@ const TITULOS_ACAO = {
   reduzir: 'Reduzir para recuperar',
   semDados: 'Ainda é cedo para revisar',
   analise: 'Análise atualizada com suas corridas',
+  dias: 'Dias de treino alterados',
 };
 
 function blocoAtualizarAnalise() {
@@ -971,6 +1013,86 @@ function telaRevisao() {
 
 // ---------- Ajustes ----------
 
+function blocoDiasDeTreino() {
+  const { perfil } = estado;
+  if (gradePendente) {
+    const { antes, depois, aPartirDe } = gradePendente;
+    const nomes = (dias) => DIAS.filter((d) => dias.includes(d.valor)).map((d) => d.curto).join(', ');
+    const linhas = [
+      ['Treinos', antes.treinos, depois.treinos],
+      ['Volume', km(antes.km), km(depois.km)],
+    ];
+    return `
+      <section class="cartao destaque" id="dias-de-treino">
+        <h2>Nova grade de treino</h2>
+        <p class="suave">Na semana de ${dataCurta(aPartirDe)}:</p>
+        <p style="margin:0"><strong>Hoje:</strong> ${nomes(antes.dias)}</p>
+        <p><strong>Nova:</strong> ${nomes(depois.dias)}</p>
+        <table class="ritmos comparacao">
+          <thead><tr><th></th><th>Hoje</th><th>Nova</th></tr></thead>
+          <tbody>${linhas.map(([nome, a, b]) => `<tr><td>${nome}</td><td>${a}</td><td>${b}</td></tr>`).join('')}</tbody>
+        </table>
+        <p class="suave" style="margin-top:12px">O app usa só os dias que o seu volume sustenta, então alguns dias marcados podem ficar livres. Nível e progressão continuam iguais.</p>
+        <p class="suave">Treinos que você moveu de dia nas próximas semanas seguem a nova grade.</p>
+        <div class="botoes">
+          <button class="principal" data-acao="aplicar-grade">Aplicar à planilha</button>
+          <button data-acao="cancelar-grade">Manter como está</button>
+        </div>
+      </section>`;
+  }
+  return `
+    <form class="cartao" id="form-dias">
+      <h2>Dias de treino</h2>
+      <p class="suave">Marque os dias em que está livre e o app refaz a grade da próxima segunda em diante. Treinos passados e a semana em andamento não mudam. Se a planilha ainda não começou, ela é refeita por inteiro.</p>
+      <fieldset>
+        <legend>Dias em que está livre</legend>
+        <div class="dias">
+          ${DIAS.map((d) => `<label><input type="checkbox" name="dias" value="${d.valor}" ${perfil.diasSemana.includes(d.valor) ? 'checked' : ''}><span>${d.curto}</span></label>`).join('')}
+        </div>
+      </fieldset>
+      <label>Dia do longão
+        <select name="diaLongo">
+          ${DIAS.map((d) => `<option value="${d.valor}" ${perfil.diaLongo === d.valor ? 'selected' : ''}>${d.nome}</option>`).join('')}
+        </select>
+      </label>
+      <p id="erro-dias" class="erro" role="alert"></p>
+      <button class="principal" type="submit">Ver como fica</button>
+    </form>`;
+}
+
+function verNovaGrade(form) {
+  const dados = new FormData(form);
+  const diasSemana = dados.getAll('dias').map(Number);
+  const diaLongo = Number(dados.get('diaLongo'));
+  const erro = document.getElementById('erro-dias');
+  if (diasSemana.length < 3) {
+    erro.textContent = 'Marque pelo menos 3 dias livres.';
+    return;
+  }
+  if (!diasSemana.includes(diaLongo)) {
+    erro.textContent = 'O dia do longão precisa ser um dos dias livres.';
+    return;
+  }
+  const dia = hoje();
+  const proxima = dia < estado.plano.inicio ? estado.plano.inicio : proximaSegunda(dia);
+  const ultima = estado.revisoes[estado.revisoes.length - 1];
+  gradePendente = refazerComNovosDias({
+    plano: estado.plano,
+    parametros: parametrosAtuais(),
+    diasSemana,
+    diaLongo,
+    // A revisão que pediu redução não pode ser desfeita por uma troca de dias.
+    semQualidadeNaPrimeira: ultima?.acao === 'reduzir' && proximaSegunda(ultima.data) === proxima,
+    hoje: dia,
+  });
+  if (!gradePendente) {
+    erro.textContent = 'Não há semanas seguintes nesta planilha. Comece um novo ciclo.';
+    return;
+  }
+  render();
+  document.getElementById('dias-de-treino').scrollIntoView({ block: 'center' });
+}
+
 function telaAjustes() {
   const { plano, perfil } = estado;
   const r = plano.ritmos;
@@ -988,6 +1110,7 @@ function telaAjustes() {
       <p class="heroi-numero">${String(plano.vdot).replace('.', ',')}</p>
       ${estado.origemVdot ? `<p style="margin:8px 0 0;font-size:.85rem">Base: ${esc(estado.origemVdot)}</p>` : ''}
     </section>
+    ${blocoDiasDeTreino()}
     <section class="cartao">
       <h2>Seus ritmos</h2>
       <table class="ritmos"><tbody>${linhasRitmo.map(([nome, valor]) => `<tr><td>${nome}</td><td>${valor}</td></tr>`).join('')}</tbody></table>
@@ -999,7 +1122,7 @@ function telaAjustes() {
     <section class="cartao">
       <h2>Perfil</h2>
       <p>${perfil.idade} anos, ${esc(perfil.pesoKg)} kg, ${esc(perfil.alturaCm)} cm${plano.prudencia?.imc ? `, IMC ${String(plano.prudencia.imc).replace('.', ',')}` : ''}</p>
-      <p class="suave">Para mudar perfil, objetivo ou dias, comece um novo ciclo.</p>
+      <p class="suave">Para mudar perfil ou objetivo, comece um novo ciclo.</p>
     </section>
     <form class="cartao" id="form-chave">
       <h2>Intervals.icu</h2>
@@ -1124,6 +1247,22 @@ const acoes = {
     if (!analisePendente) mostrarAviso('Esta planilha já terminou. Comece um novo ciclo nos Ajustes.');
   }),
 
+  'cancelar-grade': () => {
+    gradePendente = null;
+    render();
+  },
+
+  'aplicar-grade': () => {
+    estado.plano = gradePendente.plano;
+    estado.perfil = gradePendente.perfil;
+    estado.revisoes.push({ data: hoje(), acao: 'dias', motivos: [] });
+    gradePendente = null;
+    guardar();
+    render();
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Grade refeita. Envie os treinos de novo em Planilha.' : 'Grade refeita.');
+    setTimeout(enviarAutomaticamente);
+  },
+
   'cancelar-analise': () => {
     analisePendente = null;
     render();
@@ -1201,6 +1340,11 @@ app.addEventListener('click', (e) => {
     render();
     return;
   }
+  const mudar = e.target.closest('[data-mudar-dia]');
+  if (mudar) {
+    mudarDia(mudar.dataset.mudarDia);
+    return;
+  }
   const marca = e.target.closest('[data-dica]');
   if (marca) {
     mostrarDica(marca);
@@ -1247,6 +1391,8 @@ app.addEventListener('submit', (e) => {
     mostrarAviso('Avaliação salva.');
     return undefined;
   }
+
+  if (e.target.id === 'form-dias') return verNovaGrade(e.target);
 
   if (e.target.id === 'form-chave') {
     const chave = String(new FormData(e.target).get('chave') ?? '').trim();

@@ -8,13 +8,16 @@ import {
   calcularVdot,
   detalharSessao,
   diaDaSemana,
+  diasParaMudar,
   escolherDiasDeTreino,
   estimarVdot,
   formatarRitmo,
   gerarPlano,
+  mudarDiaDaSessao,
   preverTempoSeg,
   proximaSegunda,
   reanalisarPlano,
+  refazerComNovosDias,
   segundaDaSemana,
   somarDias,
   treinosPorSemana,
@@ -38,6 +41,87 @@ const kmPorSemana = (plano) => {
   for (const s of plano.sessoes) mapa.set(s.semana, (mapa.get(s.semana) ?? 0) + s.distanciaKm);
   return [...mapa.values()];
 };
+
+test('mudar o dia oferece só dias livres da mesma semana, a partir de hoje', () => {
+  const plano = gerarPlano(parametros());
+  const [primeira] = plano.sessoes;
+  const opcoes = diasParaMudar({ plano, sessao: primeira, atividades: [], hoje: INICIO });
+  const ocupados = plano.sessoes.map((s) => s.data);
+  assert.ok(opcoes.length > 0);
+  for (const { data } of opcoes) {
+    assert.equal(segundaDaSemana(data), segundaDaSemana(primeira.data));
+    assert.ok(!ocupados.includes(data));
+  }
+  const depoisDeQuarta = diasParaMudar({ plano, sessao: plano.sessoes[2], atividades: [], hoje: somarDias(INICIO, 3) });
+  assert.ok(depoisDeQuarta.every((o) => o.data >= somarDias(INICIO, 3)));
+});
+
+test('não muda o dia de prova, de treino passado ou de treino já corrido', () => {
+  const plano = gerarPlano(parametros());
+  const prova = plano.sessoes.find((s) => s.tipo === 'prova');
+  const [primeira] = plano.sessoes;
+  assert.deepEqual(diasParaMudar({ plano, sessao: prova, atividades: [], hoje: INICIO }), []);
+  assert.deepEqual(diasParaMudar({ plano, sessao: primeira, atividades: [], hoje: somarDias(primeira.data, 1) }), []);
+  assert.deepEqual(diasParaMudar({ plano, sessao: primeira, atividades: [{ data: primeira.data, km: 5 }], hoje: INICIO }), []);
+});
+
+test('avisa quando o treino forte fica colado em outro forte', () => {
+  const forte = (data, tipo) => ({ id: `pc-${data}`, data, tipo, distanciaKm: 8 });
+  const plano = { sessoes: [forte('2026-11-10', 'limiar'), forte('2026-11-15', 'longo')] };
+  const opcoes = diasParaMudar({ plano, sessao: plano.sessoes[0], atividades: [], hoje: INICIO });
+  assert.match(opcoes.find((o) => o.data === '2026-11-14').aviso, /forte/);
+  assert.equal(opcoes.find((o) => o.data === '2026-11-11').aviso, null);
+});
+
+test('não move treino para depois da prova na semana dela', () => {
+  const plano = gerarPlano(parametros({ objetivo: { distanciaKm: 10, dataProva: '2027-02-04' } }));
+  const prova = plano.sessoes.find((s) => s.tipo === 'prova');
+  const antes = plano.sessoes.find((s) => s.semana === prova.semana && s.tipo !== 'prova');
+  const opcoes = diasParaMudar({ plano, sessao: antes, atividades: [], hoje: INICIO });
+  assert.ok(opcoes.every((o) => o.data < prova.data));
+});
+
+test('mudar o dia troca a data e o id e mantém a lista em ordem', () => {
+  const plano = gerarPlano(parametros());
+  const [primeira, segunda] = plano.sessoes;
+  const novaData = somarDias(segunda.data, 1);
+  const novo = mudarDiaDaSessao(plano, primeira.id, novaData);
+  const movida = novo.sessoes.find((s) => s.data === novaData);
+  assert.equal(movida.id, `pc-${novaData}`);
+  assert.equal(movida.nome, primeira.nome);
+  assert.equal(novo.sessoes.length, plano.sessoes.length);
+  assert.ok(novo.sessoes.every((s, i) => i === 0 || novo.sessoes[i - 1].data <= s.data));
+});
+
+test('novos dias refazem só da próxima segunda e respeitam os dias escolhidos', () => {
+  const plano = gerarPlano(parametros());
+  const hoje = somarDias(INICIO, 23); // quinta da 4ª semana
+  const r = refazerComNovosDias({ plano, parametros: { perfil, objetivo: parametros().objetivo }, diasSemana: [1, 3, 5, 6], diaLongo: 6, hoje });
+  assert.equal(r.aPartirDe, proximaSegunda(hoje));
+  assert.deepEqual(r.plano.sessoes.filter((s) => s.data < r.aPartirDe), plano.sessoes.filter((s) => s.data < r.aPartirDe));
+  const novas = r.plano.sessoes.filter((s) => s.data >= r.aPartirDe && s.tipo !== 'prova');
+  assert.ok(novas.every((s) => [1, 3, 5, 6].includes(diaDaSemana(s.data))));
+  assert.ok(novas.filter((s) => s.tipo === 'longo').every((s) => diaDaSemana(s.data) === 6));
+  assert.equal(r.plano.sessoes.find((s) => s.tipo === 'prova').data, '2027-02-07');
+  assert.deepEqual(r.perfil.diasSemana, [1, 3, 5, 6]);
+});
+
+test('novos dias não devolvem o volume ao início, mesmo sem corridas', () => {
+  const plano = gerarPlano(parametros());
+  const hoje = somarDias(INICIO, 30); // já perto do meio do ciclo
+  const r = refazerComNovosDias({ plano, parametros: { perfil, objetivo: parametros().objetivo }, diasSemana: [1, 3, 5, 6], diaLongo: 6, hoje });
+  assert.equal(r.plano.vdot, plano.vdot);
+  assert.ok(Math.abs(r.depois.km - r.antes.km) <= r.antes.km * 0.15, `${r.antes.km} para ${r.depois.km}`);
+});
+
+test('novos dias antes do início refazem a planilha inteira; depois do fim não há o que refazer', () => {
+  const plano = gerarPlano(parametros());
+  const args = { plano, parametros: { perfil, objetivo: parametros().objetivo }, diasSemana: [1, 3, 5, 6], diaLongo: 6 };
+  const antes = refazerComNovosDias({ ...args, hoje: somarDias(INICIO, -2) });
+  assert.equal(antes.aPartirDe, INICIO);
+  assert.ok(antes.plano.sessoes.filter((s) => s.tipo !== 'prova').every((s) => [1, 3, 5, 6].includes(diaDaSemana(s.data))));
+  assert.equal(refazerComNovosDias({ ...args, hoje: '2027-03-01' }), null);
+});
 
 test('VDOT confere com as tabelas publicadas de Daniels', () => {
   assert.ok(Math.abs(calcularVdot(5, 20 * 60) - 49.8) < 0.2);

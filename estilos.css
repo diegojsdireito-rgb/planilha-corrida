@@ -391,6 +391,13 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .cor-limiar { --cor-zona: var(--z-limiar); }
 .cor-intervalado { --cor-zona: var(--z-intervalado); }
 
+.mudar-dia summary { display: flex; align-items: center; min-height: 28px; font-weight: 700; color: var(--marca); cursor: pointer; }
+.mudar-dia[open] summary { margin-bottom: 8px; }
+.opcao-dia { display: block; width: 100%; margin-top: 8px; text-align: left; font-weight: 400; background: var(--fundo); }
+.opcao-dia strong { display: block; font-weight: 650; }
+.opcao-dia strong::first-letter { text-transform: uppercase; }
+.opcao-aviso { display: block; margin-top: 2px; font-size: .84rem; color: var(--alerta); }
+
 .motivos { padding-left: 18px; margin: 8px 0; }
 .motivos li { margin-bottom: 6px; }
 

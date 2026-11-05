@@ -494,6 +494,41 @@ export function detalharSessao(sessao, vdot) {
   return { distanciaKm, tempoSeg, ritmoMedio: tempoSeg / distanciaKm, blocos, zonas };
 }
 
+// ---------- Mudar o dia de um treino ----------
+
+const TIPOS_INTENSOS = ['limiar', 'intervalado', 'ritmo', 'longo', 'prova'];
+
+// Só dentro da mesma semana, para não mudar a carga semanal que a progressão calculou.
+export function diasParaMudar({ plano, sessao, atividades, hoje }) {
+  const corrida = atividades.some((a) => a.data === sessao.data);
+  if (sessao.tipo === 'prova' || sessao.data < hoje || corrida) return [];
+
+  const outras = plano.sessoes.filter((s) => s.id !== sessao.id);
+  const segunda = segundaDaSemana(sessao.data);
+  const prova = plano.sessoes.find((s) => s.tipo === 'prova')?.data;
+  const opcoes = [];
+  for (let i = 0; i < 7; i++) {
+    const data = somarDias(segunda, i);
+    if (data === sessao.data || data < hoje || (prova && data >= prova)) continue;
+    if (outras.some((s) => s.data === data) || atividades.some((a) => a.data === data)) continue;
+
+    const vizinhas = outras.filter((s) => s.data === somarDias(data, -1) || s.data === somarDias(data, 1));
+    const forteColado = TIPOS_INTENSOS.includes(sessao.tipo) && vizinhas.some((s) => TIPOS_INTENSOS.includes(s.tipo));
+    let aviso = null;
+    if (forteColado) aviso = 'Fica colado em outro treino forte. Prefira outro dia, se puder.';
+    else if (vizinhas.length) aviso = 'Sem dia de descanso entre este treino e o vizinho.';
+    opcoes.push({ data, aviso });
+  }
+  return opcoes;
+}
+
+export function mudarDiaDaSessao(plano, id, novaData) {
+  const sessoes = plano.sessoes
+    .map((s) => (s.id === id ? { ...s, id: `pc-${novaData}`, data: novaData } : s))
+    .sort((a, b) => a.data.localeCompare(b.data));
+  return { ...plano, sessoes };
+}
+
 // ---------- Revisão: compara o previsto com o realizado ----------
 
 const JANELA_REVISAO_DIAS = 14;
@@ -602,6 +637,48 @@ export function reanalisarPlano({ plano, parametros, atividades, tempoInformado,
     aPartirDe,
     antes: { vdot: plano.vdot, ...resumoDaSemana(plano.sessoes, aPartirDe) },
     depois: { vdot: estimativa.vdot, ...resumoDaSemana(sessoes, aPartirDe) },
+  };
+}
+
+const diasDaGrade = (sessoes, segunda) => {
+  const fim = somarDias(segunda, 7);
+  return sessoes.filter((s) => s.data >= segunda && s.data < fim).map((s) => diaDaSemana(s.data));
+};
+
+// Troca só a distribuição na semana. A carga vem da própria planilha, não das corridas:
+// sem isso, quem não tem o Garmin conectado voltaria ao volume inicial.
+export function refazerComNovosDias({ plano, parametros, diasSemana, diaLongo, semQualidadeNaPrimeira = false, hoje }) {
+  const aPartirDe = hoje < plano.inicio ? plano.inicio : proximaSegunda(hoje);
+  const restantes = plano.sessoes.filter((s) => s.data >= aPartirDe);
+  if (!restantes.length) return null;
+
+  const semanaAlvo = restantes[0].semana;
+  const comCargaCheia = plano.sessoes.filter((s) => s.semana <= semanaAlvo && !s.recuperacao && s.fase !== 'polimento');
+  const semanaBase = comCargaCheia.length ? comCargaCheia[comCargaCheia.length - 1].semana : semanaAlvo;
+  const daBase = plano.sessoes.filter((s) => s.semana === semanaBase);
+  const base = {
+    kmSemana: daBase.reduce((t, s) => t + s.distanciaKm, 0),
+    longoKm: Math.max(...daBase.map((s) => s.distanciaKm)),
+  };
+
+  const perfil = { ...parametros.perfil, diasSemana, diaLongo };
+  const novo = gerarPlano({
+    ...parametros,
+    perfil,
+    vdot: plano.vdot,
+    inicio: plano.inicio,
+    aPartirDe,
+    base,
+    semQualidadeAte: semQualidadeNaPrimeira ? somarDias(aPartirDe, 7) : null,
+  });
+  const sessoes = [...plano.sessoes.filter((s) => s.data < aPartirDe), ...novo.sessoes];
+
+  return {
+    plano: { ...novo, sessoes },
+    perfil,
+    aPartirDe,
+    antes: { ...resumoDaSemana(plano.sessoes, aPartirDe), dias: diasDaGrade(plano.sessoes, aPartirDe) },
+    depois: { ...resumoDaSemana(sessoes, aPartirDe), dias: diasDaGrade(sessoes, aPartirDe) },
   };
 }
 
