@@ -218,6 +218,7 @@ h3 { font-size: .95rem; margin: 12px 0 6px; }
 
 .motivos { padding-left: 18px; margin: 8px 0; }
 .motivos li { margin-bottom: 6px; }
+.cartao a { color: var(--marca); font-weight: 600; }
 
 .ritmos { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .ritmos td { padding: 6px 0; border-top: 1px solid var(--borda); }

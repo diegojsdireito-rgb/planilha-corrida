@@ -3,6 +3,7 @@
 const CHAVE = 'planilha-corrida:v1';
 
 export const estadoInicial = () => ({
+  avisoCiente: false,
   chaveApi: '',
   perfil: null,
   objetivo: null,

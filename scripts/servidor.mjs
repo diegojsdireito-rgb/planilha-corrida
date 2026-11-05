@@ -28,4 +28,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end('Não encontrado');
   }
-}).listen(PORTA, '127.0.0.1', () => console.log(`Planilha de Corrida em http://localhost:${PORTA}`));
+}).listen(PORTA, '127.0.0.1', () => console.log(`Run Glória em http://localhost:${PORTA}`));

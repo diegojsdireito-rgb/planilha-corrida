@@ -1,7 +1,7 @@
 {
-  "name": "Planilha de Corrida",
-  "short_name": "Corrida",
-  "description": "Planilha de corrida pessoal, adaptada aos seus treinos.",
+  "name": "Run Glória",
+  "short_name": "Run Glória",
+  "description": "Planilha de corrida adaptada aos seus treinos.",
   "lang": "pt-BR",
   "start_url": "./index.html",
   "scope": "./",

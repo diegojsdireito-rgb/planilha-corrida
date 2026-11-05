@@ -1,8 +1,8 @@
-# Planilha de Corrida
+# Run Glória
 
-App web pessoal, instalável no iPhone, que monta uma planilha de corrida e a ajusta pelo que foi realmente treinado. Os dados do Garmin chegam pelo [intervals.icu](https://intervals.icu), que também leva os treinos ao relógio.
+App web gratuito, instalável no iPhone, que monta uma planilha de corrida e a ajusta pelo que foi realmente treinado. Os dados do Garmin chegam pelo [intervals.icu](https://intervals.icu), que também leva os treinos ao relógio.
 
-Não tem servidor próprio nem banco de dados: tudo fica no aparelho. A chave de API só é enviada ao intervals.icu e não entra na cópia de segurança.
+Não tem servidor próprio, banco de dados nem login: tudo fica no aparelho de cada pessoa, e quem tiver o link pode usar. A chave de API só é enviada ao intervals.icu e não entra na cópia de segurança.
 
 ## Rodar no computador
 

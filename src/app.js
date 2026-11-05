@@ -61,7 +61,7 @@ let cadastroAnterior = {};
 let analisePendente = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 9;
+const VERSAO_APP = 10;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -245,6 +245,33 @@ function textoEnvioAutomatico() {
   return `Envio automático ligado. ${quando}`;
 }
 
+// ---------- Boas-vindas ----------
+
+function telaBoasVindas() {
+  abas.hidden = true;
+  app.innerHTML = `
+    <header class="topo">
+      <h1>Run Glória</h1>
+      <p class="suave">Monta seus treinos e ajusta a planilha pelo que você realmente correu.</p>
+    </header>
+    <section class="cartao alerta">
+      <h2>Antes de começar</h2>
+      <p>A planilha é gerada por regras automáticas. Ela não substitui avaliação médica nem o acompanhamento de um treinador, e não garante evitar lesões.</p>
+      <p>Se tiver dor, doença ou alguma restrição, procure orientação profissional antes de seguir os treinos.</p>
+    </section>
+    <section class="cartao">
+      <h2>Seus dados</h2>
+      <p>Cadastro, planilha e corridas ficam só neste aparelho. Quem criou o app não recebe nada disso.</p>
+      <p>Por isso, se trocar de celular ou apagar os dados do navegador, a planilha se perde. Exporte uma cópia de segurança em Ajustes.</p>
+    </section>
+    <section class="cartao">
+      <h2>Instalar no iPhone</h2>
+      <p>No Safari, toque em Compartilhar e depois em Adicionar à Tela de Início. Abra o app sempre por esse ícone.</p>
+    </section>
+    <button class="principal largo" data-acao="ciente">Entendi, começar</button>
+    <p class="suave" style="margin-top:12px;text-align:center">Versão ${VERSAO_APP}</p>`;
+}
+
 // ---------- Cadastro ----------
 
 function telaCadastro(valores = {}) {
@@ -317,7 +344,12 @@ function telaCadastro(valores = {}) {
 
       <section class="cartao">
         <h2>Conexão com o Garmin (opcional)</h2>
-        <p class="suave">Conecte o Garmin ao intervals.icu e cole aqui a chave de API, que fica em Settings, Developer Settings.</p>
+        <p class="suave">Sem a conexão, o app funciona com o que você informar aqui, mas não recebe suas corridas nem envia treinos ao relógio.</p>
+        <ol class="motivos suave">
+          <li>Crie uma conta gratuita no <a href="https://intervals.icu" target="_blank" rel="noopener">intervals.icu</a>.</li>
+          <li>Em Settings, conecte o Garmin diretamente, não pelo Strava, e ligue Upload planned workouts.</li>
+          <li>Em Settings, Developer Settings, gere a chave de API e cole aqui. Não passe essa chave a ninguém.</li>
+        </ol>
         <label>Chave de API do intervals.icu<input name="chave" type="password" autocomplete="off" value="${esc(v.chave)}"></label>
       </section>
 
@@ -923,6 +955,7 @@ function renderAbas() {
 }
 
 function render() {
+  if (!estado.plano && !estado.avisoCiente) return telaBoasVindas();
   if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
   const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
@@ -961,6 +994,13 @@ ligarGestos(app, {
 
 const acoes = {
   voltar: voltarDoTreino,
+
+  ciente: () => {
+    estado.avisoCiente = true;
+    guardar();
+    render();
+    window.scrollTo(0, 0);
+  },
 
   enviar: (botao) => comOcupado(botao, async () => {
     await enviarAoRelogio();
@@ -1024,7 +1064,7 @@ const acoes = {
     setTimeout(enviarAutomaticamente);
   }),
 
-  exportar: () => salvarArquivo(exportar(estado), `planilha-corrida-${hoje()}.json`, 'application/json'),
+  exportar: () => salvarArquivo(exportar(estado), `run-gloria-${hoje()}.json`, 'application/json'),
 
   'baixar-csv': () => salvarArquivo(csvDasCorridas(estado.atividades), `corridas-${hoje()}.csv`, 'text/csv'),
 
@@ -1049,7 +1089,7 @@ const acoes = {
       dataProva: objetivo.dataProva,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
