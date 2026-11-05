@@ -72,9 +72,16 @@ p { margin: 0 0 8px; }
 label { display: block; font-weight: 600; font-size: .92rem; margin-bottom: 12px; }
 label small { display: block; font-weight: 400; color: var(--suave); }
 
+/* O campo de data do iOS tem largura própria e empurraria a coluna para fora da tela. */
+.linha > *, .linha3 > * { min-width: 0; }
+
+input[type="date"] { -webkit-appearance: none; appearance: none; text-align: left; }
+
 input, select {
   display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 4px;
   min-height: 44px;
   padding: 8px 12px;

@@ -73,11 +73,14 @@ function mostrarAviso(texto) {
   temporizador = setTimeout(() => { aviso.hidden = true; }, 5000);
 }
 
-function lerTempo(texto) {
-  const partes = String(texto).trim().split(':').map(Number);
-  if (partes.length < 2 || partes.length > 3 || partes.some((n) => !Number.isFinite(n) || n < 0)) return null;
-  const seg = partes.reduce((total, n) => total * 60 + n, 0);
-  return seg > 0 ? seg : null;
+// Campos separados porque o teclado numérico do iPhone não tem dois-pontos.
+function lerTempo(form) {
+  const partes = [form.get('tempoHoras'), form.get('tempoMinutos'), form.get('tempoSegundos')].map((v) => String(v ?? '').trim());
+  if (partes.every((p) => p === '')) return { preenchido: false, seg: null };
+  const [h, m, s] = partes.map(Number);
+  const valido = [h, m, s].every((n) => Number.isInteger(n) && n >= 0) && m < 60 && s < 60;
+  const seg = valido ? h * 3600 + m * 60 + s : 0;
+  return { preenchido: true, seg: seg > 0 ? seg : null };
 }
 
 const numero = (form, nome) => {
@@ -132,7 +135,7 @@ async function enviarAoRelogio() {
 
 function telaCadastro(valores = {}) {
   abas.hidden = true;
-  const v = { idade: '', peso: '', altura: '', kmSemana: '', longo: '', distanciaTempo: '5', tempo: '', chave: estado.chaveApi, ...valores };
+  const v = { idade: '', peso: '', altura: '', kmSemana: '', longo: '', distanciaTempo: '5', chave: estado.chaveApi, ...valores };
   const diasMarcados = valores.dias ?? [2, 4, 6, 0];
   app.innerHTML = `
     <header class="topo">
@@ -186,14 +189,16 @@ function telaCadastro(valores = {}) {
           <label>Km por semana<input name="kmSemana" inputmode="decimal" value="${esc(v.kmSemana)}"></label>
           <label>Maior corrida recente (km)<input name="longo" inputmode="decimal" value="${esc(v.longo)}"></label>
         </div>
-        <div class="linha">
-          <label>Tempo recente em
-            <select name="distanciaTempo">
-              ${[['3', '3 km'], ['5', '5 km'], ['10', '10 km'], ['21.1', 'Meia maratona'], ['42.2', 'Maratona']]
-                .map(([valor, nome]) => `<option value="${valor}" ${v.distanciaTempo === valor ? 'selected' : ''}>${nome}</option>`).join('')}
-            </select>
-          </label>
-          <label>Tempo<small>min:seg ou h:min:seg</small><input name="tempo" inputmode="numeric" placeholder="25:00" value="${esc(v.tempo)}"></label>
+        <label>Tempo recente em
+          <select name="distanciaTempo">
+            ${[['3', '3 km'], ['5', '5 km'], ['10', '10 km'], ['21.1', 'Meia maratona'], ['42.2', 'Maratona']]
+              .map(([valor, nome]) => `<option value="${valor}" ${v.distanciaTempo === valor ? 'selected' : ''}>${nome}</option>`).join('')}
+          </select>
+        </label>
+        <div class="linha3">
+          <label>Horas<input name="tempoHoras" type="number" inputmode="numeric" min="0" max="12"></label>
+          <label>Minutos<input name="tempoMinutos" type="number" inputmode="numeric" min="0" max="59"></label>
+          <label>Segundos<input name="tempoSegundos" type="number" inputmode="numeric" min="0" max="59"></label>
         </div>
       </section>
 
@@ -216,8 +221,7 @@ async function enviarCadastro(evento) {
   const dataProva = form.get('dataProva') || null;
   const distancia = form.get('distancia') ? Number(form.get('distancia')) : null;
   const chave = String(form.get('chave') ?? '').trim();
-  const textoTempo = String(form.get('tempo') ?? '').trim();
-  const tempoSeg = textoTempo ? lerTempo(textoTempo) : null;
+  const { preenchido: temTempo, seg: tempoSeg } = lerTempo(form);
   const dia = hoje();
 
   const problema = (mensagem) => { erro.textContent = mensagem; erro.scrollIntoView({ block: 'center' }); };
@@ -229,7 +233,7 @@ async function enviarCadastro(evento) {
   if (dias.length < 3) return problema('Escolha pelo menos 3 dias de corrida.');
   if (dataProva && !distancia) return problema('Escolha a distância da prova.');
   if (distancia && !dataProva) return problema('Informe a data da prova, ou escolha Condicionamento.');
-  if (textoTempo && !tempoSeg) return problema('Escreva o tempo como min:seg, por exemplo 25:00.');
+  if (temTempo && !tempoSeg) return problema('Confira o tempo: minutos e segundos vão de 0 a 59.');
 
   const botao = evento.target.querySelector('button[type="submit"]');
   await comOcupado(botao, async () => {
