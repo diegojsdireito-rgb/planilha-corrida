@@ -1,0 +1,12 @@
+{
+  "name": "planilha-corrida",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Planilha de corrida pessoal, adaptada aos dados do Garmin pelo intervals.icu",
+  "scripts": {
+    "dev": "node scripts/servidor.mjs",
+    "test": "node --test",
+    "icones": "node scripts/gerar-icones.mjs"
+  }
+}
