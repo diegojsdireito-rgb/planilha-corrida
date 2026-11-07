@@ -181,15 +181,13 @@ p { margin: 0 0 8px; }
 .nota.marcada { border-color: var(--marca); background: var(--marca); color: var(--marca-texto); }
 .notas-legenda { display: flex; justify-content: space-between; margin: 6px 0 0; font-size: .78rem; }
 .botao-texto { min-height: 40px; padding: 0; border: 0; background: none; color: var(--marca); }
-.etapas { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: etapa; }
-.etapas li { position: relative; padding: 10px 0 10px 36px; border-top: 1px solid var(--borda); counter-increment: etapa; }
-.etapas li::before { content: counter(etapa); position: absolute; left: 0; top: 10px; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--borda); font-size: .78rem; font-weight: 700; }
-.etapas p { margin: 0; }
-.etapa-previsto { color: var(--suave); font-size: .85rem; }
-.etapa-feito { font-weight: 600; font-variant-numeric: tabular-nums; }
-.etapas .selo { margin-top: 5px; }
-.selo.etapa-rapido { background: color-mix(in srgb, var(--ok) 20%, transparent); }
-.selo.etapa-lento { background: color-mix(in srgb, var(--erro) 20%, transparent); }
+.trechos { display: grid; gap: 6px; margin-top: 8px; }
+.trecho { padding: 8px 10px; border-left: 4px solid var(--borda); border-radius: 4px; background: color-mix(in srgb, var(--borda) 30%, transparent); }
+.trecho p { margin: 0; font-size: .85rem; }
+.trecho-feito { font-variant-numeric: tabular-nums; }
+.trecho-dentro { border-left-color: var(--ok); }
+.trecho-rapido { border-left-color: var(--z-maratona); }
+.trecho-lento { border-left-color: var(--z-longo); }
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }

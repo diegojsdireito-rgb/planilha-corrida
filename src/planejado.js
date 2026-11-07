@@ -1,4 +1,4 @@
-// Planejado x realizado. Funções puras. A aderência é uma fórmula do app, sem validação em estudo.
+// Previsto e feito. Funções puras. A aderência é uma fórmula do app, sem validação em estudo.
 
 const TOLERANCIA_DO_RITMO = 5; // s/km: abaixo disso, a diferença cabe no erro do GPS.
 const DESVIO_QUE_ZERA_O_RITMO = 60; // s/km.

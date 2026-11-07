@@ -37,7 +37,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/aniversario.js` | Idade calculada pela data de nascimento e dia do aniversário. |
 | `src/cumprimento.js` | Situação de cada treino: cumprido, parcial, não feito ou sem registro, e corrida ligada a treino de outro dia. |
 | `src/feedback.js` | Esforço e sensação depois do treino, inclusive os que vêm do relógio. |
-| `src/planejado.js` | Planejado x realizado: aderência e comparação por etapa. |
+| `src/planejado.js` | Previsto e feito: aderência e comparação trecho a trecho. |
 | `src/calendario.js` | Calendário do mês e totais de tudo o que foi feito, dentro ou fora da planilha. |
 | `src/medalhas.js` | Conquistas: recordes, marcos, datas especiais, constância semanal e provas, além do resumo que guarda as corridas com mais de 12 meses. |
 | `src/peso.js` | Histórico de peso e IMC, com as faixas da OMS. |

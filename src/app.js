@@ -115,7 +115,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.3';
+const VERSAO_APP = '3.4';
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -676,7 +676,7 @@ function blocoFeedbackNaEvolucao(dia) {
     </section>`;
 }
 
-// ---------- Planejado x realizado ----------
+// ---------- Previsto e feito ----------
 
 const somarCampo = (lista, campo) => {
   const valores = lista.map((a) => a[campo]).filter((v) => v > 0);
@@ -715,15 +715,10 @@ function blocoPlanejado(sessao) {
   ].filter(([, previsto, real]) => previsto || real);
   return `
     <section class="cartao" data-planejado="${esc(sessao.id)}">
-      <h2>Planejado x realizado</h2>
-      <div class="semana-topo">
-        ${anelDeProgresso(a.total, `Aderência ao treino: ${pct}%`)}
-        <div>
-          <p class="sobretitulo">Aderência</p>
-          <h3 style="margin:2px 0">${titulo}</h3>
-          ${a.maiorDivergencia ? `<p class="suave" style="margin:0">Maior diferença: ${a.maiorDivergencia.toLowerCase()}.</p>` : ''}
-        </div>
-      </div>
+      <h2>Previsto e feito</h2>
+      <p class="meta-numero"><b>${pct}%</b> de aderência: ${titulo.toLowerCase()}</p>
+      <span class="medalha-progresso" role="img" aria-label="Aderência ao treino: ${pct}%"><i style="width:${pct}%"></i></span>
+      ${a.maiorDivergencia ? `<p class="suave" style="margin:6px 0 0">O que mais pesou: ${a.maiorDivergencia.toLowerCase()}.</p>` : ''}
       <table class="ritmos comparacao">
         <thead><tr><th></th><th>Previsto</th><th>Feito</th></tr></thead>
         <tbody>${linhas.map(([nome, previsto, real]) => `<tr><td>${nome}</td><td>${esc(previsto ?? '–')}</td><td>${esc(real ?? '–')}</td></tr>`).join('')}</tbody>
@@ -733,23 +728,24 @@ function blocoPlanejado(sessao) {
 }
 
 function htmlDasEtapas(comparacao) {
-  const selo = { rapido: (d) => `<span class="selo etapa-rapido">${Math.abs(d)} s/km mais rápido</span>`, lento: (d) => `<span class="selo etapa-lento">${d} s/km mais lento</span>`, dentro: () => '' };
+  const resultado = { rapido: (d) => `${Math.abs(d)} s/km à frente da faixa`, lento: (d) => `${d} s/km atrás da faixa`, dentro: () => 'Na faixa' };
   const duracao = (e) => (e.km !== undefined ? km(e.km) : `${e.minutos} min`);
+  const feito = (v) => `${formatarDuracaoCurta(v.seg)} em ${String(Math.round(v.km * 100) / 100).replace('.', ',')} km, ${formatarRitmo(v.seg / v.km)}/km`;
   return `
-    <h2 style="margin-top:18px">Etapas</h2>
-    <ol class="etapas">
+    <h2 style="margin-top:18px">Trecho a trecho</h2>
+    <div class="trechos">
       ${comparacao.linhas.map(({ etapa, volta, desvio, situacao }) => `
-        <li>
-          <p class="etapa-previsto">${esc(etapa.rotulo)}: ${esc(duracao(etapa))} a ${esc(textoRitmo(etapa.ritmo))}</p>
-          <p class="etapa-feito">${String(Math.round(volta.km * 100) / 100).replace('.', ',')} km em ${formatarDuracaoCurta(volta.seg)} (${formatarRitmo(volta.seg / volta.km)}/km)</p>
-          ${selo[situacao](desvio)}
-        </li>`).join('')}
+        <div class="trecho trecho-${situacao}">
+          <p class="trecho-nome"><strong>${esc(etapa.rotulo)}</strong> ${esc(duracao(etapa))}, ${esc(textoRitmo(etapa.ritmo))}</p>
+          <p class="trecho-feito">${feito(volta)}</p>
+          <p class="suave">${resultado[situacao](desvio)}</p>
+        </div>`).join('')}
       ${comparacao.extras.map((v) => `
-        <li>
-          <p class="etapa-previsto">Fora do previsto</p>
-          <p class="etapa-feito">${String(Math.round(v.km * 100) / 100).replace('.', ',')} km em ${formatarDuracaoCurta(v.seg)} (${formatarRitmo(v.seg / v.km)}/km)</p>
-        </li>`).join('')}
-    </ol>`;
+        <div class="trecho">
+          <p class="trecho-nome"><strong>A mais</strong></p>
+          <p class="trecho-feito">${feito(v)}</p>
+        </div>`).join('')}
+    </div>`;
 }
 
 function heroiDoTreino(sessao, sobretitulo, realizadas = []) {

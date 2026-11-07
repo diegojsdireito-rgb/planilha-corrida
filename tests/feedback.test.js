@@ -109,7 +109,7 @@ test('o desvio do ritmo respeita a faixa e a tolerância', () => {
 });
 
 test('compara etapa por etapa quando as voltas batem, e guarda as extras', () => {
-  const voltas = [{ km: 1.47, seg: 601 }, { km: 0.4, seg: 152 }, { km: 0.1, seg: 64 }, { km: 0.05, seg: 20 }];
+  const voltas = [{ km: 1.5, seg: 600 }, { km: 0.4, seg: 156 }, { km: 0.1, seg: 64 }, { km: 0.05, seg: 20 }];
   const r = compararEtapas(etapas, voltas);
   assert.equal(r.linhas.length, 3);
   assert.equal(r.linhas[0].situacao, 'rapido');
