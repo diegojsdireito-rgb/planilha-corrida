@@ -133,6 +133,34 @@ p { margin: 0 0 8px; }
 .parabens { text-align: center; }
 .parabens-bolo { margin: 0; font-size: 2.2rem; line-height: 1.2; }
 .parabens p:last-child { margin-bottom: 0; }
+.medalha { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--borda); }
+.medalha .suave { display: block; font-size: .85rem; }
+.medalha-disco {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--tom);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--tom) 28%, var(--cartao)), var(--cartao));
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.g-recordes { --tom: var(--z-maratona); }
+.g-marcos { --tom: var(--z-leve); }
+.g-datas { --tom: var(--z-longo); }
+.g-constancia { --tom: var(--z-limiar); }
+.g-provas { --tom: var(--z-intervalado); }
+.medalha.bloqueada .medalha-disco { filter: grayscale(1); opacity: .4; border-style: dashed; border-color: var(--suave); }
+.medalha.bloqueada strong { color: var(--suave); }
+.medalha-progresso { display: block; height: 6px; margin: 6px 0 3px; overflow: hidden; border-radius: 99px; background: var(--borda); }
+.medalha-progresso i { display: block; height: 100%; border-radius: 99px; background: var(--marca); }
+.medalhas-recentes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.medalha-recente { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.medalha-recente small { font-size: .7rem; line-height: 1.2; color: var(--suave); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }

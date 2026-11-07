@@ -15,6 +15,7 @@ import {
 } from './estatisticas.js';
 import { abaDoGesto, ligarGestos, ligarPuxada } from './gestos.js';
 import { barrasDeVolume, curvaDaAtividade, linhaDeEvolucao } from './graficos.js';
+import { arquivarCorridas, calcularMedalhas, chavesConquistadas, GRUPOS, juntarCorridas, medalhasNovas, situacaoDasSemanas } from './medalhas.js';
 import { curvasDaAtividade, enquadrarMapa, pontosDoMapa } from './percurso.js';
 import { criarCliente, eventoDaSessao, faixaDoTreino } from './icu.js';
 import {
@@ -89,11 +90,13 @@ let avulsaAberta = null;
 let provaAberta = null;
 let provasPendentes = null;
 let atividadeAberta = null;
+let medalhasAbertas = false;
+let editandoUsuario = false;
 let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '2.7';
+const VERSAO_APP = '2.8';
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -200,6 +203,30 @@ const todasAvulsas = () => juntarAvulsas(estado.avulsas, estado.outrasDoRelogio)
 
 // ---------- Integração ----------
 
+// O app só baixa 12 meses e a planilha pode ser refeita: o resumo guardado evita perder conquistas.
+const inicioDaJanela = () => somarDias(hoje(), -DIAS_DE_HISTORICO);
+
+function semanasDoHistorico() {
+  const corridas = juntarCorridas(estado.arquivoDeCorridas, estado.atividades, inicioDaJanela());
+  return {
+    ...estado.arquivoDeSemanas,
+    ...situacaoDasSemanas({ sessoes: estado.plano?.sessoes ?? [], corridas, avaliacoes: estado.avaliacoes, hoje: hoje() }),
+  };
+}
+
+function arquivarHistorico() {
+  estado.arquivoDeSemanas = semanasDoHistorico();
+  estado.arquivoDeCorridas = arquivarCorridas(estado.arquivoDeCorridas, estado.atividades, inicioDaJanela());
+}
+
+const medalhasAtuais = () => calcularMedalhas({
+  corridas: juntarCorridas(estado.arquivoDeCorridas, estado.atividades, inicioDaJanela()),
+  semanas: semanasDoHistorico(),
+  provasDoCalendario: estado.provas,
+  analises: estado.analises,
+  nascimento: estado.nascimento,
+});
+
 async function sincronizar(chave = estado.chaveApi) {
   const dia = hoje();
   const { atividades, semDados, corridasSemDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
@@ -208,6 +235,7 @@ async function sincronizar(chave = estado.chaveApi) {
   estado.outrasDoRelogio = outras;
   estado.semDados = semDados;
   estado.corridasSemDados = corridasSemDados;
+  arquivarHistorico();
   estado.ultimaSincronizacao = new Date().toISOString();
   guardar();
 }
@@ -999,6 +1027,7 @@ function telaHoje() {
         ${camposDoUsuario()}
         <button class="principal" type="submit" style="margin-top:10px">Salvar</button>
       </form>`}
+    ${blocoNovasConquistas()}
     ${principal}
     ${blocoFeitoHoje(dia)}
     ${blocoDaSemana(dia)}
@@ -1421,6 +1450,81 @@ function blocoFeitoHoje(dia) {
     </section>`;
 }
 
+// ---------- Conquistas ----------
+
+const discoDaMedalha = (m) => `<span class="medalha-disco g-${m.grupo}" aria-hidden="true">${m.emoji}</span>`;
+const dataCompleta = (data) => `${data.slice(8, 10)}/${data.slice(5, 7)}/${data.slice(0, 4)}`;
+
+function linhaDaMedalha(m) {
+  const partes = m.conquistada
+    ? [m.detalhe, dataCompleta(m.data)].filter(Boolean).join(', ')
+    : m.descricao;
+  const vezes = m.vezes ? ` Recorde batido ${m.vezes === 1 ? '1 vez' : `${m.vezes} vezes`}.` : '';
+  return `
+    <div class="medalha ${m.conquistada ? '' : 'bloqueada'}">
+      ${discoDaMedalha(m)}
+      <span class="sessao-corpo">
+        <strong>${esc(m.nome)}</strong>${m.conquistada ? '' : '<span class="sr-only"> (ainda não conquistada)</span>'}
+        <span class="suave">${esc(partes)}${vezes}</span>
+        ${!m.conquistada && m.progresso?.atual > 0 ? `
+          <span class="medalha-progresso"><i style="width:${Math.round((m.progresso.atual / m.progresso.meta) * 100)}%"></i></span>
+          <span class="suave">${esc(m.progresso.texto)}</span>` : ''}
+      </span>
+    </div>`;
+}
+
+function telaMedalhas() {
+  const medalhas = medalhasAtuais();
+  const total = medalhas.filter((m) => m.conquistada).length;
+  return `
+    <button class="voltar" data-acao="voltar">‹ Voltar</button>
+    <header class="topo">
+      <p class="sobretitulo">${total} de ${medalhas.length}</p>
+      <h1>Conquistas</h1>
+      <p class="suave">Calculadas pelas suas corridas neste aparelho. Só corrida conta, e medalha não muda treino nem nível.</p>
+    </header>
+    ${GRUPOS.map((g) => {
+      const doGrupo = medalhas.filter((m) => m.grupo === g.chave);
+      return `
+        <section class="cartao">
+          <h2>${g.nome}</h2>
+          <p class="suave">${g.texto}</p>
+          ${doGrupo.map(linhaDaMedalha).join('')}
+        </section>`;
+    }).join('')}`;
+}
+
+function blocoConquistas() {
+  const medalhas = medalhasAtuais();
+  const conquistadas = medalhas.filter((m) => m.conquistada).sort((a, b) => b.data.localeCompare(a.data));
+  return `
+    <section class="cartao">
+      <h2>Conquistas</h2>
+      <p class="suave">${conquistadas.length} de ${medalhas.length} medalhas.</p>
+      ${conquistadas.length ? `<div class="medalhas-recentes">${conquistadas.slice(0, 4).map((m) => `<span class="medalha-recente">${discoDaMedalha(m)}<small>${esc(m.nome)}</small></span>`).join('')}</div>` : ''}
+      <button style="margin-top:10px" data-acao="ver-medalhas">Ver todas</button>
+    </section>`;
+}
+
+function blocoNovasConquistas() {
+  const novas = medalhasNovas(medalhasAtuais(), estado.medalhasVistas);
+  if (!novas.length) return '';
+  const primeiraVez = estado.medalhasVistas === null;
+  const titulo = primeiraVez
+    ? `Você já tem ${novas.length === 1 ? '1 conquista' : `${novas.length} conquistas`}`
+    : novas.length === 1 ? 'Nova conquista' : `${novas.length} novas conquistas`;
+  return `
+    <section class="cartao destaque">
+      <h2>${titulo}</h2>
+      ${primeiraVez ? '<p class="suave">Calculadas pelo seu histórico de corridas.</p>' : ''}
+      ${novas.slice(0, 3).map(linhaDaMedalha).join('')}
+      <div class="botoes" style="margin-top:10px">
+        <button class="principal" data-acao="ver-medalhas">Ver conquistas</button>
+        <button data-acao="dispensar-medalhas">Ok</button>
+      </div>
+    </section>`;
+}
+
 function blocoProvasRealizadas() {
   const lista = provasRealizadas(estado.provas, estado.atividades);
   if (!lista.length) {
@@ -1638,7 +1742,7 @@ function telaEvolucao() {
         <h2>Ainda não há corridas</h2>
         <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
       </section>
-      ${blocoCalendario(dia)}${blocoOutrasNaEvolucao(dia)}${blocoProvasRealizadas()}${atualizacao}${blocoPrevisoes}`;
+      ${blocoConquistas()}${blocoCalendario(dia)}${blocoOutrasNaEvolucao(dia)}${blocoProvasRealizadas()}${atualizacao}${blocoPrevisoes}`;
   }
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
@@ -1675,6 +1779,7 @@ function telaEvolucao() {
       </div>
       <p style="margin:14px 0 0">${comparacao(atual.km, anterior.km)}.</p>
     </section>
+    ${blocoConquistas()}
     ${blocoCalendario(dia)}
     ${blocoOutrasNaEvolucao(dia)}
     <section class="cartao">
@@ -2035,6 +2140,35 @@ function verNovaGrade(form) {
   document.getElementById('dias-de-treino').scrollIntoView({ block: 'center' });
 }
 
+// Depois de cadastrados, os dados ficam só para leitura: alterar exige tocar em Editar.
+function blocoUsuario() {
+  const privacidade = '<p class="suave" style="margin:10px 0 0">Ficam só neste aparelho e entram na sua cópia de segurança. Não há cadastro central.</p>';
+  const cadastrado = estado.nome && estado.nascimento;
+  if (cadastrado && !editandoUsuario) {
+    return `
+      <section class="cartao">
+        <h2>Usuário</h2>
+        <table class="ritmos"><tbody>
+          <tr><td>Nome</td><td>${esc(estado.nome)}</td></tr>
+          <tr><td>Data de nascimento</td><td>${dataCompleta(estado.nascimento)}</td></tr>
+          <tr><td>Idade</td><td>${idadeEm(estado.nascimento, hoje())} anos</td></tr>
+        </tbody></table>
+        <button style="margin-top:10px" data-acao="editar-usuario">Editar</button>
+        ${privacidade}
+      </section>`;
+  }
+  return `
+    <form class="cartao" id="form-nome">
+      <h2>${cadastrado ? 'Editar usuário' : 'Usuário'}</h2>
+      ${camposDoUsuario()}
+      <div class="botoes" style="margin-top:10px">
+        <button class="principal" type="submit">Salvar</button>
+        ${cadastrado ? '<button type="button" data-acao="cancelar-usuario">Cancelar</button>' : ''}
+      </div>
+      ${privacidade}
+    </form>`;
+}
+
 function telaAjustes() {
   const { plano, perfil } = estado;
   const r = plano.ritmos;
@@ -2047,13 +2181,7 @@ function telaAjustes() {
   ];
   return `
     <header class="topo"><p class="sobretitulo">${estado.nome ? esc(estado.nome) : 'Sua conta neste aparelho'}</p><h1>Ajustes</h1></header>
-    <form class="cartao" id="form-nome">
-      <h2>Usuário</h2>
-      ${camposDoUsuario()}
-      ${estado.nascimento ? `<p class="suave" style="margin:10px 0 0">${idadeEm(estado.nascimento, hoje())} anos. A idade é atualizada sozinha.</p>` : ''}
-      <button type="submit" style="margin-top:10px">Salvar</button>
-      <p class="suave" style="margin:10px 0 0">Ficam só neste aparelho e entram na sua cópia de segurança. Não há cadastro central.</p>
-    </form>
+    ${blocoUsuario()}
     <section class="heroi">
       <p class="sobretitulo">Seu nível atual (VDOT)</p>
       <p class="heroi-numero">${String(plano.vdot).replace('.', ',')}</p>
@@ -2140,6 +2268,11 @@ function render() {
     window.scrollTo(0, 0);
     return;
   }
+  if (medalhasAbertas) {
+    app.innerHTML = telaMedalhas();
+    window.scrollTo(0, 0);
+    return;
+  }
   const atividade = atividadeAberta && atividadePorId(atividadeAberta);
   if (atividade) {
     app.innerHTML = telaAtividade(atividade);
@@ -2164,6 +2297,8 @@ abas.addEventListener('click', (e) => {
   aba = botao.dataset.aba;
   sessaoAberta = null;
   atividadeAberta = null;
+  medalhasAbertas = false;
+  editandoUsuario = false;
   avulsaAberta = null;
   provaAberta = null;
   provasPendentes = null;
@@ -2173,6 +2308,7 @@ abas.addEventListener('click', (e) => {
 function voltarDoTreino() {
   sessaoAberta = null;
   atividadeAberta = null;
+  medalhasAbertas = false;
   avulsaAberta = null;
   provaAberta = null;
   provasPendentes = null;
@@ -2183,9 +2319,9 @@ function voltarDoTreino() {
 // Dentro de um treino, só voltar. Nas abas, trocar para a vizinha.
 ligarGestos(app, {
   podeIniciar: () => Boolean(estado.plano) && !ocupado,
-  temDestino: (direcao) => (sessaoAberta || atividadeAberta || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
+  temDestino: (direcao) => (sessaoAberta || atividadeAberta || medalhasAbertas || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
   aoDeslizar: (direcao) => {
-    if (sessaoAberta || atividadeAberta || avulsaAberta || provaAberta) {
+    if (sessaoAberta || atividadeAberta || medalhasAbertas || avulsaAberta || provaAberta) {
       voltarDoTreino();
       return;
     }
@@ -2303,6 +2439,28 @@ const acoes = {
     setTimeout(enviarAutomaticamente);
   },
 
+  'editar-usuario': () => {
+    editandoUsuario = true;
+    renderMantendoRolagem();
+  },
+  'cancelar-usuario': () => {
+    editandoUsuario = false;
+    renderMantendoRolagem();
+  },
+  'ver-medalhas': () => {
+    rolagemAnterior = window.scrollY;
+    estado.medalhasVistas = chavesConquistadas(medalhasAtuais());
+    guardar();
+    medalhasAbertas = true;
+    render();
+  },
+  'dispensar-medalhas': () => {
+    estado.medalhasVistas = chavesConquistadas(medalhasAtuais());
+    guardar();
+    const rolagem = window.scrollY;
+    render();
+    window.scrollTo(0, rolagem);
+  },
   'ver-calendario': () => {
     aba = 'plano';
     sessaoAberta = null;
@@ -2348,7 +2506,8 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    arquivarHistorico();
+    const { arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       peso: perfil.pesoKg,
       altura: perfil.alturaCm,
@@ -2360,7 +2519,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -2496,6 +2655,7 @@ app.addEventListener('submit', (e) => {
     if (erro) return mostrarAviso(erro);
     estado.nome = nome;
     estado.nascimento = nascimento;
+    editandoUsuario = false;
     atualizarIdade();
     guardar();
     document.activeElement?.blur();
