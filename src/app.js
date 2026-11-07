@@ -33,6 +33,7 @@ import { aderenciaDoTreino, compararEtapas, etapasDoTreino } from './planejado.j
 import { barrasDeVolume, curvaDaAtividade, linhaDeEvolucao } from './graficos.js';
 import { arquivarCorridas, calcularMedalhas, chavesConquistadas, GRUPOS, juntarCorridas, medalhasNovas, situacaoDasSemanas } from './medalhas.js';
 import { cargaPorSemana, melhoresDaCorrida, resumoDaCarga } from './desempenho.js';
+import { avaliarTeste, desmarcarTeste, erroDoTeste, INTERVALO_DO_RETESTE_DIAS, marcarTeste, primeiraDataDoTeste, registrarTeste, reporTestes, resultadoDasCurvas, retesteEm, sessoesParaTeste, TESTES } from './testes.js';
 import { curvasDaAtividade, enquadrarMapa, parciaisPorKm, pontosDoMapa, voltasDaAtividade } from './percurso.js';
 import { erroDoPeso, registrarPeso, resumoDoPeso, imcDe } from './peso.js';
 import { criarCliente, eventoDaSessao, faixaDoTreino } from './icu.js';
@@ -53,7 +54,10 @@ import {
   reanalisarPlano,
   referenciaDaMeta,
   refazerComNovosDias,
+  calcularRitmos,
+  refazerComNivel,
   refazerComProvas,
+  semMetaDePace,
   segundaDaSemana,
   somarDias,
   VERSAO_REGRAS,
@@ -91,8 +95,9 @@ const ROTULOS = {
   intervalado: 'Intervalado',
   ritmo: 'Ritmo de prova',
   prova: 'Prova',
+  teste: 'Teste',
 };
-const FASES = { base: 'Base', construcao: 'Construção', pico: 'Pico', polimento: 'Polimento' };
+const FASES = { iniciacao: 'Iniciação', base: 'Base', construcao: 'Construção', pico: 'Pico', polimento: 'Polimento' };
 const DIAS_DE_HISTORICO = 365;
 const MINUTOS_ENTRE_ATUALIZACOES = 15;
 
@@ -118,7 +123,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.6';
+const VERSAO_APP = '3.7';
 
 const barraDeSecoes = (aba_, opcoes) => `
   <div class="secoes" role="group" aria-label="Seções">
@@ -522,7 +527,14 @@ function telaCadastro(valores = {}) {
 
       <section class="cartao">
         <h2>Seu nível hoje</h2>
-        <p class="suave">Com o intervals.icu conectado, o histórico recente entra na conta automaticamente.</p>
+        <label>Quanto você consegue correr sem parar?
+          <select name="experiencia" required>
+            ${[['', 'Escolha uma opção'], ['nao-corre', 'Ainda não corro'], ['ate10', 'Até 10 minutos'], ['ate30', 'Até 30 minutos'], ['mais30', 'Mais de 30 minutos']]
+              .map(([valor, nome]) => `<option value="${valor}" ${(v.experiencia ?? '') === valor ? 'selected' : ''}>${nome}</option>`).join('')}
+          </select>
+        </label>
+        <p class="suave">Quem ainda não corre, ou corre até 10 minutos, começa alternando corrida e caminhada.</p>
+        <p class="suave">Os campos abaixo são opcionais: deixe em branco o que não souber. Com o intervals.icu conectado, o histórico recente entra na conta automaticamente.</p>
         <div class="linha">
           <label>Km por semana<input name="kmSemana" inputmode="decimal" value="${esc(v.kmSemana)}"></label>
           <label>Maior corrida recente (km)<input name="longo" inputmode="decimal" value="${esc(v.longo)}"></label>
@@ -573,6 +585,8 @@ async function enviarCadastro(evento) {
   const pesoKg = numero(form, 'peso');
   const alturaCm = numero(form, 'altura');
   if (!pesoKg || !alturaCm) return problema('Preencha peso e altura.');
+  const experiencia = String(form.get('experiencia') ?? '');
+  if (!experiencia) return problema('Diga quanto você consegue correr sem parar.');
   if (dias.length < 3) return problema('Marque pelo menos 3 dias livres.');
   if (dataProva && !distancia) return problema('Escolha a distância da prova.');
   if (distancia && !dataProva) return problema('Informe a data da prova, ou escolha Condicionamento.');
@@ -589,6 +603,7 @@ async function enviarCadastro(evento) {
         pesoKg,
         alturaCm,
         lesaoRecente: form.get('lesao') === 'on',
+        experiencia,
         diasSemana: dias,
         diaLongo: Number(form.get('diaLongo')),
       };
@@ -639,7 +654,7 @@ async function enviarCadastro(evento) {
 
 // ---------- Hoje ----------
 
-const classeTipo = (tipo) => ({ leve: 't-leve', longo: 't-longo', ritmo: 't-ritmo', limiar: 't-forte', intervalado: 't-forte', prova: 't-prova' })[tipo];
+const classeTipo = (tipo) => ({ leve: 't-leve', longo: 't-longo', ritmo: 't-ritmo', limiar: 't-forte', intervalado: 't-forte', prova: 't-prova', teste: 't-forte' })[tipo];
 
 const seloTipo = (tipo) => `<span class="selo ${classeTipo(tipo)}">${ROTULOS[tipo]}</span>`;
 
@@ -710,6 +725,21 @@ function blocoPlanejado(sessao) {
   if (sessao.tipo === 'prova' || !r.corridas.length) return '';
   const d = detalharSessao(sessao, estado.plano.vdot);
   const faixa = faixaDoTreino(sessao);
+  if (semMetaDePace(sessao)) {
+    const feitoSeg = somarCampo(r.corridas, 'seg');
+    return `
+      <section class="cartao" data-planejado="${esc(sessao.id)}">
+        <h2>Previsto e feito</h2>
+        <table class="ritmos comparacao">
+          <thead><tr><th></th><th>Previsto</th><th>Feito</th></tr></thead>
+          <tbody>
+            <tr><td>Duração</td><td>${esc(sessao.minutosTotal ? `${sessao.minutosTotal} min` : faixa.tempo)}</td><td>${esc(feitoSeg ? formatarTempo(feitoSeg) : '–')}</td></tr>
+            <tr><td>Distância</td><td>Livre</td><td>${esc(km(Math.round(r.km * 100) / 100))}</td></tr>
+          </tbody>
+        </table>
+        <p class="suave" style="margin:10px 0 0">Este treino não tem meta de pace, então não há nota de aderência.</p>
+      </section>`;
+  }
   const etapas = etapasDoTreino(d);
   const unica = etapas.length === 1 ? etapas[0].ritmo : null;
   const seg = somarCampo(r.corridas, 'seg');
@@ -775,13 +805,13 @@ function heroiDoTreino(sessao, sobretitulo, realizadas = []) {
   return `
     <section class="heroi ${classeTipo(sessao.tipo)}">
       <p class="sobretitulo">${esc(sobretitulo)}</p>
-      <p class="heroi-numero">${numeroKm(sessao.distanciaKm)}<small>km</small></p>
+      <p class="heroi-numero">${sessao.minutosTotal ? `${sessao.minutosTotal}<small>min</small>` : `${numeroKm(sessao.distanciaKm)}<small>km</small>`}</p>
       <h2>${esc(sessao.nome)}</h2>
       ${seloTipo(sessao.tipo)}
       ${perfilDoTreino(d)}
       <div class="heroi-dados">
-        <div><b>${formatarTempo(d.tempoSeg)}</b><span>${sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado'}</span></div>
-        <div><b>${formatarRitmo(d.ritmoMedio)}/km</b><span>Pace médio</span></div>
+        ${sessao.minutosTotal ? `<div><b>${km(sessao.distanciaKm)}</b><span>Distância aproximada</span></div>` : `<div><b>${formatarTempo(d.tempoSeg)}</b><span>${sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado'}</span></div>`}
+        ${semMetaDePace(sessao) ? '<div><b>Livre</b><span>Sem meta de pace</span></div>' : `<div><b>${formatarRitmo(d.ritmoMedio)}/km</b><span>Pace médio</span></div>`}
       </div>
       ${realizadas.map((a) => `<p class="heroi-feito" data-feito="${esc(a.id)}">${esc(textoFeito(a, sessao))}</p>`).join('')}
       <button data-abrir="${esc(sessao.id)}">Ver treino</button>
@@ -1226,7 +1256,7 @@ function linhaSessao(sessao, dia) {
     parcial: `<span class="status parcial">${feito} de ${km(sessao.distanciaKm)}</span>`,
     'nao-feito': '<span class="status falta">Não feito</span>',
     perdido: '<span class="status falta">Sem registro</span>',
-    planejado: `<span class="status">${km(sessao.distanciaKm)}</span>`,
+    planejado: `<span class="status">${sessao.minutosTotal ? `${sessao.minutosTotal} min` : km(sessao.distanciaKm)}</span>`,
   }[r.situacao];
   const quando = new Date(`${sessao.data}T12:00:00Z`);
   return `
@@ -1434,7 +1464,7 @@ function htmlDasVoltas(dados, categoria, atividade) {
   const voltas = voltasDaAtividade(dados.intervalos);
   const parciais = parciaisPorKm(dados);
   const sessao = categoria === 'corrida' ? sessaoDaCorrida(atividade, estado.plano.sessoes, estado.ligacoes) : null;
-  const comparacao = sessao?.blocos?.length ? compararEtapas(etapasDoTreino(detalharSessao(sessao, estado.plano.vdot)), voltas) : null;
+  const comparacao = sessao?.blocos?.length && !semMetaDePace(sessao) ? compararEtapas(etapasDoTreino(detalharSessao(sessao, estado.plano.vdot)), voltas) : null;
   if (comparacao) {
     return `
       ${htmlDasEtapas(comparacao)}
@@ -1532,6 +1562,9 @@ async function carregarPercurso(a) {
   // Troca só este cartão, para a tela não voltar ao topo enquanto a pessoa lê.
   const cartao = document.querySelector(`[data-percurso="${CSS.escape(id)}"]`);
   if (cartao) cartao.outerHTML = blocoPercurso(a);
+  const sessao = estado.plano && sessaoDaCorrida(a, estado.plano.sessoes, estado.ligacoes);
+  const blocoTeste = sessao?.tipo === 'teste' && !document.activeElement?.matches('input, select') && document.querySelector(`[data-bloco-teste="${CSS.escape(sessao.id)}"]`);
+  if (blocoTeste) blocoTeste.outerHTML = blocoDoTeste(sessao, corridasDoTreino(sessao, estado.atividades, estado.ligacoes), hoje());
 }
 
 const umaCasaDecimal = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
@@ -2043,7 +2076,7 @@ async function analisarRecentes() {
 function textoFeito(atividade, sessao) {
   const base = `Feito: ${km(atividade.km)} em ${formatarTempo(atividade.seg)}`;
   const analise = estado.analises[atividade.id];
-  if (!analise?.total || !analisePronta(atividade)) return base;
+  if (semMetaDePace(sessao) || !analise?.total || !analisePronta(atividade)) return base;
   const comparacao = compararComPrevisto(analise.seg, detalharSessao(sessao, estado.plano.vdot).zonas);
   return comparacao ? `${base}, ${pct(comparacao.dentro)} na meta` : base;
 }
@@ -2236,6 +2269,7 @@ function telaEvolucao() {
           <h2>Recordes em 12 meses</h2>
           <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
         </section>` : ''}
+      ${blocoHistoricoDeTestes()}
       ${blocoMelhoresMarcas()}
       ${secaoProvas}`;
   }
@@ -2310,8 +2344,11 @@ function blocoDoRegistro(sessao, dia) {
     return `
       <section class="cartao">
         <h2>${r.situacao === 'feito' ? 'Treino cumprido' : 'Treino feito em parte'}</h2>
-        <p>${km(Math.round(r.km * 10) / 10)} de ${km(sessao.distanciaKm)} previstos (${pct}%).</p>
-        <p class="suave">Cumprido a partir de 80% da distância, um corte definido pelo app.</p>
+        ${sessao.minutosTotal
+          ? `<p>${Math.round(r.seg / 60)} min de ${sessao.minutosTotal} min previstos (${Math.round((r.seg / 60 / sessao.minutosTotal) * 100)}%).</p>
+             <p class="suave">Cumprido a partir de 80% do tempo, um corte definido pelo app.</p>`
+          : `<p>${km(Math.round(r.km * 10) / 10)} de ${km(sessao.distanciaKm)} previstos (${pct}%).</p>
+             <p class="suave">Cumprido a partir de 80% da distância, um corte definido pelo app.</p>`}
         ${ligadas.map((a) => `
           <div class="avulsa-linha">
             <span class="sessao-corpo"><strong>Feito em ${dataCurta(a.data)}</strong><span class="suave">${km(Math.round(a.km * 10) / 10)}</span></span>
@@ -2416,9 +2453,9 @@ function telaDetalhe(sessao) {
   const d = detalharSessao(sessao, estado.plano.vdot);
   const realizadas = corridasDoTreino(sessao, estado.atividades, estado.ligacoes);
   const numeros = [
-    ['Distância', km(Math.round(d.distanciaKm * 10) / 10)],
-    [sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado', formatarTempo(d.tempoSeg)],
-    ['Pace médio', `${formatarRitmo(d.ritmoMedio)}/km`],
+    sessao.minutosTotal ? ['Duração', `${sessao.minutosTotal} min`] : ['Distância', km(Math.round(d.distanciaKm * 10) / 10)],
+    sessao.minutosTotal ? ['Distância aproximada', km(Math.round(d.distanciaKm * 10) / 10)] : [sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado', formatarTempo(d.tempoSeg)],
+    semMetaDePace(sessao) ? ['Pace', 'Livre'] : ['Pace médio', `${formatarRitmo(d.ritmoMedio)}/km`],
   ];
   const passos = d.blocos.map((bloco) => `
     <div class="bloco">
@@ -2426,8 +2463,10 @@ function telaDetalhe(sessao) {
       ${bloco.passos.map((p) => `
         <div class="passo cor-${p.zona}">
           <span class="chip-zona">${ZONAS[p.zona].codigo}</span>
-          <span><strong>${p.km !== undefined ? km(p.km) : `${p.minutos} min`}</strong> a ${textoRitmo(p.ritmo)}<br>
-          <span class="suave">${esc(ZONAS[p.zona].nome)}, cerca de ${formatarTempo(p.tempoSeg)}</span></span>
+          ${p.semAlvo
+            ? `<span><strong>${p.km !== undefined ? km(p.km) : `${p.minutos} min`}</strong> de ${esc((p.rotulo ?? ZONAS[p.zona].nome).toLowerCase())}<br><span class="suave">${esc(ZONAS[p.zona].sensacao)}</span></span>`
+            : `<span><strong>${p.km !== undefined ? km(p.km) : `${p.minutos} min`}</strong> a ${textoRitmo(p.ritmo)}<br>
+          <span class="suave">${esc(ZONAS[p.zona].nome)}, cerca de ${formatarTempo(p.tempoSeg)}</span></span>`}
         </div>`).join('')}
     </div>`).join('');
 
@@ -2439,14 +2478,15 @@ function telaDetalhe(sessao) {
       ${seloTipo(sessao.tipo)}
       ${perfilDoTreino(d)}
       <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
-      <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : `Estimativa pelo meio das faixas de ritmo, com o seu nível atual. Nessas faixas, o treino leva ${faixaDoTreino(sessao).tempo}.`}</p>
+      <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : semMetaDePace(sessao) ? 'Sem meta de pace. A distância é só uma estimativa.' : `Estimativa pelo meio das faixas de ritmo, com o seu nível atual. Nessas faixas, o treino leva ${faixaDoTreino(sessao).tempo}.`}</p>
     </section>
     ${blocoDoRegistro(sessao, dia)}
+    ${sessao.tipo === 'teste' ? blocoDoTeste(sessao, realizadas, dia) : ''}
     ${blocoPlanejado(sessao)}
     ${realizadas.length ? cartaoDeFeedback({ chave: sessao.id, data: sessao.data, titulo: sessao.nome }) : ''}
     ${blocoMudarDia(sessao, dia)}
     ${sessao.tipo === 'prova' && realizadas.length ? blocoResultadoDaProva(sessao, realizadas.find((a) => a.prova) ?? realizadas[0]) : ''}
-    ${estado.chaveApi ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}
+    ${estado.chaveApi && !semMetaDePace(sessao) ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}
     ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
     ${realizadas.map(blocoPercurso).join('')}
     <section class="cartao">
@@ -2454,12 +2494,209 @@ function telaDetalhe(sessao) {
       <p>${esc(sessao.porque)}</p>
     </section>
     ${passos ? `<section class="cartao"><h2>Passo a passo</h2>${passos}</section>` : ''}
-    ${d.zonas.length ? `
+    ${d.zonas.length && !semMetaDePace(sessao) ? `
       <section class="cartao">
         <h2>Tempo por zona de ritmo</h2>
         ${d.zonas.map((z) => `${barraDeZona(`${z.codigo} ${z.nome}`, z.tempoSeg, z.fracao, z.chave)}<p class="suave">${esc(z.sensacao)}</p>`).join('')}
         <p class="suave">Zonas de ritmo calculadas pelo app. São diferentes das zonas de frequência cardíaca do relógio.</p>
       </section>` : ''}`;
+}
+
+// ---------- Testes de campo ----------
+
+const AVISO_DE_SAUDE = 'É um esforço máximo. Não faça com dor, doença ou contraindicação médica, e procure orientação profissional se tiver problema de coração, pressão alta ou nunca tiver feito esforço intenso. Pare na hora se sentir dor no peito, tontura ou falta de ar fora do normal.';
+const idDoTeste = (chave, data) => `t-${chave}-${data}`;
+const decimalBr = (v) => String(v).replace('.', ',');
+const textoDoResultado = (t) => (t.chave === 'cooper' ? `${decimalBr(t.km)} km em 12 min` : `3 km em ${formatarTempo(t.seg)}`);
+
+function formularioDoResultado(chave, { data = '', km: kmInicial = '', seg = 0, fcMaxima = '', origem = 'manual', max }) {
+  return `
+    <form class="form-resultado" data-form="resultado-teste" data-teste="${chave}" data-origem="${origem}">
+      <label>Data do teste<input name="data" type="date" max="${max}" value="${esc(data)}" required></label>
+      ${chave === 'cooper'
+        ? `<label>Distância em 12 minutos, em km<input name="km" inputmode="decimal" placeholder="Ex.: 2,1" value="${esc(decimalBr(kmInicial))}" required></label>`
+        : `<div class="linha">
+             <label>Minutos<input name="minutos" type="number" inputmode="numeric" min="0" max="60" value="${seg ? Math.floor(seg / 60) : ''}" required></label>
+             <label>Segundos<input name="segundos" type="number" inputmode="numeric" min="0" max="59" value="${seg ? seg % 60 : ''}"></label>
+           </div>`}
+      <label>Maior frequência cardíaca (opcional)<input name="fcMaxima" type="number" inputmode="numeric" min="60" max="240" value="${esc(fcMaxima)}"></label>
+      <p class="erro" role="alert"></p>
+      <button class="principal" type="submit">Salvar resultado</button>
+    </form>`;
+}
+
+function blocoDoTeste(sessao, realizadas, dia) {
+  const chave = sessao.teste;
+  const registrado = estado.testes.find((t) => t.id === idDoTeste(chave, sessao.data));
+  const corrida = realizadas[0];
+  const lido = corrida?.id && percursos.has(String(corrida.id)) ? resultadoDasCurvas(chave, percursos.get(String(corrida.id))) : null;
+  const passos = [
+    'Escolha um lugar plano e seguro, de preferência uma pista, em um horário sem calor forte.',
+    'Aqueça por 10 minutos em ritmo leve. O treino no relógio conduz as etapas, sem alvo de pace.',
+    chave === 'cooper'
+      ? 'Percorra a maior distância possível em 12 minutos. Se precisar, alterne corrida e caminhada.'
+      : 'Corra os 3 km no menor tempo que conseguir sustentar.',
+    'Mantenha um ritmo constante: largar forte demais é o erro mais comum e piora o resultado.',
+    'Termine com 10 minutos bem leves. Faça o teste descansado, e não no dia seguinte a um treino pesado.',
+  ];
+  let resultado = '';
+  if (registrado) {
+    resultado = `<h3>Resultado</h3><p><strong>${esc(textoDoResultado(registrado))}</strong>${registrado.vdot ? `, nível (VDOT) ${decimalBr(registrado.vdot)}` : ''}.</p><p class="suave">O histórico fica em Planilha › Testes.</p>`;
+  } else if (corrida || sessao.data <= dia) {
+    const carregando = corrida?.id && estado.chaveApi && !percursos.has(String(corrida.id)) && !errosDePercurso.has(String(corrida.id));
+    resultado = `
+      <h3>Resultado</h3>
+      <p class="suave">${lido ? 'Encontrei este resultado nas curvas do relógio. Confira antes de salvar: se o melhor trecho não foi o teste, corrija.' : carregando ? 'Buscando as curvas do relógio. Se preferir, digite o resultado.' : 'Digite o resultado do teste.'}</p>
+      ${formularioDoResultado(chave, { data: sessao.data, km: lido?.km ?? '', seg: lido?.seg ?? 0, fcMaxima: corrida?.fcMaxima ?? '', origem: lido ? 'relogio' : 'manual', max: dia })}`;
+  }
+  return `
+    <section class="cartao" data-bloco-teste="${esc(sessao.id)}">
+      <h2>Como fazer o teste</h2>
+      <ol class="passos-do-teste">${passos.map((p) => `<li>${esc(p)}</li>`).join('')}</ol>
+      <p class="suave">${esc(AVISO_DE_SAUDE)}</p>
+      ${resultado}
+      ${!corrida && !registrado && sessao.data >= dia ? `<button style="margin-top:10px" data-acao="desmarcar-teste" data-sessao="${esc(sessao.id)}">Desmarcar o teste</button>` : ''}
+    </section>`;
+}
+
+const LINHAS_DE_RITMO = [
+  ['Z2 Leve', (r) => textoRitmo(r.leve)],
+  ['Z3 Ritmo de maratona', (r) => textoRitmo(r.maratona)],
+  ['Z4 Limiar', (r) => textoRitmo(r.limiar)],
+  ['Z5 Intervalado', (r) => textoRitmo(r.intervalado)],
+];
+
+const notaDaFc = (t) => (t.fcMaxima ? `Maior frequência cardíaca no teste: ${t.fcMaxima} bpm. As zonas de FC do relógio são calculadas pelo intervals.icu: se esse valor for maior que a máxima cadastrada lá, atualize em Settings.` : '');
+
+// Fica pendente até a pessoa decidir, mesmo que feche o app.
+const testeParaDecidir = () => estado.testes.find((t) => t.aplicado === null && t.vdot && t.vdot !== estado.plano.vdot);
+
+function blocoDecisaoDoTeste(dia) {
+  const teste = testeParaDecidir();
+  if (!teste) return '';
+  const novoPlano = refazerComNivel({ plano: estado.plano, parametros: parametrosAtuais(), vdot: teste.vdot, hoje: dia });
+  const novos = calcularRitmos(teste.vdot);
+  const caiu = teste.vdot < estado.plano.vdot;
+  return `
+    <section class="cartao destaque">
+      <h2>Novo resultado: ${esc(textoDoResultado(teste))}</h2>
+      <table class="ritmos comparacao">
+        <thead><tr><th></th><th>Hoje</th><th>Pelo teste</th></tr></thead>
+        <tbody>
+          <tr><td>Nível (VDOT)</td><td>${decimalBr(estado.plano.vdot)}</td><td>${decimalBr(teste.vdot)}</td></tr>
+          ${LINHAS_DE_RITMO.map(([nome, valor]) => `<tr><td>${nome}</td><td>${esc(valor(estado.plano.ritmos))}</td><td>${esc(valor(novos))}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      ${caiu ? '<p class="suave" style="margin-top:12px">Ficou abaixo do nível atual. Calor, cansaço e largada forte demais puxam o resultado para baixo. Se foi um dia ruim, mantenha os ritmos e repita depois.</p>' : '<p class="suave" style="margin-top:12px">Confira se a distância ou o tempo estão certos: erro de GPS pode inflar o resultado.</p>'}
+      ${notaDaFc(teste) ? `<p class="suave">${esc(notaDaFc(teste))}</p>` : ''}
+      ${novoPlano ? `<p class="suave">Se aplicar, os ritmos mudam a partir de ${dataCurta(novoPlano.aPartirDe)}. Treinos anteriores e o volume continuam iguais.</p>` : '<p class="suave">Esta planilha já terminou: o resultado fica só no histórico.</p>'}
+      <div class="botoes">
+        ${novoPlano ? `<button class="principal" data-acao="aplicar-teste" data-teste="${esc(teste.id)}">Aplicar novos ritmos</button>` : ''}
+        <button data-acao="manter-teste" data-teste="${esc(teste.id)}">Manter como está</button>
+      </div>
+    </section>`;
+}
+
+function blocoHistoricoDeTestes() {
+  if (!estado.testes.length) return '';
+  const comNivel = estado.testes.filter((t) => t.vdot);
+  const grafico = linhaDeEvolucao(comNivel.map((t) => ({ data: t.data, valor: t.vdot })), { nome: 'VDOT nos testes', formatar: (v) => v.toFixed(1).replace('.', ','), passoMinimo: 0.5 });
+  const ultimo = estado.testes.at(-1);
+  return `
+    <section class="cartao">
+      <h2>Meus testes</h2>
+      <div class="voltas-rolagem" data-sem-gesto>
+        <table class="voltas" aria-label="Histórico de testes">
+          <thead><tr><th>Data</th><th>Resultado</th><th>Pace</th><th>VDOT</th><th>VO2máx</th></tr></thead>
+          <tbody>${[...estado.testes].reverse().map((t) => `
+            <tr><td>${dataCurta(t.data)}</td><td>${esc(textoDoResultado(t))}</td><td>${formatarRitmo(t.ritmo)}</td><td>${t.vdot ? decimalBr(t.vdot) : '–'}</td><td>${t.vo2 > 0 ? decimalBr(t.vo2) : '–'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${grafico}
+      ${notaDaFc(ultimo) ? `<p class="suave">${esc(notaDaFc(ultimo))}</p>` : ''}
+      <p class="suave mapa-nota">VO2máx pela fórmula de Cooper, em mL/kg/min: é uma estimativa, não exame. Compare testes iguais, em condições parecidas.${estado.testes.some((t) => !t.vdot) ? ' Sem VDOT quando o resultado fica fora da faixa das fórmulas: o teste vale para acompanhar sua evolução.' : ''}</p>
+    </section>`;
+}
+
+function blocoEscolhaDoTeste(chave, dia) {
+  const teste = TESTES[chave];
+  const opcoes = sessoesParaTeste({ plano: estado.plano, chave, corridas: estado.atividades, ligacoes: estado.ligacoes, naoFeitos: estado.naoFeitos, hoje: dia });
+  const liberacao = primeiraDataDoTeste(estado.plano, chave, dia);
+  const marcar = opcoes.length ? `
+    <form class="form-marcar" data-form="marcar-teste" data-teste="${chave}">
+      <label>No lugar de qual treino leve?
+        <select name="sessao">${opcoes.map((s) => `<option value="${esc(s.id)}">${esc(dataCurta(s.data))}, ${esc(s.nome)}</option>`).join('')}</select>
+      </label>
+      <label class="marcar"><input type="checkbox" name="saude" required> Li o aviso e estou em condições de fazer um esforço máximo</label>
+      <p class="erro" role="alert"></p>
+      <button class="principal" type="submit">Marcar teste</button>
+    </form>`
+    : `<p class="suave">${liberacao && liberacao > dia ? `Fica disponível perto de ${dataCurta(liberacao)}, quando os trechos de corrida já estiverem maiores.` : 'Sem treino leve disponível nas próximas semanas, ou já há um teste marcado nessas semanas.'}</p>`;
+  return `
+    <section class="cartao">
+      <h2>${esc(teste.nome)}</h2>
+      <p>${esc(teste.resumo)}</p>
+      ${marcar}
+      <details class="tabela-grafico">
+        <summary>Já fiz: registrar resultado</summary>
+        ${formularioDoResultado(chave, { data: dia, max: dia })}
+      </details>
+    </section>`;
+}
+
+function blocoTestes(dia) {
+  const marcados = estado.plano.sessoes.filter((s) => s.tipo === 'teste' && s.data >= dia);
+  const reteste = retesteEm(estado.testes);
+  return `
+    ${blocoDecisaoDoTeste(dia)}
+    <section class="cartao">
+      <h2>Para que servem</h2>
+      <p>Um teste mede seu nível com um esforço real. O resultado recalcula os ritmos e as zonas Z2 a Z5 da planilha, sempre com a sua confirmação.</p>
+      <p class="suave">${esc(AVISO_DE_SAUDE)}</p>
+      ${reteste && dia >= reteste ? `<p><strong>Já se passaram ${Math.round(INTERVALO_DO_RETESTE_DIAS / 7)} semanas desde o último teste.</strong> Repetir agora mostra a sua evolução.</p>` : ''}
+      ${reteste && dia < reteste ? `<p class="suave">Sugestão do app: repetir perto de ${dataCurta(reteste)}.</p>` : ''}
+    </section>
+    ${marcados.length ? `<section class="cartao"><h2>Marcados</h2>${marcados.map((s) => linhaSessao(s, dia)).join('')}</section>` : ''}
+    ${blocoEscolhaDoTeste('cooper', dia)}
+    ${blocoEscolhaDoTeste('tres', dia)}
+    ${blocoHistoricoDeTestes()}`;
+}
+
+// Sem nenhum tempo, os ritmos são só um ponto de partida. Quem está na iniciação ainda não precisa disso.
+function convitePorNivelEstimado(dia) {
+  const naIniciacao = estado.plano.sessoes.some((s) => s.fase === 'iniciacao' && s.data >= dia);
+  if (naIniciacao || estado.testes.length || !String(estado.origemVdot ?? '').startsWith('valor inicial')) return '';
+  return `
+    <section class="cartao alerta">
+      <strong>Seus ritmos ainda são uma estimativa.</strong> Um teste de campo mede o seu nível real.
+      <div class="botoes" style="margin-top:10px"><button data-secao="testes" data-secao-de="plano">Ver testes</button></div>
+    </section>`;
+}
+
+function salvarResultadoDoTeste(formulario) {
+  const form = new FormData(formulario);
+  const chave = formulario.dataset.teste;
+  const dia = hoje();
+  const data = String(form.get('data') ?? '');
+  const km = numero(form, 'km');
+  const seg = Number(form.get('minutos') || 0) * 60 + Number(form.get('segundos') || 0);
+  const erro = erroDoTeste({ chave, data, km, seg }, dia);
+  if (erro) {
+    formulario.querySelector('.erro').textContent = erro;
+    return;
+  }
+  const fcMaxima = Number(form.get('fcMaxima')) || null;
+  const avaliacao = avaliarTeste({ chave, km, seg });
+  const id = idDoTeste(chave, data);
+  estado.testes = registrarTeste(estado.testes, { id, chave, data, ...avaliacao, fcMaxima, origem: formulario.dataset.origem, vdotAntes: estado.plano.vdot, aplicado: null });
+  guardar();
+  sessaoAberta = null;
+  aba = 'plano';
+  secoes.plano = 'testes';
+  render();
+  window.scrollTo(0, 0);
+  mostrarAviso('Resultado salvo.');
 }
 
 function telaPlano() {
@@ -2505,14 +2742,16 @@ function telaPlano() {
       <p class="suave">${esc(meta)}, ${plano.totalSemanas} semanas</p>
     </header>
     ${avisoPlanilhaAntiga()}
-    ${barraDeSecoes('plano', [['semanas', 'Semanas'], ['calendario', 'Calendário'], ['provas', 'Provas']])}
+    ${barraDeSecoes('plano', [['semanas', 'Semanas'], ['calendario', 'Calendário'], ['provas', 'Provas'], ['testes', 'Testes']])}
     ${secoes.plano === 'calendario' ? blocoCalendario(dia) : ''}
     ${secoes.plano === 'provas' ? blocoProvas(dia) : ''}
+    ${secoes.plano === 'testes' ? blocoTestes(dia) : ''}
     ${secoes.plano === 'semanas' ? `
     ${blocoDoObjetivo(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
     ${(plano.avisos ?? []).map((a) => `<section class="cartao alerta">${esc(a)}</section>`).join('')}
     ${semanaAntesDoInicio(dia)}
+    ${convitePorNivelEstimado(dia)}
     ${lista}
     ${(() => {
       const semanaVista = plano.sessoes.find((s) => s.data >= dia)?.semana;
@@ -2543,6 +2782,7 @@ const TITULOS_ACAO = {
   analise: 'Análise atualizada com suas corridas',
   dias: 'Dias de treino alterados',
   provas: 'Calendário de provas alterado',
+  teste: 'Ritmos atualizados por um teste',
 };
 
 function blocoAtualizarAnalise() {
@@ -2970,7 +3210,7 @@ const acoes = {
     const { novas, objetivo, resultado } = provasPendentes;
     estado.provas = novas;
     estado.objetivo = objetivo;
-    estado.plano = resultado.plano;
+    estado.plano = reporTestes(estado.plano, resultado.plano, hoje());
     estado.revisoes.push({ data: hoje(), acao: 'provas', motivos: [] });
     guardar();
     voltarDoTreino();
@@ -2986,13 +3226,45 @@ const acoes = {
     mostrarAviso('Atividade excluída.');
   },
 
+  'desmarcar-teste': (botao) => {
+    estado.plano = desmarcarTeste(estado.plano, botao.dataset.sessao);
+    guardar();
+    render();
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Teste desmarcado. Envie os treinos de novo em Planilha.' : 'Teste desmarcado.');
+    setTimeout(enviarAutomaticamente);
+  },
+
+  'manter-teste': (botao) => {
+    estado.testes = estado.testes.map((t) => (t.id === botao.dataset.teste ? { ...t, aplicado: false } : t));
+    guardar();
+    renderMantendoRolagem();
+  },
+
+  'aplicar-teste': (botao) => {
+    const dia = hoje();
+    const teste = estado.testes.find((t) => t.id === botao.dataset.teste);
+    const resultado = refazerComNivel({ plano: estado.plano, parametros: parametrosAtuais(), vdot: teste.vdot, hoje: dia });
+    if (!resultado) return;
+    estado.plano = reporTestes(estado.plano, resultado.plano, dia);
+    estado.tempoInformado = { distanciaKm: teste.km, tempoSeg: teste.seg };
+    estado.origemVdot = `teste de ${dataCurta(teste.data)}: ${textoDoResultado(teste)}`;
+    estado.historicoNivel = registrarNivel(estado.historicoNivel, dia, teste.vdot);
+    estado.testes = estado.testes.map((t) => (t.id === teste.id ? { ...t, aplicado: true } : t));
+    estado.revisoes.push({ data: dia, acao: 'teste', motivos: [] });
+    guardar();
+    render();
+    window.scrollTo(0, 0);
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Ritmos atualizados. Envie os treinos de novo em Planilha.' : 'Ritmos atualizados.');
+    setTimeout(enviarAutomaticamente);
+  },
+
   'cancelar-grade': () => {
     gradePendente = null;
     render();
   },
 
   'aplicar-grade': () => {
-    estado.plano = gradePendente.plano;
+    estado.plano = reporTestes(estado.plano, gradePendente.plano, hoje());
     estado.perfil = gradePendente.perfil;
     estado.revisoes.push({ data: hoje(), acao: 'dias', motivos: [] });
     gradePendente = null;
@@ -3010,7 +3282,7 @@ const acoes = {
   'aplicar-analise': () => {
     const { plano, origem } = analisePendente;
     const dia = hoje();
-    estado.plano = plano;
+    estado.plano = reporTestes(estado.plano, plano, dia);
     estado.origemVdot = origem;
     estado.historicoNivel = registrarNivel(estado.historicoNivel, dia, plano.vdot);
     estado.revisoes.push({ data: dia, acao: 'analise', motivos: [] });
@@ -3079,7 +3351,7 @@ const acoes = {
   'aplicar-revisao': (botao) => comOcupado(botao, async () => {
     const dia = hoje();
     const analise = analisarRevisao(dadosDaRevisao(dia));
-    estado.plano = aplicarRevisao({ plano: estado.plano, parametros: parametrosAtuais(), analise, hoje: dia });
+    estado.plano = reporTestes(estado.plano, aplicarRevisao({ plano: estado.plano, parametros: parametrosAtuais(), analise, hoje: dia }), dia);
     estado.revisoes.push({ data: dia, acao: analise.acao, motivos: analise.motivos });
     estado.historicoNivel = registrarNivel(estado.historicoNivel, dia, estado.plano.vdot);
     guardar();
@@ -3117,6 +3389,7 @@ const acoes = {
       peso: perfil.pesoKg,
       altura: perfil.alturaCm,
       lesao: perfil.lesaoRecente,
+      experiencia: perfil.experiencia,
       dias: perfil.diasSemana,
       diaLongo: perfil.diaLongo,
       distancia: objetivo.distanciaKm === null ? '' : objetivo.distanciaKm,
@@ -3124,7 +3397,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, avaliacoes, corridasManuais, historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), testes: estado.testes, avisoCiente: true, avaliacoes, corridasManuais, historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -3332,6 +3605,20 @@ app.addEventListener('submit', (e) => {
     return mostrarAviso('Cadastro salvo.');
   }
   if (e.target.id === 'form-corrida') return salvarCorridaManual(e.target);
+  if (e.target.dataset.form === 'resultado-teste') return salvarResultadoDoTeste(e.target);
+  if (e.target.dataset.form === 'marcar-teste') {
+    const dados = new FormData(e.target);
+    if (dados.get('saude') !== 'on') {
+      e.target.querySelector('.erro').textContent = 'Confirme que leu o aviso e está em condições de fazer o teste.';
+      return;
+    }
+    estado.plano = marcarTeste(estado.plano, String(dados.get('sessao')), e.target.dataset.teste);
+    guardar();
+    renderMantendoRolagem();
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Teste marcado. Envie os treinos de novo para o relógio.' : 'Teste marcado.');
+    setTimeout(enviarAutomaticamente);
+    return;
+  }
   if (e.target.id === 'form-nao-feito') {
     const motivo = String(new FormData(e.target).get('motivo') ?? 'outro');
     estado.naoFeitos = { ...estado.naoFeitos, [e.target.dataset.sessao]: { motivo } };

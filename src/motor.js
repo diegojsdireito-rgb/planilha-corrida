@@ -97,7 +97,7 @@ export function formatarTempo(seg) {
 // ---------- Estimativa inicial a partir dos dados ----------
 
 const VDOT_INICIAL_PRUDENTE = 30;
-const vdotPlausivel = (v) => Number.isFinite(v) && v >= 15 && v <= 85;
+export const vdotPlausivel = (v) => Number.isFinite(v) && v >= 15 && v <= 85;
 
 export function estimarVdot({ atividades = [], tempoInformado = null, hoje }) {
   const limite = somarDias(hoje, -84);
@@ -122,7 +122,7 @@ export function estimarVdot({ atividades = [], tempoInformado = null, hoje }) {
   if (!validos.length) {
     return {
       vdot: VDOT_INICIAL_PRUDENTE,
-      origem: 'valor inicial prudente, sem tempo recente. Faça um teste de 3 km forte para calibrar.',
+      origem: 'valor inicial prudente, sem tempo recente. Quando estiver pronto, faça um teste em Planilha › Testes.',
     };
   }
   const melhor = validos.reduce((a, b) => (b.vdot > a.vdot ? b : a));
@@ -254,6 +254,67 @@ export function escolherDiasDeTreino(disponiveis, diaLongo, quantidade) {
     }
   }
   return { dias: melhor, diaLongo: longo };
+}
+
+// Início para quem ainda não corre. O ponto de partida e a chegada em 30 min contínuos vêm de
+// Relph 2023 (Couch-to-5K modificado, 1 min correndo e 1,5 min caminhando, 9 semanas), onde muitos
+// acharam a progressão rápida e a desistência foi alta. Por isso a subida aqui é mais suave, termina
+// em 25 min e cada etapa é decisão do app, não resultado testado.
+const ETAPAS_DA_INICIACAO = [
+  { corrida: 1, caminhada: 2, repeticoes: 8 },
+  { corrida: 2, caminhada: 2, repeticoes: 6 },
+  { corrida: 3, caminhada: 2, repeticoes: 5 },
+  { corrida: 4, caminhada: 2, repeticoes: 4 },
+  { corrida: 5, caminhada: 2, repeticoes: 4 },
+  { corrida: 7, caminhada: 2, repeticoes: 3 },
+  { corrida: 9, caminhada: 2, repeticoes: 3 },
+  { corrida: 12, caminhada: 2, repeticoes: 2 },
+  { corrida: 15, caminhada: 2, repeticoes: 2 },
+  { corrida: 20, caminhada: 2, repeticoes: 1 },
+  { corrida: 25, caminhada: 0, repeticoes: 1 },
+];
+const ETAPA_DE_QUEM_CORRE_ATE_10 = 4;
+const ETAPAS_REPETIDAS_NO_MODO_CUIDADOSO = [3, 6];
+const CAMINHADA_LIVRE_MIN = 5;
+const RITMO_DA_CAMINHADA = { de: 600, ate: 780 };
+const FOLGA_DO_RITMO_INICIANTE = 60;
+
+export function etapasDaIniciacao({ experiencia, prudente }) {
+  const inicio = { 'nao-corre': 0, ate10: ETAPA_DE_QUEM_CORRE_ATE_10 }[experiencia];
+  if (inicio === undefined) return [];
+  return ETAPAS_DA_INICIACAO.flatMap((etapa, i) => {
+    if (i < inicio) return [];
+    return prudente && ETAPAS_REPETIDAS_NO_MODO_CUIDADOSO.includes(i) ? [etapa, etapa] : [etapa];
+  });
+}
+
+export const semMetaDePace = (sessao) => sessao.tipo === 'teste' || Boolean(sessao.minutosTotal);
+
+function sessaoDaIniciacao(data, { corrida, caminhada, repeticoes }, ritmos) {
+  const ritmoDaCorrida = { de: ritmos.leve.ate, ate: ritmos.leve.ate + FOLGA_DO_RITMO_INICIANTE };
+  const passoDeCaminhada = (minutos, rotulo = 'Caminhada') => ({ minutos, ritmo: RITMO_DA_CAMINHADA, zona: 'caminhada', semAlvo: true, rotulo });
+  const passos = [
+    { minutos: corrida, ritmo: ritmoDaCorrida, zona: 'leve', semAlvo: true, rotulo: 'Corrida' },
+    ...(caminhada ? [passoDeCaminhada(caminhada)] : []),
+  ];
+  const centro = (r) => (r.de + r.ate) / 2;
+  const kmCorrida = (corrida * repeticoes * 60) / centro(ritmoDaCorrida);
+  const kmCaminhada = ((caminhada * repeticoes + 2 * CAMINHADA_LIVRE_MIN) * 60) / centro(RITMO_DA_CAMINHADA);
+  return {
+    id: `pc-${data}`,
+    data,
+    tipo: 'leve',
+    nome: caminhada ? `Corra ${corrida} min, caminhe ${caminhada} min` : `${corrida} min de corrida sem parar`,
+    distanciaKm: meioKm(kmCorrida + kmCaminhada),
+    minutosTotal: 2 * CAMINHADA_LIVRE_MIN + (corrida + caminhada) * repeticoes,
+    minutosCorrida: corrida,
+    porque: 'Acostuma o corpo ao impacto aos poucos. Sem meta de pace: corra num ritmo em que dê para conversar. Se pesar, caminhe mais: o treino conta pelo tempo, não pela distância.',
+    blocos: [
+      { rotulo: 'Aquecimento', repeticoes: 1, passos: [passoDeCaminhada(CAMINHADA_LIVRE_MIN, 'Aquecimento')] },
+      { rotulo: 'Principal', repeticoes, passos },
+      { rotulo: 'Volta à calma', repeticoes: 1, passos: [passoDeCaminhada(CAMINHADA_LIVRE_MIN, 'Volta à calma')] },
+    ],
+  };
 }
 
 function dataNaSemana(segunda, dia) {
@@ -423,9 +484,11 @@ export function gerarPlano(parametros) {
 
   const distancia = objetivo.distanciaKm;
   const prova = objetivo.dataProva;
+  const prudencia = parametros.prudencia ?? avaliarPrudencia(perfil);
+  const etapas = etapasDaIniciacao({ experiencia: perfil.experiencia, prudente: prudencia.prudente });
   const total = prova
     ? diasEntre(inicio, segundaDaSemana(prova)) / 7 + 1
-    : SEMANAS_SEM_PROVA;
+    : SEMANAS_SEM_PROVA + etapas.length;
 
   if (total < 2) throw new Error('A prova está perto demais para montar uma planilha. Escolha uma data a partir de duas semanas.');
   if (total > MAXIMO_SEMANAS) throw new Error('A prova está a mais de um ano. Escolha uma data mais próxima.');
@@ -433,7 +496,8 @@ export function gerarPlano(parametros) {
   const polimento = prova ? (POLIMENTO[distancia] ?? [0.6]) : [];
   const usados = polimento.slice(-Math.max(1, total - 1));
   const faseDa = fasesDoPlano(total, usados.length);
-  const prudencia = parametros.prudencia ?? avaliarPrudencia(perfil);
+  // Com prova perto, a iniciação encurta para dar lugar às semanas finais.
+  const iniciacao = etapas.slice(0, Math.max(0, total - usados.length - 1));
   const taxa = prudencia.prudente ? 0.05 : 0.1;
   const cicloRecuperacao = prudencia.prudente ? 3 : 4;
   const treinosMaximos = Math.min(
@@ -453,6 +517,14 @@ export function gerarPlano(parametros) {
   for (let i = 0; i < total; i++) {
     const segunda = somarDias(inicio, i * 7);
     if (segunda < segundaDaSemana(aPartirDe)) continue;
+
+    if (i < iniciacao.length) {
+      const { dias } = escolherDiasDeTreino(perfil.diasSemana, perfil.diaLongo, 3);
+      const semana = dias.map((d) => ({ ...sessaoDaIniciacao(dataNaSemana(segunda, d), iniciacao[i], ritmos), semana: i + 1, fase: 'iniciacao', recuperacao: false }));
+      sessoes.push(...semana);
+      corridasRecentes.push(...semana.map((s) => ({ data: s.data, km: s.distanciaKm })));
+      continue;
+    }
 
     const fase = faseDa(i);
     const treino = total - usados.length;
@@ -491,10 +563,10 @@ export function gerarPlano(parametros) {
 
   const dentroDoCiclo = (parametros.provas ?? []).filter((p) => p.data < somarDias(inicio, total * 7));
   const comProvas = encaixarProvas(sessoes, dentroDoCiclo, { inicio, desde: segundaDaSemana(aPartirDe), ritmos });
-  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes: comProvas, avisos: avisosDoPlano({ objetivo, base, ritmos, referencia }) };
+  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes: comProvas, avisos: [...avisosDoPlano({ objetivo, base, ritmos, referencia }), ...(iniciacao.length < etapas.length ? [`A prova chega antes do fim da iniciação com corrida e caminhada, que precisaria de ${etapas.length} semanas. Os treinos passam a ser contínuos antes do ideal: considere uma prova mais distante ou completá-la caminhando em parte.`] : [])] };
 }
 
-const TIPOS_FORTES = ['limiar', 'intervalado', 'ritmo'];
+const TIPOS_FORTES = ['limiar', 'intervalado', 'ritmo', 'teste'];
 const KM_MINIMO_ANTES_DA_PROVA = 3;
 const REDUCAO_ANTES_DA_PROVA = 0.5;
 // Dias sem treino forte depois de uma prova longa: recomendação de treinadores (Higdon, Pfitzinger).
@@ -562,6 +634,7 @@ function avisosDoPlano({ objetivo, base, ritmos, referencia }) {
 
 // Divisão didática por ritmo, derivada do VDOT. Não usa frequência cardíaca.
 export const ZONAS = {
+  caminhada: { codigo: 'Z0', nome: 'Caminhada', sensacao: 'Passo firme e confortável.' },
   recuperacao: { codigo: 'Z1', nome: 'Recuperação', sensacao: 'Trote bem solto, para recuperar.' },
   leve: { codigo: 'Z2', nome: 'Leve', sensacao: 'Confortável: dá para conversar em frases completas.' },
   maratona: { codigo: 'Z3', nome: 'Ritmo de maratona', sensacao: 'Firme, mas sustentável por muito tempo.' },
@@ -605,7 +678,7 @@ export function detalharSessao(sessao, vdot) {
 
 // ---------- Mudar o dia de um treino ----------
 
-const TIPOS_INTENSOS = ['limiar', 'intervalado', 'ritmo', 'longo', 'prova'];
+const TIPOS_INTENSOS = ['limiar', 'intervalado', 'ritmo', 'longo', 'prova', 'teste'];
 
 // Só dentro da mesma semana, para não mudar a carga semanal que a progressão calculou.
 export function diasParaMudar({ plano, sessao, atividades, hoje }) {
@@ -661,7 +734,11 @@ export function analisarRevisao({ plano, atividades, avaliacoes = {}, dispensado
   const realizadas = atividades.filter((a) => naJanela(a.data));
   const kmPrevistos = previstas.reduce((soma, s) => soma + s.distanciaKm, 0);
   const kmRealizados = realizadas.reduce((soma, a) => soma + a.km, 0);
-  const adesao = kmPrevistos ? kmRealizados / kmPrevistos : null;
+  // Na iniciação vale o tempo: quem caminha mais não deve parecer em falta por fazer menos km.
+  const porTempo = previstas.length > 0 && previstas.every((s) => s.minutosTotal);
+  const minPrevistos = previstas.reduce((soma, s) => soma + (s.minutosTotal ?? 0), 0);
+  const minRealizados = realizadas.reduce((soma, a) => soma + (a.seg ?? 0) / 60, 0);
+  const adesao = porTempo ? minRealizados / minPrevistos : kmPrevistos ? kmRealizados / kmPrevistos : null;
 
   const notas = daJanela.map((s) => avaliacoes[s.id]).filter(Boolean);
   const esforcos = [
@@ -681,7 +758,9 @@ export function analisarRevisao({ plano, atividades, avaliacoes = {}, dispensado
     motivos.push('Ainda não há treinos previstos nos últimos 14 dias para comparar.');
   } else {
     const pct = Math.round(adesao * 100);
-    motivos.push(`Você correu ${decimal(kmRealizados)} km de ${decimal(kmPrevistos)} km previstos (${pct}%).`);
+    motivos.push(porTempo
+      ? `Você treinou ${Math.round(minRealizados)} min de ${minPrevistos} min previstos (${pct}%).`
+      : `Você correu ${decimal(kmRealizados)} km de ${decimal(kmPrevistos)} km previstos (${pct}%).`);
     if (esforco !== null) motivos.push(`Esforço médio informado: ${decimal(esforco)} de 10.`);
 
     if (dor) {
@@ -845,6 +924,15 @@ export function refazerComNovosDias({ plano, parametros, diasSemana, diaLongo, s
     antes: { ...resumoDaSemana(plano.sessoes, aPartirDe), dias: diasDaGrade(plano.sessoes, aPartirDe) },
     depois: { ...resumoDaSemana(sessoes, aPartirDe), dias: diasDaGrade(sessoes, aPartirDe) },
   };
+}
+
+// Ritmos novos, vindos de um teste. Volume e dias continuam os da planilha.
+export function refazerComNivel({ plano, parametros, vdot, hoje }) {
+  const aPartirDe = hoje < plano.inicio ? plano.inicio : proximaSegunda(hoje);
+  const base = baseDaPlanilha(plano, aPartirDe);
+  if (!base) return null;
+  const novo = gerarPlano({ ...parametros, vdot, inicio: plano.inicio, aPartirDe, base });
+  return { plano: { ...novo, sessoes: [...plano.sessoes.filter((s) => s.data < aPartirDe), ...novo.sessoes] }, aPartirDe };
 }
 
 // Mantém o passado intacto e recalcula só da próxima segunda em diante.

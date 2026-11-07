@@ -24,6 +24,8 @@ export function textoDoTreino(sessao, formatar) {
       const titulo = bloco.repeticoes > 1 ? `${bloco.rotulo} ${bloco.repeticoes}x` : bloco.rotulo;
       const passos = bloco.passos.map((p) => {
         const duracao = p.km !== undefined ? textoDistancia(p.km) : `${p.minutos}m`;
+        // Sem alvo de pace: o relógio mostra só o nome e a duração do trecho.
+        if (p.semAlvo) return `- ${p.rotulo ?? bloco.rotulo} ${duracao}`;
         return `- ${duracao} ${textoRitmo(p.ritmo, formatar)}`;
       });
       return [titulo, ...passos].join('\n');
@@ -32,7 +34,7 @@ export function textoDoTreino(sessao, formatar) {
 }
 
 const DIAS_NO_TITULO = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const TIPOS_NAS_NOTAS = { leve: 'Corrida leve', longo: 'Longão', limiar: 'Limiar', intervalado: 'Intervalado', ritmo: 'Ritmo de prova' };
+const TIPOS_NAS_NOTAS = { leve: 'Corrida leve', longo: 'Longão', limiar: 'Limiar', intervalado: 'Intervalado', ritmo: 'Ritmo de prova', teste: 'Teste' };
 
 const bordaDoRitmo = (ritmo) => (typeof ritmo === 'number' ? { de: ritmo, ate: ritmo } : ritmo);
 const umaCasa = (valor) => String(Math.round(valor * 10) / 10).replace('.', ',');
@@ -63,6 +65,7 @@ function tituloDoTreino(sessao) {
   const [, mes, dia] = sessao.data.split('-');
   const semana = DIAS_NO_TITULO[new Date(`${sessao.data}T12:00:00Z`).getUTCDay()];
   const { distancia, tempo } = faixaDoTreino(sessao);
+  if (sessao.minutosTotal) return `${dia}/${mes} ${semana} - ${sessao.nome} - ${sessao.minutosTotal} min`;
   return `${dia}/${mes} ${semana} - ${sessao.nome} - ${distancia} - ${tempo}`;
 }
 
@@ -74,6 +77,7 @@ function textoDaIntensidade(ritmo, formatar) {
 function textoDoPasso(passo, formatar) {
   const zona = ZONAS[passo.zona ?? 'leve'];
   const duracao = passo.km !== undefined ? `${umaCasa(passo.km)} km` : `${passo.minutos} min`;
+  if (passo.semAlvo) return `${duracao}, ${passo.rotulo ?? zona.nome}, sem meta de pace`;
   return `${duracao}, ${zona.codigo} ${zona.nome} (${textoDaIntensidade(passo.ritmo, formatar)})`;
 }
 
@@ -89,8 +93,8 @@ export function notasDoTreino(sessao, formatar) {
   const { distancia, tempo } = faixaDoTreino(sessao);
   return [
     ...linhas,
-    `Tipo: ${TIPOS_NAS_NOTAS[sessao.tipo]}`,
-    `Total: ${distancia}, ${tempo}`,
+    `Tipo: ${sessao.tipo === 'leve' && sessao.minutosTotal ? 'Corrida e caminhada' : TIPOS_NAS_NOTAS[sessao.tipo]}`,
+    sessao.minutosTotal ? `Total: ${sessao.minutosTotal} min` : `Total: ${distancia}, ${tempo}`,
     sessao.porque ? `Por que: ${sessao.porque}` : null,
   ].filter(Boolean).join('\n');
 }

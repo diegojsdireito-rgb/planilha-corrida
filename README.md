@@ -42,6 +42,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/medalhas.js` | Conquistas: recordes, marcos, datas especiais, constância semanal e provas, além do resumo que guarda as corridas com mais de 12 meses. |
 | `src/peso.js` | Histórico de peso e IMC, com as faixas da OMS. |
 | `src/desempenho.js` | Pace ajustado à subida, desacoplamento, clima, melhores marcas, condicionamento e fadiga. Cada valor passa por uma faixa plausível, porque a API não documenta todas as unidades. |
+| `src/testes.js` | Testes de campo (Cooper e 3 km): marcar, ler o resultado pelas curvas do relógio, avaliar e repor o teste quando a planilha é refeita. |
 | `src/percurso.js` | Enquadramento do mapa, voltas, parciais por km e curvas de pace, frequência cardíaca e altitude. O percurso fica só na memória da tela. |
 | `src/provas.js` | Calendário de provas: principal, secundárias, volume comparado à referência e avisos de prazo. |
 | `src/regras.js` | Origem de cada regra (estudo, treinador ou decisão do app) mostrada em Ajustes. |
@@ -66,6 +67,8 @@ Regras principais:
 - **Treino forte** só entra para quem busca tempo. A origem de cada regra aparece em Ajustes e fica em `src/regras.js`.
 - **Detalhes do treino** mostram tempo e pace estimados pelo meio das faixas de ritmo, e zonas Z1 a Z5 de ritmo calculadas pelo app. Depois da corrida, trazem os dados reais e as zonas de frequência cardíaca do intervals.icu.
 - **Análise do treino** compara o tempo real em cada zona de ritmo com o previsto e mostra quanto ficou na meta, acima e abaixo (80% ou mais é "dentro da meta", 60% ou mais é "parcialmente": corte do app, não de estudo). A parte anaeróbica é aproximada pelo pace, porque o Training Effect do Garmin não vem pela API.
+- **Início com corrida e caminhada**: quem ainda não corre, ou corre até 10 minutos, alterna corrida e caminhada 3 vezes por semana até 25 minutos seguidos, sem meta de pace, e o treino conta pelo tempo. Depois entra a planilha normal. As etapas são decisão do app.
+- **Testes**, na Planilha: o teste de 12 minutos (Cooper) ou de 3 km substitui um treino leve e vai ao relógio. O resultado vem das curvas ou é digitado, e os ritmos só mudam depois da confirmação, da próxima segunda em diante.
 - **Treino cumprido**: a corrida do dia, ou uma corrida da mesma semana ligada por você, conta como cumprido a partir de 80% da distância e como parcial abaixo disso (corte do app). Na virada do dia, o treino sem corrida fica sem registro. O botão Não fiz este treino guarda o motivo: doença ou dor não contam como falta na Revisão nem quebram a sequência de semanas.
 - **Corrida manual**, para treino sem relógio, conta no volume e nos marcos, mas não no nível nem nos recordes.
 - **Análises do intervals.icu** (pace ajustado, desacoplamento, clima, melhores marcas, condicionamento e fadiga) só informam: não mudam treino, nível nem revisão. Só aparecem quando o dado vem preenchido.

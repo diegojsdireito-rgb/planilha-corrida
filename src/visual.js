@@ -45,7 +45,7 @@ export function trechosDoTreino(detalhe) {
   return trechos.map((p) => ({ zona: p.zona, fracao: total ? p.seg / total : 0 }));
 }
 
-const ALTURA_DA_ZONA = { recuperacao: 0.28, leve: 0.45, maratona: 0.62, limiar: 0.8, intervalado: 1 };
+const ALTURA_DA_ZONA = { caminhada: 0.18, recuperacao: 0.28, leve: 0.45, maratona: 0.62, limiar: 0.8, intervalado: 1 };
 const LARGURA_DO_PERFIL = 320;
 const ALTURA_DO_PERFIL = 64;
 const VAO_DO_PERFIL = 2;

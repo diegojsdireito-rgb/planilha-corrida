@@ -255,6 +255,7 @@ p { margin: 0 0 8px; }
 .heroi-arte { display: block; width: 100%; height: 96px; margin: -6px 0 8px; }
 
 .perfil { display: block; width: 100%; margin-top: 16px; }
+.p-caminhada { fill: var(--z-recuperacao); opacity: .55; }
 .p-recuperacao { fill: var(--z-recuperacao); }
 .p-leve { fill: var(--z-leve); }
 .p-maratona { fill: var(--z-maratona); }
@@ -487,6 +488,7 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .zona .barra { margin-top: 4px; }
 .zona-topo { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; font-variant-numeric: tabular-nums; }
 .zona + .suave { margin-top: 4px; }
+.cor-caminhada { --cor-zona: var(--z-recuperacao); }
 .cor-recuperacao { --cor-zona: var(--z-recuperacao); }
 .cor-leve { --cor-zona: var(--z-leve); }
 .cor-maratona { --cor-zona: var(--z-maratona); }
@@ -678,3 +680,8 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .ajuste-corpo { padding: 2px 16px 16px; }
 .ajuste-corpo > .cartao { margin: 0; padding: 0; background: none; box-shadow: none; }
 .ajuste-corpo > .cartao > h2:first-child { display: none; }
+
+/* ---------- Testes de campo ---------- */
+
+.passos-do-teste { margin: 8px 0 0; padding-left: 20px; }
+.passos-do-teste li { margin-bottom: 6px; }

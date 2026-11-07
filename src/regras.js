@@ -21,9 +21,21 @@ export const REGRAS = [
     fontes: [['Planos de Higdon', 'https://www.halhigdon.com/training-programs/']],
   },
   {
+    nome: 'Início com corrida e caminhada',
+    origem: 'app',
+    texto: 'Quem ainda não corre, ou corre até 10 minutos, alterna corrida e caminhada 3 vezes por semana até 25 minutos seguidos, sem meta de pace. O formato se inspira em um programa de 9 semanas com 110 adultos, sem grupo de comparação, em que muitos acharam a progressão rápida e a maioria desistiu. Por isso as etapas daqui são mais suaves, mas nenhuma foi testada.',
+    fontes: [['Relph 2023', 'https://pmc.ncbi.nlm.nih.gov/articles/PMC10487403/']],
+  },
+  {
+    nome: 'Testes de campo',
+    origem: 'estudo',
+    texto: 'O nível sai das fórmulas de Daniels e Gilbert, e o VO2máx do teste de 12 minutos sai da fórmula de Cooper. Em adultos saudáveis, esse teste tendeu a subestimar valores baixos e superestimar valores altos, então é uma estimativa. Largada forte demais, calor e pouca motivação pioram o resultado. Liberar o teste depois de 9 ou 15 minutos seguidos de corrida e sugerir repetir em 8 semanas são decisões do app.',
+    fontes: [['Validade do teste de 12 minutos', 'https://pubmed.ncbi.nlm.nih.gov/20647946/']],
+  },
+  {
     nome: 'Treino cumprido',
     origem: 'app',
-    texto: 'Conta como cumprido a partir de 80% da distância prevista, e como parcial abaixo disso. Sem corrida, o treino fica sem registro na virada do dia. Não feito por doença ou dor não conta como falta. Sem estudo que defina esses cortes.',
+    texto: 'Conta como cumprido a partir de 80% da distância prevista, ou do tempo nos treinos por tempo, e como parcial abaixo disso. Sem corrida, o treino fica sem registro na virada do dia. Não feito por doença ou dor não conta como falta. Sem estudo que defina esses cortes.',
     fontes: [],
   },
   {

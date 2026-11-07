@@ -9,6 +9,7 @@ export const estadoInicial = () => ({
   nascimento: null,
   historicoPeso: [],
   corridasManuais: [],
+  testes: [],
   ligacoes: {},
   naoFeitos: {},
   perfil: null,
