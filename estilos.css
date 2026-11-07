@@ -406,6 +406,27 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .meta-legenda i { width: 10px; height: 10px; border-radius: 3px; }
 .meta-legenda b { color: var(--texto); font-variant-numeric: tabular-nums; }
 
+.voltar { margin: 0 0 4px -8px; padding: 6px 8px; min-height: 40px; background: none; border: 0; color: var(--marca); }
+.avulsa-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--borda);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-weight: 400;
+}
+.avulsa-linha .suave { display: block; font-size: .85rem; }
+.avulsa-nota { font-style: italic; }
+.avulsa-linha .selo { flex: none; }
+.dia { position: relative; }
+.dia-outra { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--z-longo); }
+
 .passos-chave { margin-bottom: 12px; }
 .passos-chave summary { display: flex; align-items: center; min-height: 44px; color: var(--marca); font-size: .92rem; font-weight: 600; cursor: pointer; }
 

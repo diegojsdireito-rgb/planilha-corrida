@@ -10,6 +10,8 @@ export const estadoInicial = () => ({
   tempoInformado: null,
   plano: null,
   atividades: [],
+  outrasDoRelogio: [],
+  avulsas: [],
   semDados: 0,
   avaliacoes: {},
   analises: {},

@@ -32,6 +32,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 |---|---|
 | `src/motor.js` | Ritmos (VDOT de Daniels e Gilbert), geração da planilha e revisão. Só funções puras. |
 | `src/analise.js` | Análise da corrida feita: tempo em cada ritmo, porcentagem na meta e estimativa anaeróbica. |
+| `src/avulsas.js` | Caminhadas e outros exercícios, do relógio ou lançados à mão. |
 | `src/icu.js` | Leitura de corridas e envio de treinos ao intervals.icu. |
 | `src/armazenamento.js` | Dados no aparelho e cópia de segurança. |
 | `src/envio.js` | Envio automático da semana, a partir de 3 dias antes do primeiro treino dela. Só roda com o app aberto. |
@@ -49,6 +50,7 @@ Regras principais:
 - **Volume** sobe até 10% por semana, ou 5% no modo cuidadoso (lesão recente, 45 anos ou mais, IMC 30 ou mais), com semanas de recuperação e polimento.
 - **Detalhes do treino** mostram tempo e pace estimados pelo meio das faixas de ritmo, e zonas Z1 a Z5 de ritmo calculadas pelo app. Depois da corrida, trazem os dados reais e as zonas de frequência cardíaca do intervals.icu.
 - **Análise do treino** compara o tempo real em cada zona de ritmo com o previsto e mostra quanto ficou na meta, acima e abaixo (80% ou mais é "dentro da meta", 60% ou mais é "parcialmente": corte do app, não de estudo). A parte anaeróbica é aproximada pelo pace, porque o Training Effect do Garmin não vem pela API.
+- **Outras atividades** (caminhada, bicicleta, musculação etc.) chegam do relógio ou são registradas à mão. Aparecem em Hoje e Evolução, mas não entram no volume de corrida, no nível nem na revisão.
 - **Mudar o dia** move um treino para outro dia livre da mesma semana, com aviso se ficar colado em outro treino. Fora da semana, a carga semanal mudaria.
 - **Dias de treino**, em Ajustes, refaz a grade da próxima segunda em diante com os novos dias livres, mostrando o antes e depois. Mantém nível e carga da planilha.
 - **Atualizar análise** recalcula nível e volume pelas corridas reais e mostra o antes e depois. Só muda a planilha com confirmação, e nunca os treinos passados ou a semana em andamento.

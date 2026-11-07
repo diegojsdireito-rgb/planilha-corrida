@@ -1,5 +1,6 @@
 import { compararComPrevisto, ORDEM_DAS_ZONAS, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
+import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, resumoPorCategoria } from './avulsas.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
 import {
   adesaoDoPeriodo,
@@ -65,9 +66,10 @@ let rolagemAnterior = 0;
 let cadastroAnterior = {};
 let analisePendente = null;
 let gradePendente = null;
+let avulsaAberta = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 15;
+const VERSAO_APP = 16;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -148,12 +150,18 @@ async function comOcupado(botao, tarefa) {
   }
 }
 
+// Redesenhar apagaria o que está sendo preenchido.
+const podeRedesenhar = () => !avulsaAberta && !document.activeElement?.matches('input, select, textarea');
+
+const todasAvulsas = () => juntarAvulsas(estado.avulsas, estado.outrasDoRelogio);
+
 // ---------- Integração ----------
 
 async function sincronizar(chave = estado.chaveApi) {
   const dia = hoje();
-  const { atividades, semDados } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
+  const { atividades, semDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
   estado.atividades = atividades;
+  estado.outrasDoRelogio = outras;
   estado.semDados = semDados;
   estado.ultimaSincronizacao = new Date().toISOString();
   guardar();
@@ -172,8 +180,7 @@ async function atualizarSeNecessario() {
   }
   const novas = estado.atividades.length - antes;
   if (novas <= 0) return;
-  const digitando = document.activeElement?.matches('input, select, textarea');
-  if (!digitando) render();
+  if (podeRedesenhar()) render();
   mostrarAviso(novas === 1 ? 'Nova corrida recebida.' : `${novas} novas corridas recebidas.`);
 }
 
@@ -193,7 +200,7 @@ async function atualizarPorGesto() {
     ocupado = false;
   }
   const novas = estado.atividades.length - antes;
-  if (!document.activeElement?.matches('input, select, textarea')) render();
+  if (podeRedesenhar()) render();
   if (novas <= 0) mostrarAviso('Nenhuma corrida nova.');
   else mostrarAviso(novas === 1 ? 'Nova corrida recebida.' : `${novas} novas corridas recebidas.`);
   await enviarAutomaticamente();
@@ -264,7 +271,7 @@ async function enviarAutomaticamente() {
   } finally {
     ocupado = false;
   }
-  if (!document.activeElement?.matches('input, select, textarea')) render();
+  if (podeRedesenhar()) render();
 }
 
 function textoEnvioAutomatico() {
@@ -526,14 +533,17 @@ function blocoDaSemana(dia) {
   const feito = atividades.reduce((t, a) => t + a.km, 0);
   const dias = diasDaSemana({ segunda, sessoes, atividades, hoje: dia });
   const feitos = dias.filter((d) => d.sessao && d.situacao === 'feito').length;
+  const comOutra = new Set(todasAvulsas().map((a) => a.data));
 
   const celulas = dias.map((d) => {
     const nome = DIAS[(new Date(`${d.data}T12:00:00Z`).getUTCDay() + 6) % 7].curto;
     const marca = { feito: '✓', perdido: '–', descanso: '·' }[d.situacao] ?? numeroKm(d.sessao.distanciaKm);
     const classes = `dia ${d.situacao} ${d.ehHoje ? 'hoje' : ''} ${d.sessao ? classeTipo(d.sessao.tipo) : ''}`;
-    const conteudo = `<span class="dia-nome">${nome}</span><span class="dia-marca">${marca}</span>`;
-    if (!d.sessao) return `<div class="${classes}" role="img" aria-label="${nome}: ${d.situacao === 'feito' ? `corrida de ${km(d.km)}` : 'descanso'}">${conteudo}</div>`;
-    return `<button class="${classes}" data-abrir="${esc(d.sessao.id)}" aria-label="${nome}: ${esc(d.sessao.nome)}, ${km(d.sessao.distanciaKm)}">${conteudo}</button>`;
+    const temOutra = comOutra.has(d.data);
+    const conteudo = `<span class="dia-nome">${nome}</span><span class="dia-marca">${marca}</span>${temOutra ? '<i class="dia-outra"></i>' : ''}`;
+    const extra = temOutra ? ', com outra atividade' : '';
+    if (!d.sessao) return `<div class="${classes}" role="img" aria-label="${nome}: ${d.situacao === 'feito' ? `corrida de ${km(d.km)}` : 'descanso'}${extra}">${conteudo}</div>`;
+    return `<button class="${classes}" data-abrir="${esc(d.sessao.id)}" aria-label="${nome}: ${esc(d.sessao.nome)}, ${km(d.sessao.distanciaKm)}${extra}">${conteudo}</button>`;
   }).join('');
 
   return `
@@ -549,6 +559,116 @@ function blocoDaSemana(dia) {
       <div class="dias-semana">${celulas}</div>
       ${estado.chaveApi ? '' : '<p class="suave" style="margin:10px 0 0">Conecte o intervals.icu nos Ajustes para contar suas corridas.</p>'}
     </section>`;
+}
+
+function linhaAvulsa(a) {
+  const dados = [
+    dataCurta(a.data),
+    duracaoCurta(a.minutos),
+    a.km ? km(Math.round(a.km * 10) / 10) : null,
+    a.fcMedia ? `FC ${Math.round(a.fcMedia)} bpm` : null,
+    a.subida ? `${Math.round(a.subida)} m de subida` : null,
+  ].filter(Boolean).join(', ');
+  const corpo = `
+    <span class="sessao-corpo">
+      <strong>${esc(a.categoria === 'outro' && a.nome ? a.nome : nomeDaCategoria(a.categoria))}</strong>
+      <span class="suave">${esc(dados)}</span>
+      ${a.nota ? `<span class="suave avulsa-nota">${esc(a.nota)}</span>` : ''}
+    </span>`;
+  if (a.origem === 'relogio') return `<div class="avulsa-linha">${corpo}<span class="selo">Relógio</span></div>`;
+  return `<button class="avulsa-linha" data-avulsa="${esc(a.id)}" aria-label="Editar ${esc(nomeDaCategoria(a.categoria))}, ${dataCurta(a.data)}">${corpo}<span class="sessao-fim"><span class="selo">Manual</span>${icone('seta')}</span></button>`;
+}
+
+function blocoOutrasDaSemana(dia) {
+  const segunda = segundaDaSemana(dia);
+  const fim = somarDias(segunda, 7);
+  const lista = todasAvulsas().filter((a) => a.data >= segunda && a.data < fim);
+  const total = lista.reduce((t, a) => t + a.minutos, 0);
+  return `
+    <section class="cartao">
+      <h2>Outras atividades</h2>
+      <p class="suave">${lista.length ? `${lista.length === 1 ? '1 atividade' : `${lista.length} atividades`} nesta semana, ${duracaoCurta(total)}.` : 'Caminhadas e outros exercícios. Não entram no volume de corrida.'}</p>
+      ${lista.map(linhaAvulsa).join('')}
+      <button style="margin-top:8px" data-avulsa="nova">Registrar atividade</button>
+    </section>`;
+}
+
+function blocoOutrasNaEvolucao(dia) {
+  const lista = todasAvulsas();
+  const resumo = resumoPorCategoria(lista, somarDias(dia, -27), somarDias(dia, 1));
+  return `
+    <section class="cartao">
+      <h2>Outras atividades nos últimos 28 dias</h2>
+      ${resumo.length
+        ? `<table class="ritmos"><tbody>${resumo.map((r) => `<tr><td>${esc(r.nome)} (${r.quantidade}x)</td><td>${duracaoCurta(r.minutos)}</td></tr>`).join('')}</tbody></table>`
+        : '<p class="suave">Nenhuma registrada neste período.</p>'}
+      <p class="suave" style="margin-top:10px">Vêm do relógio, pelo intervals.icu, ou do registro manual. Não entram no volume de corrida, no nível nem na revisão.</p>
+      ${lista.length ? `
+        <details class="tabela-grafico">
+          <summary>Ver todas (${lista.length})</summary>
+          ${lista.map(linhaAvulsa).join('')}
+        </details>` : ''}
+      <button style="margin-top:8px" data-avulsa="nova">Registrar atividade</button>
+    </section>`;
+}
+
+function telaAvulsa() {
+  const item = estado.avulsas.find((a) => a.id === avulsaAberta);
+  const dia = hoje();
+  const horas = item ? Math.floor(item.minutos / 60) : '';
+  const minutos = item ? item.minutos % 60 : '';
+  return `
+    <button class="voltar" data-acao="voltar">‹ Voltar</button>
+    <header class="topo">
+      <h1>${item ? 'Editar atividade' : 'Registrar atividade'}</h1>
+      <p class="suave">O que o relógio grava chega sozinho. Registre aqui só o que ficou de fora, para não contar duas vezes.</p>
+    </header>
+    <form class="cartao" id="form-avulsa">
+      <label>Atividade
+        <select name="categoria">
+          ${CATEGORIAS.map((c) => `<option value="${c.chave}" ${item?.categoria === c.chave ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}
+        </select>
+      </label>
+      <label>Data<input name="data" type="date" max="${dia}" value="${esc(item?.data ?? dia)}"></label>
+      <div class="linha">
+        <label>Horas<input name="horas" type="number" inputmode="numeric" min="0" max="24" value="${horas}"></label>
+        <label>Minutos<input name="minutos" type="number" inputmode="numeric" min="0" max="59" value="${minutos}"></label>
+      </div>
+      <label>Distância em km (opcional)<input name="km" inputmode="decimal" value="${item?.km ? String(item.km).replace('.', ',') : ''}"></label>
+      <label>Observação (opcional)<input name="nota" maxlength="200" value="${esc(item?.nota ?? '')}"></label>
+      <p id="erro-avulsa" class="erro" role="alert"></p>
+      <div class="botoes">
+        <button class="principal" type="submit">Salvar</button>
+        ${item ? '<button type="button" class="perigo" data-acao="excluir-avulsa">Excluir</button>' : ''}
+      </div>
+    </form>`;
+}
+
+function salvarAvulsa(formulario) {
+  const form = new FormData(formulario);
+  const textoKm = String(form.get('km') ?? '').trim();
+  const horas = Number(form.get('horas') || 0);
+  const resto = Number(form.get('minutos') || 0);
+  const dados = {
+    categoria: String(form.get('categoria')),
+    data: String(form.get('data') ?? ''),
+    minutos: resto < 60 ? horas * 60 + resto : NaN,
+    km: textoKm ? Number(textoKm.replace(',', '.')) : null,
+  };
+  const erro = erroDaAvulsa(dados, hoje());
+  if (erro) {
+    document.getElementById('erro-avulsa').textContent = erro;
+    return;
+  }
+  const nota = String(form.get('nota') ?? '').trim();
+  const editando = estado.avulsas.some((a) => a.id === avulsaAberta);
+  const registro = { ...dados, id: editando ? avulsaAberta : `av-${Date.now()}`, nota, origem: 'manual' };
+  estado.avulsas = editando ? estado.avulsas.map((a) => (a.id === avulsaAberta ? registro : a)) : [...estado.avulsas, registro];
+  guardar();
+  avulsaAberta = null;
+  render();
+  window.scrollTo(0, rolagemAnterior);
+  mostrarAviso('Atividade salva.');
 }
 
 function blocoDoObjetivo(dia) {
@@ -607,6 +727,7 @@ function telaHoje() {
     ${avisoPlanilhaAntiga()}
     ${principal}
     ${blocoDaSemana(dia)}
+    ${blocoOutrasDaSemana(dia)}
     ${blocoDoObjetivo(dia)}
     ${avaliar && avaliar.tipo !== 'prova' ? formularioAvaliacao(avaliar) : ''}`;
 }
@@ -840,7 +961,7 @@ function telaEvolucao() {
         <h2>Ainda não há corridas</h2>
         <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
       </section>
-      ${atualizacao}${blocoPrevisoes}`;
+      ${blocoOutrasNaEvolucao(dia)}${atualizacao}${blocoPrevisoes}`;
   }
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
@@ -908,6 +1029,7 @@ function telaEvolucao() {
       <h2>Recordes em 12 meses</h2>
       <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
     </section>
+    ${blocoOutrasNaEvolucao(dia)}
     ${blocoPrevisoes}
     <section class="cartao">
       <h2>Baixar meus dados</h2>
@@ -1306,6 +1428,11 @@ function render() {
   if (!estado.plano && !estado.avisoCiente) return telaBoasVindas();
   if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
+  if (avulsaAberta) {
+    app.innerHTML = telaAvulsa();
+    window.scrollTo(0, 0);
+    return;
+  }
   const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
   const telas = { hoje: telaHoje, plano: telaPlano, evolucao: telaEvolucao, revisao: telaRevisao, ajustes: telaAjustes };
   app.innerHTML = aberta ? telaDetalhe(aberta) : telas[aba]();
@@ -1318,11 +1445,13 @@ abas.addEventListener('click', (e) => {
   if (!botao) return;
   aba = botao.dataset.aba;
   sessaoAberta = null;
+  avulsaAberta = null;
   render();
 });
 
 function voltarDoTreino() {
   sessaoAberta = null;
+  avulsaAberta = null;
   render();
   window.scrollTo(0, rolagemAnterior);
 }
@@ -1330,9 +1459,9 @@ function voltarDoTreino() {
 // Dentro de um treino, só voltar. Nas abas, trocar para a vizinha.
 ligarGestos(app, {
   podeIniciar: () => Boolean(estado.plano) && !ocupado,
-  temDestino: (direcao) => (sessaoAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
+  temDestino: (direcao) => (sessaoAberta || avulsaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
   aoDeslizar: (direcao) => {
-    if (sessaoAberta) {
+    if (sessaoAberta || avulsaAberta) {
       voltarDoTreino();
       return;
     }
@@ -1342,7 +1471,7 @@ ligarGestos(app, {
 });
 
 ligarPuxada(app, document.getElementById('puxada'), {
-  podeIniciar: () => Boolean(estado.plano) && !ocupado,
+  podeIniciar: () => Boolean(estado.plano) && !ocupado && !avulsaAberta,
   aoAtualizar: atualizarPorGesto,
 });
 
@@ -1380,6 +1509,14 @@ const acoes = {
     render();
     if (!analisePendente) mostrarAviso('Esta planilha já terminou. Comece um novo ciclo nos Ajustes.');
   }),
+
+  'excluir-avulsa': () => {
+    if (!window.confirm('Excluir esta atividade?')) return;
+    estado.avulsas = estado.avulsas.filter((a) => a.id !== avulsaAberta);
+    guardar();
+    voltarDoTreino();
+    mostrarAviso('Atividade excluída.');
+  },
 
   'cancelar-grade': () => {
     gradePendente = null;
@@ -1419,7 +1556,7 @@ const acoes = {
   sincronizar: (botao) => comOcupado(botao, async () => {
     await sincronizar();
     render();
-    mostrarAviso(`${estado.atividades.length} corridas atualizadas.`);
+    mostrarAviso(estado.atividades.length === 1 ? '1 corrida atualizada.' : `${estado.atividades.length} corridas atualizadas.`);
   }),
 
   'aplicar-revisao': (botao) => comOcupado(botao, async () => {
@@ -1447,7 +1584,7 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       idade: perfil.idade,
       peso: perfil.pesoKg,
@@ -1459,7 +1596,7 @@ const acoes = {
       dataProva: objetivo.dataProva,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -1471,6 +1608,13 @@ app.addEventListener('click', (e) => {
   if (abrir) {
     rolagemAnterior = window.scrollY;
     sessaoAberta = abrir.dataset.abrir;
+    render();
+    return;
+  }
+  const avulsa = e.target.closest('[data-avulsa]');
+  if (avulsa) {
+    rolagemAnterior = window.scrollY;
+    avulsaAberta = avulsa.dataset.avulsa;
     render();
     return;
   }
@@ -1535,6 +1679,7 @@ app.addEventListener('submit', (e) => {
   }
 
   if (e.target.id === 'form-dias') return verNovaGrade(e.target);
+  if (e.target.id === 'form-avulsa') return salvarAvulsa(e.target);
 
   if (e.target.id === 'form-chave') {
     const chave = String(new FormData(e.target).get('chave') ?? '').trim();

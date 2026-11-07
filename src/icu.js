@@ -1,4 +1,5 @@
 // Cliente do intervals.icu. A chave fica só no aparelho e vai só para intervals.icu.
+import { avulsaDoIntervals } from './avulsas.js';
 
 const BASE = 'https://intervals.icu/api/v1/athlete/0';
 const BASE_ATIVIDADE = 'https://intervals.icu/api/v1/activity';
@@ -110,6 +111,7 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
       return {
         atividades: normalizadas.filter((a) => a.km > 0),
         semDados: normalizadas.filter((a) => a.km === 0).length,
+        outras: lista.filter((a) => a.type && !TIPOS_DE_CORRIDA.has(a.type) && a.moving_time > 0).map(avulsaDoIntervals),
       };
     },
 
