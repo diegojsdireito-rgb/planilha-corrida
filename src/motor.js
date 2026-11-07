@@ -8,7 +8,7 @@
 // como fatores de risco observados em iniciantes (Nielsen 2013).
 
 // Suba quando a geração mudar: planilhas salvas com outra versão pedem para ser refeitas.
-export const VERSAO_REGRAS = 3;
+export const VERSAO_REGRAS = 4;
 
 const DISTANCIA_MARATONA = 42.195;
 
@@ -175,6 +175,7 @@ const MAXIMO_SEMANAS = 52;
 // Com poucos dias, volume alto só caberia em corridas "leves" longas demais.
 const KM_MAX_POR_DIA_DE_TREINO = 14;
 const LEVE_MAX_DO_LONGO = 0.75;
+const KM_MINIMO_DO_LEVE = 3;
 const LONGO_MAX_MINUTOS = 180;
 const KM_MINIMO_PARA_INTERVALADO = 25;
 const MAXIMO_TREINOS_POR_SEMANA = 6;
@@ -380,7 +381,8 @@ function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limi
   const referencia = referenciaDaMeta(objetivo);
   const longoMax = Math.max(referencia.longo, parametros.base.longoKm || 0);
   const longoPeloTempo = (LONGO_MAX_MINUTOS * 60) / ritmos.leve.ate;
-  const kmLongo = Math.min(meioKm(Math.min((km * referencia.longo) / referencia.pico, longoMax, longoPeloTempo)), limiteLongo);
+  // Os leves têm piso de 3 km: com volume baixo, o longão não pode ficar abaixo desse piso.
+  const kmLongo = Math.max(KM_MINIMO_DO_LEVE, Math.min(meioKm(Math.min((km * referencia.longo) / referencia.pico, longoMax, longoPeloTempo)), limiteLongo));
 
   let qtdQualidade = 0;
   if (objetivo.meta === 'tempo' && !semQualidade && !recuperacao && km >= 15) {
@@ -401,7 +403,7 @@ function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limi
 
   const leves = dias.filter((d) => d !== diaLongo && !diasFortes.includes(d));
   if (leves.length) {
-    const kmLeve = meioKm(Math.max(3, Math.min((km - kmUsados) / leves.length, kmLongo * LEVE_MAX_DO_LONGO)));
+    const kmLeve = meioKm(Math.max(KM_MINIMO_DO_LEVE, Math.min((km - kmUsados) / leves.length, kmLongo * LEVE_MAX_DO_LONGO)));
     for (const d of leves) sessoes.push(sessaoLeve(dataNaSemana(segunda, d), kmLeve, ritmos));
   }
 

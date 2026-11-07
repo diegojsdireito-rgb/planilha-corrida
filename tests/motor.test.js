@@ -534,3 +534,48 @@ test('revisão sem histórico não altera o plano', () => {
   assert.equal(analise.acao, 'semDados');
   assert.equal(aplicarRevisao({ plano, parametros: parametros(), analise, hoje: '2026-11-05' }), plano);
 });
+
+test('o longão nunca fica menor que outro treino da semana, mesmo em recuperação com volume baixo', () => {
+  const falhas = [];
+  const inicio = '2026-11-09';
+  const cenarios = [
+    { distanciaKm: null, dataProva: null, meta: 'terminar' },
+    { distanciaKm: 5, dataProva: '2027-02-07', meta: 'terminar' },
+    { distanciaKm: 5, dataProva: '2027-02-07', meta: 'tempo' },
+    { distanciaKm: 10, dataProva: '2027-03-07', meta: 'terminar' },
+    { distanciaKm: 10, dataProva: '2027-03-07', meta: 'tempo' },
+    { distanciaKm: 21.1, dataProva: '2027-05-02', meta: 'terminar' },
+    { distanciaKm: 21.1, dataProva: '2027-05-02', meta: 'tempo' },
+    { distanciaKm: 42.2, dataProva: '2027-08-01', meta: 'tempo' },
+  ];
+  for (const objetivo of cenarios) {
+    for (const lesaoRecente of [false, true]) {
+      for (const diasSemana of [[2, 4, 0], [2, 4, 6, 0], [1, 3, 4, 5, 6, 0]]) {
+        for (const kmSemana of [0, 3, 6, 9, 12, 15, 20, 30, 45, 60]) {
+          for (const longoKm of [0, 3, 6, 10.1, 20]) {
+            const perfil = { idade: 39, pesoKg: 75, alturaCm: 178, lesaoRecente, diasSemana, diaLongo: 0 };
+            const plano = gerarPlano({ perfil, objetivo, base: { kmSemana, longoKm }, vdot: 30, inicio });
+            const semanas = new Map();
+            for (const s of plano.sessoes) semanas.set(s.semana, [...(semanas.get(s.semana) ?? []), s]);
+            for (const [numero, sessoes] of semanas) {
+              const longo = sessoes.find((s) => s.tipo === 'longo');
+              if (!longo) continue;
+              const maiorLeve = Math.max(0, ...sessoes.filter((s) => s.tipo === 'leve').map((s) => s.distanciaKm));
+              if (longo.distanciaKm < maiorLeve) falhas.push({ objetivo: objetivo.distanciaKm, meta: objetivo.meta, lesaoRecente, dias: diasSemana.length, kmSemana, longoKm, numero, longo: longo.distanciaKm, maiorLeve });
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.deepEqual(falhas.slice(0, 5), []);
+});
+
+test('a planilha do caso real: a semana de recuperação fica com longão de 3 km', () => {
+  const perfil = { idade: 39, pesoKg: 82, alturaCm: 178, lesaoRecente: true, diasSemana: [0, 3, 4, 5, 6, 1], diaLongo: 0 };
+  const plano = gerarPlano({ perfil, objetivo: { distanciaKm: null, dataProva: null, meta: 'terminar' }, base: { kmSemana: 6, longoKm: 10.1 }, vdot: 28.6, inicio: '2026-11-09' });
+  const dia29 = plano.sessoes.find((s) => s.data === '2026-11-29');
+  assert.equal(dia29.tipo, 'longo');
+  assert.equal(dia29.distanciaKm, 3);
+  assert.equal(dia29.recuperacao, true);
+});

@@ -98,12 +98,12 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.0';
+const VERSAO_APP = '3.1';
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
     <h2>Esta planilha usa regras antigas</h2>
-    <p>As regras de volume e o limite por corrida foram revistos com base em pesquisa. Gere de novo para usar as regras atuais: seu cadastro continua preenchido. Até lá, o envio automático fica parado.</p>
+    <p>As regras da planilha foram corrigidas. Gere de novo para usar as regras atuais: seu cadastro continua preenchido. Até lá, o envio automático fica parado.</p>
     <button class="principal" data-acao="recomecar">Gerar planilha de novo</button>
   </section>`);
 
