@@ -32,6 +32,7 @@ import { chaveDoFeedback, corridaSemFeedback, feedbackPorSemana, nomeDaSensacao,
 import { aderenciaDoTreino, compararEtapas, etapasDoTreino } from './planejado.js';
 import { barrasDeVolume, curvaDaAtividade, linhaDeEvolucao } from './graficos.js';
 import { arquivarCorridas, calcularMedalhas, chavesConquistadas, GRUPOS, juntarCorridas, medalhasNovas, situacaoDasSemanas } from './medalhas.js';
+import { cargaPorSemana, melhoresDaCorrida, resumoDaCarga } from './desempenho.js';
 import { curvasDaAtividade, enquadrarMapa, parciaisPorKm, pontosDoMapa, voltasDaAtividade } from './percurso.js';
 import { erroDoPeso, registrarPeso, resumoDoPeso, imcDe } from './peso.js';
 import { criarCliente, eventoDaSessao, faixaDoTreino } from './icu.js';
@@ -117,7 +118,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.5';
+const VERSAO_APP = '3.6';
 
 const barraDeSecoes = (aba_, opcoes) => `
   <div class="secoes" role="group" aria-label="Seções">
@@ -288,8 +289,15 @@ const situacaoDaSessao = (sessao, dia = hoje()) => situacaoDoTreino({ sessao, co
 
 async function sincronizar(chave = estado.chaveApi) {
   const dia = hoje();
-  const { atividades, semDados, corridasSemDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
+  const cliente = criarCliente({ chave });
+  // As marcas são um extra: se falharem, as corridas chegam do mesmo jeito.
+  const [{ atividades, semDados, corridasSemDados, outras, carga }, marcas] = await Promise.all([
+    cliente.atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia),
+    cliente.melhoresMarcas().catch(() => null),
+  ]);
   reunirCorridas(atividades);
+  estado.cargaDeTreino = carga;
+  if (marcas) estado.melhoresMarcas = marcas;
   estado.outrasDoRelogio = outras;
   estado.semDados = semDados;
   estado.corridasSemDados = corridasSemDados;
@@ -1454,6 +1462,32 @@ function htmlDasVoltas(dados, categoria, atividade) {
     <p class="suave mapa-nota">Calculadas pelas curvas do relógio, sem contar paradas.</p>`;
 }
 
+// Melhor tempo em cada distância dentro da corrida, ao lado do melhor do atleta em 12 meses.
+function htmlDasMarcas(dados, categoria) {
+  if (categoria !== 'corrida') return '';
+  const marcas = melhoresDaCorrida(dados);
+  if (!marcas.length) return '';
+  const historico = new Map(estado.melhoresMarcas.map((m) => [m.km, m]));
+  const temHistorico = marcas.some((m) => historico.has(m.km));
+  const ehMelhor = (m) => historico.has(m.km) && m.seg <= historico.get(m.km).seg + 1;
+  return `
+    <h2 style="margin-top:18px">Melhores marcas nesta corrida</h2>
+    <div class="voltas-rolagem" data-sem-gesto>
+      <table class="voltas" aria-label="Melhores marcas nesta corrida">
+        <thead><tr><th>Distância</th><th>Tempo</th><th>Pace</th>${temHistorico ? '<th>Melhor em 12 meses</th>' : ''}</tr></thead>
+        <tbody>${marcas.map((m) => `
+          <tr class="${ehMelhor(m) ? 'volta-melhor' : ''}">
+            <td>${m.nome}</td>
+            <td>${formatarDuracaoCurta(m.seg)}</td>
+            <td>${formatarRitmo(m.ritmo)}</td>
+            ${temHistorico ? `<td>${historico.has(m.km) ? formatarDuracaoCurta(historico.get(m.km).seg) : ''}</td>` : ''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="suave mapa-nota">Calculadas pelas curvas do relógio, sem contar paradas${marcas.some(ehMelhor) ? '. Em destaque, seu melhor tempo em 12 meses' : ''}. O GPS pode errar alguns metros.</p>`;
+}
+
 function blocoPercurso(a) {
   if (!a.id || !estado.chaveApi) return '';
   const atributo = `data-percurso="${esc(a.id)}"`;
@@ -1471,11 +1505,13 @@ function blocoPercurso(a) {
   const mapa = htmlDoMapa(dados.latlngs);
   const curvas = htmlDasCurvas(dados, a.categoria ?? 'corrida');
   const voltas = htmlDasVoltas(dados, a.categoria ?? 'corrida', a);
+  const marcas = htmlDasMarcas(dados, a.categoria ?? 'corrida');
   if (!mapa && !curvas && !voltas) return `<section class="cartao" ${atributo}><h2>Mapa e gráficos</h2><p class="suave">O relógio não gravou percurso nem curvas nesta atividade.</p></section>`;
   return `
     <section class="cartao" ${atributo}>
       ${mapa ? `<h2>Percurso</h2>${mapa}` : '<p class="suave" style="margin:0">Sem percurso de GPS nesta atividade.</p>'}
       ${voltas}
+      ${marcas}
       ${curvas ? '<h2 style="margin-top:18px">Gráficos</h2>' : ''}
       ${curvas}
     </section>`;
@@ -1496,6 +1532,31 @@ async function carregarPercurso(a) {
   // Troca só este cartão, para a tela não voltar ao topo enquanto a pessoa lê.
   const cartao = document.querySelector(`[data-percurso="${CSS.escape(id)}"]`);
   if (cartao) cartao.outerHTML = blocoPercurso(a);
+}
+
+const umaCasaDecimal = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
+
+// Pace ajustado, desacoplamento e clima. Só informam: não mudam treino, nível nem revisão.
+function htmlDaLeitura(a) {
+  const graus = (v) => `${Math.round(v)} °C`;
+  const clima = a.temperatura != null
+    ? ['Clima', `${graus(a.temperatura)}${a.sensacaoTermica != null ? `, sensação de ${graus(a.sensacaoTermica)}` : ''}`]
+    : a.temperaturaDoRelogio != null ? ['Temperatura no relógio', graus(a.temperaturaDoRelogio)] : null;
+  const linhas = [
+    a.paceAjustado ? ['Pace ajustado à subida', `${formatarRitmo(a.paceAjustado)}/km`] : null,
+    a.desacoplamento != null ? ['Desacoplamento', `${umaCasaDecimal(a.desacoplamento)}%`] : null,
+    clima,
+    a.ventoKmH != null ? ['Vento', `${Math.round(a.ventoKmH)} km/h${a.ventoContra != null ? `, ${Math.round(a.ventoContra)}% do tempo contra` : ''}`] : null,
+  ].filter(Boolean);
+  if (!linhas.length) return '';
+  const notas = [
+    a.paceAjustado ? 'O pace ajustado estima o ritmo equivalente em terreno plano.' : null,
+    a.desacoplamento != null ? 'O desacoplamento mostra quanto a frequência cardíaca subiu em relação ao pace ao longo da corrida. Vale mais em corrida contínua, e calor e paradas também mudam o número. Treinadores costumam usar 5% como referência, que é convenção, não limite comprovado.' : null,
+    clima && a.temperatura == null ? 'O sensor do relógio sofre com o calor do corpo e pode marcar mais do que o ar.' : null,
+  ].filter(Boolean);
+  return `
+    <table class="ritmos"><tbody>${linhas.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table>
+    ${notas.length ? `<p class="suave">${notas.join(' ')}</p>` : ''}`;
 }
 
 function telaAtividade(a) {
@@ -1539,6 +1600,7 @@ function telaAtividade(a) {
     ${ehCorrida && !naPlanilha ? cartaoDeFeedback({ chave: chaveDaCorrida(a), data: a.data, titulo: nome }) : ''}
     ${a.tipoDaAtividade === 'semDados' ? '' : blocoPercurso(a)}
     ${extras.length ? `<section class="cartao"><h2>Dados</h2><table class="ritmos"><tbody>${extras.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table></section>` : ''}
+    ${ehCorrida && htmlDaLeitura(a) ? `<section class="cartao"><h2>Leitura da corrida</h2>${htmlDaLeitura(a)}</section>` : ''}
     ${totalZonas ? `
       <section class="cartao">
         <h2>Tempo por zona de frequência cardíaca</h2>
@@ -2016,6 +2078,7 @@ function blocoRealizado(atividade, previsto) {
       <h2>O que você fez</h2>
       <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
       ${extras.length ? `<table class="ritmos"><tbody>${extras.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${htmlDaLeitura(atividade) ? `<h3>Leitura da corrida</h3>${htmlDaLeitura(atividade)}` : ''}
       ${zonasFc ? `<h3>Tempo por zona de frequência cardíaca</h3>${zonasFc}<p class="suave">Zonas calculadas pelo intervals.icu.</p>` : ''}
       ${atividade.id && estado.chaveApi ? `
         <h3>Baixar esta corrida</h3>
@@ -2033,6 +2096,43 @@ function comparacao(atual, anterior) {
   const pct = Math.round(((atual - anterior) / anterior) * 100);
   if (pct === 0) return 'Igual aos 28 dias anteriores';
   return `${Math.abs(pct)}% ${pct > 0 ? 'a mais' : 'a menos'} que nos 28 dias anteriores`;
+}
+
+// Sem veredito: não há corte comprovado para a subida da carga. Os limites da planilha seguem os mesmos.
+function blocoCarga(dia) {
+  const resumo = resumoDaCarga(estado.cargaDeTreino);
+  if (!resumo) return '';
+  const semanas = cargaPorSemana(estado.cargaDeTreino, dia);
+  const inteiro = (v) => String(Math.round(v));
+  const grafico = (nome, campo) => linhaDeEvolucao(semanas.map((s) => ({ data: s.segunda, valor: s[campo] })), { nome, formatar: inteiro, passoMinimo: 1 });
+  const condicionamento = grafico('Condicionamento', 'ctl');
+  const fadiga = grafico('Fadiga', 'atl');
+  const mudanca = resumo.variacao === null ? ''
+    : Math.round(resumo.variacao) === 0 ? ' O condicionamento ficou igual em relação a 7 dias antes.'
+      : ` O condicionamento ${resumo.variacao > 0 ? 'subiu' : 'caiu'} ${Math.abs(Math.round(resumo.variacao))} em relação a 7 dias antes.`;
+  return `
+    <section class="cartao">
+      <h2>Condicionamento e fadiga</h2>
+      <div class="numeros">
+        <div><b>${inteiro(resumo.ctl)}</b><span>Condicionamento</span></div>
+        <div><b>${inteiro(resumo.atl)}</b><span>Fadiga</span></div>
+        <div><b>${inteiro(resumo.equilibrio)}</b><span>Equilíbrio</span></div>
+      </div>
+      <p class="suave">Na última atividade, em ${dataCurta(resumo.data)}.${mudanca} Condicionamento é a carga média de cerca de 6 semanas e fadiga, de cerca de 1 semana. Equilíbrio negativo indica carga recente acima da habitual. Calculados pelo intervals.icu com todos os exercícios, não só corrida.</p>
+      ${condicionamento ? `<h3>Condicionamento por semana</h3>${condicionamento}` : ''}
+      ${fadiga ? `<h3>Fadiga por semana</h3>${fadiga}` : ''}
+    </section>`;
+}
+
+function blocoMelhoresMarcas() {
+  if (!estado.melhoresMarcas.length) return '';
+  const dataDa = (m) => estado.atividades.find((a) => String(a.id) === String(m.atividade))?.data;
+  return `
+    <section class="cartao">
+      <h2>Melhores marcas em 12 meses</h2>
+      <p class="suave">Melhor trecho de cada distância em qualquer corrida, segundo o intervals.icu. Depende do GPS, então não equivale a tempo oficial de prova.</p>
+      <table class="ritmos"><tbody>${estado.melhoresMarcas.map((m) => `<tr><td>${m.nome}</td><td>${formatarDuracaoCurta(m.seg)}, ${formatarRitmo(m.ritmo)}/km${dataDa(m) ? `, ${dataCurta(dataDa(m))}` : ''}</td></tr>`).join('')}</tbody></table>
+    </section>`;
 }
 
 function telaEvolucao() {
@@ -2066,7 +2166,7 @@ function telaEvolucao() {
       </section>`;
     return `${cabecalho}${{
       resumo: `${vazio}${blocoConquistas()}${blocoOutrasNaEvolucao(dia)}${atualizacao}`,
-      graficos: `${vazio}${blocoFeedbackNaEvolucao(dia)}`,
+      graficos: `${vazio}${blocoFeedbackNaEvolucao(dia)}${blocoCarga(dia)}`,
       corpo: secaoCorpo,
       provas: secaoProvas,
     }[secoes.evolucao]}`;
@@ -2114,6 +2214,7 @@ function telaEvolucao() {
         <p class="suave">Metros corridos por batimento cardíaco. Subir é bom sinal, mas calor e terreno também mudam o valor.</p>
         ${grafEficiencia}
       </section>` : ''}
+    ${blocoCarga(dia)}
     ${grafNivel ? `
       <section class="cartao">
         <h2>Nível estimado (VDOT)</h2>
@@ -2135,6 +2236,7 @@ function telaEvolucao() {
           <h2>Recordes em 12 meses</h2>
           <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
         </section>` : ''}
+      ${blocoMelhoresMarcas()}
       ${secaoProvas}`;
   }
 

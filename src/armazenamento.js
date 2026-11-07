@@ -20,6 +20,8 @@ export const estadoInicial = () => ({
   outrasDoRelogio: [],
   avulsas: [],
   semDados: 0,
+  cargaDeTreino: [],
+  melhoresMarcas: [],
   corridasSemDados: [],
   arquivoDeCorridas: [],
   arquivoDeSemanas: {},

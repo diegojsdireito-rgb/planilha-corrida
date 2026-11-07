@@ -1,12 +1,13 @@
 // Cliente do intervals.icu. A chave fica só no aparelho e vai só para intervals.icu.
 import { avulsaDoIntervals, cadenciaDe } from './avulsas.js';
+import { dadosDeDesempenho, marcasDaCurva, pontosDeCarga } from './desempenho.js';
 import { ZONAS } from './motor.js';
 
 const BASE = 'https://intervals.icu/api/v1/athlete/0';
 const BASE_ATIVIDADE = 'https://intervals.icu/api/v1/activity';
 const CAMINHO_DO_ARQUIVO = { fit: 'fit-file', gpx: 'gpx-file' };
 const TIPOS_DE_CORRIDA = new Set(['Run', 'TrailRun', 'VirtualRun']);
-const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,max_heartrate,total_elevation_gain,icu_hr_zone_times,source,elapsed_time,calories,feel,average_cadence,icu_training_load';
+const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,max_heartrate,total_elevation_gain,icu_hr_zone_times,source,elapsed_time,calories,feel,average_cadence,icu_training_load,gap,decoupling,average_weather_temp,average_feels_like,average_temp,average_wind_speed,headwind_percent,icu_ctl,icu_atl';
 
 // Texto no formato do construtor de treinos do intervals.icu. "m" significa minutos,
 // por isso distância fracionada vai em metros ("1500mtr").
@@ -133,6 +134,7 @@ export function normalizarAtividade(a) {
     subida: a.total_elevation_gain ?? null,
     tempoPorZonaFc: Array.isArray(a.icu_hr_zone_times) ? a.icu_hr_zone_times : [],
     origem: a.source ?? null,
+    ...dadosDeDesempenho(a),
   };
 }
 
@@ -204,6 +206,12 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
       };
     },
 
+    // Melhores marcas dos últimos 12 meses, o período padrão da API.
+    async melhoresMarcas() {
+      const curvas = await pedir('/pace-curves.json?type=Run&fields=list.distance,list.values,list.activity_id');
+      return marcasDaCurva(curvas?.list?.[0]);
+    },
+
     // Atividades que vieram só do Strava chegam sem dados pela API, por decisão do Strava.
     async atividades(de, ate) {
       const lista = await pedir(`/activities?oldest=${de}&newest=${ate}&fields=${CAMPOS_ATIVIDADE}`);
@@ -213,6 +221,7 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
         atividades: normalizadas.filter((a) => a.km > 0),
         semDados: normalizadas.filter((a) => a.km === 0).length,
         corridasSemDados: normalizadas.filter((a) => a.km === 0 && a.data),
+        carga: pontosDeCarga(lista),
         outras: lista.filter((a) => a.type && !TIPOS_DE_CORRIDA.has(a.type) && a.moving_time > 0).map(avulsaDoIntervals),
       };
     },
