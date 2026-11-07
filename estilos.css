@@ -88,7 +88,28 @@ p { margin: 0 0 8px; }
 .suave { color: var(--suave); font-size: .92rem; }
 .sobretitulo { margin: 0; font-size: .74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); }
 .topo { margin: 4px 2px 16px; }
-#minhas-provas { scroll-margin-top: calc(env(safe-area-inset-top) + 12px); }
+#minhas-provas, #calendario { scroll-margin-top: calc(env(safe-area-inset-top) + 12px); }
+
+.cal-mes { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.cal-mes button { width: 44px; min-height: 44px; padding: 0; font-size: 1.3rem; }
+.cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal-cabecalho { margin-bottom: 4px; text-align: center; font-size: .7rem; font-weight: 600; color: var(--suave); }
+.cal-grade .dia { padding: 5px 0 9px; min-height: 60px; gap: 3px; }
+.cal-grade .dia.fora-do-mes { opacity: .4; }
+.cal-grade .dia.selecionado { outline: 2px solid var(--marca); outline-offset: -2px; }
+.dia.extra .dia-marca { background: var(--z-maratona); color: #181b22; }
+.dia.sem-dados .dia-marca { background: var(--alerta-suave); color: var(--alerta); }
+.dia.livre .dia-marca:empty { visibility: hidden; }
+.cal-legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 12px 0 8px; font-size: .8rem; }
+.cal-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.cal-ponto { width: 11px; height: 11px; border-radius: 50%; }
+.cal-ponto.planejado { border: 2px solid var(--suave); }
+.cal-ponto.feito { background: var(--ok); }
+.cal-ponto.extra { background: var(--z-maratona); }
+.cal-ponto.outra { width: 7px; height: 7px; background: var(--z-longo); }
+.cal-detalhe { margin-top: 12px; }
+.cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
+.cal-detalhe .sessao { padding-left: 0; padding-right: 0; }
 
 .marca { display: flex; align-items: center; gap: 8px; margin: 0 2px 12px; font-family: var(--titulos); font-weight: 800; letter-spacing: -.01em; }
 .marca-sol { width: 26px; height: 26px; flex: none; }

@@ -1,6 +1,7 @@
 import { compararComPrevisto, ORDEM_DAS_ZONAS, ritmoDaProva, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
-import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, resumoPorCategoria } from './avulsas.js';
+import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria } from './avulsas.js';
+import { gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from './calendario.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
 import {
   adesaoDoPeriodo,
@@ -85,9 +86,11 @@ let gradePendente = null;
 let avulsaAberta = null;
 let provaAberta = null;
 let provasPendentes = null;
+let mesVisto = null;
+let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 21;
+const VERSAO_APP = 22;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -196,11 +199,12 @@ const todasAvulsas = () => juntarAvulsas(estado.avulsas, estado.outrasDoRelogio)
 
 async function sincronizar(chave = estado.chaveApi) {
   const dia = hoje();
-  const { atividades, semDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
+  const { atividades, semDados, corridasSemDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
   estado.atividades = marcarCorridasDeProva(atividades, estado.provas);
   if (estado.plano) estado.provas = registrarResultados(estado.provas, atividades, estado.plano.vdot);
   estado.outrasDoRelogio = outras;
   estado.semDados = semDados;
+  estado.corridasSemDados = corridasSemDados;
   estado.ultimaSincronizacao = new Date().toISOString();
   guardar();
 }
@@ -640,16 +644,33 @@ function blocoOutrasDaSemana(dia) {
     </section>`;
 }
 
+const dadosDaAtividade = () => ({
+  sessoes: estado.plano.sessoes,
+  corridas: estado.atividades,
+  semDados: estado.corridasSemDados,
+  outras: todasAvulsas(),
+});
+
 function blocoOutrasNaEvolucao(dia) {
   const lista = todasAvulsas();
-  const resumo = resumoPorCategoria(lista, somarDias(dia, -27), somarDias(dia, 1));
+  const r = resumoDaAtividade({ ...dadosDaAtividade(), de: somarDias(dia, -27), ate: somarDias(dia, 1) });
+  const texto = (seg, quilometros) => [duracaoCurta(Math.round(seg / 60)), quilometros ? km(Math.round(quilometros * 10) / 10) : null].filter(Boolean).join(', ');
+  const linhas = [
+    r.planilha.quantidade ? [`Corrida da planilha (${r.planilha.quantidade}x)`, texto(r.planilha.seg, r.planilha.km)] : null,
+    r.fora.quantidade ? [`Corrida fora da planilha (${r.fora.quantidade}x)`, texto(r.fora.seg, r.fora.km)] : null,
+    r.semDados.quantidade ? [`Corrida sem distância (${r.semDados.quantidade}x)`, r.semDados.seg ? duracaoCurta(Math.round(r.semDados.seg / 60)) : 'sem dados'] : null,
+    ...r.outras.map((c) => [`${c.nome} (${c.quantidade}x)`, texto(c.minutos * 60, c.km)]),
+  ].filter(Boolean);
   return `
     <section class="cartao">
-      <h2>Outras atividades nos últimos 28 dias</h2>
-      ${resumo.length
-        ? `<table class="ritmos"><tbody>${resumo.map((r) => `<tr><td>${esc(r.nome)} (${r.quantidade}x)</td><td>${duracaoCurta(r.minutos)}</td></tr>`).join('')}</tbody></table>`
-        : '<p class="suave">Nenhuma registrada neste período.</p>'}
-      <p class="suave" style="margin-top:10px">Vêm do relógio, pelo intervals.icu, ou do registro manual. Não entram no volume de corrida, no nível nem na revisão.</p>
+      <h2>Toda a atividade nos últimos 28 dias</h2>
+      ${linhas.length
+        ? `<table class="ritmos"><tbody>
+            ${linhas.map(([nome, valor]) => `<tr><td>${esc(nome)}</td><td>${esc(valor)}</td></tr>`).join('')}
+            <tr><td><strong>Tempo total</strong></td><td><strong>${duracaoCurta(Math.round(r.tempoTotalSeg / 60))}</strong></td></tr>
+          </tbody></table>`
+        : '<p class="suave">Nada registrado neste período.</p>'}
+      <p class="suave" style="margin-top:10px">Corrida fora da planilha também conta no volume e no nível. Caminhada e outros exercícios contam aqui e no calendário, mas não no volume de corrida nem no nível, porque a carga é diferente.</p>
       ${lista.length ? `
         <details class="tabela-grafico">
           <summary>Ver todas (${lista.length})</summary>
@@ -954,6 +975,7 @@ function telaHoje() {
     </header>
     ${avisoPlanilhaAntiga()}
     ${principal}
+    ${blocoFeitoHoje(dia)}
     ${blocoDaSemana(dia)}
     ${blocoOutrasDaSemana(dia)}
     ${blocoDoObjetivo(dia, { comAtalho: true })}
@@ -1041,6 +1063,118 @@ function blocoResultadoDaProva(sessao, atividade) {
       <p>${esc(comparacaoComPrevisto(atividade.seg, previstoSeg))}</p>
       <p class="suave">Pace médio de ${formatarRitmo(atividade.seg / atividade.km)}/km em ${km(Math.round(atividade.km * 10) / 10)} no GPS.</p>
       ${nivel ? `<p class="suave">Nível nesta prova: VDOT ${nivel}. Sua planilha usa ${String(estado.plano.vdot).replace('.', ',')}. Para atualizar os ritmos, use Revisão › Atualizar análise.</p>` : ''}
+    </section>`;
+}
+
+// ---------- Calendário ----------
+
+const nomeDoMes = (mes) => {
+  const texto = new Date(`${mes}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return texto[0].toUpperCase() + texto.slice(1);
+};
+
+function corpoCorridaFeita(a, naPlanilha) {
+  const dados = [
+    dataCurta(a.data),
+    km(Math.round(a.km * 10) / 10),
+    a.seg ? formatarTempo(a.seg) : null,
+    a.seg ? `${formatarRitmo(a.seg / a.km)}/km` : null,
+    a.fcMedia ? `FC ${Math.round(a.fcMedia)} bpm` : null,
+  ].filter(Boolean).join(', ');
+  return `
+    <span class="sessao-corpo"><strong>${esc(a.nome ?? 'Corrida')}</strong><span class="suave">${esc(dados)}</span></span>
+    <span class="selo">${naPlanilha ? 'Da planilha' : 'Fora da planilha'}</span>`;
+}
+
+const linhaCorridaFora = (a) => `<div class="avulsa-linha">${corpoCorridaFeita(a, false)}</div>`;
+
+const linhaSemDados = (a) => `
+  <div class="avulsa-linha">
+    <span class="sessao-corpo"><strong>${esc(a.nome ?? 'Corrida')}</strong><span class="suave">${dataCurta(a.data)}${a.seg ? `, ${formatarTempo(a.seg)}` : ''}. Chegou sem distância e fica fora do volume.</span></span>
+    <span class="selo">Sem dados</span>
+  </div>`;
+
+function celulaDoCalendario(d, selecionado) {
+  const numero = Number(d.data.slice(8));
+  const totalKm = d.corridas.reduce((t, a) => t + a.km, 0);
+  const marca = {
+    feito: numeroKm(totalKm),
+    extra: numeroKm(totalKm),
+    'sem-dados': '?',
+    perdido: '–',
+    planejado: d.sessao ? numeroKm(d.sessao.distanciaKm) : '',
+    livre: '',
+  }[d.situacao];
+  const descricao = [
+    dataLonga(d.data),
+    { feito: `corrida da planilha, ${km(totalKm)}`, extra: `corrida fora da planilha, ${km(totalKm)}`, 'sem-dados': 'corrida sem distância', perdido: 'treino sem registro', planejado: `treino previsto, ${d.sessao ? km(d.sessao.distanciaKm) : ''}`, livre: null }[d.situacao],
+    d.outras.length ? `${d.outras.length === 1 ? 'outra atividade' : `${d.outras.length} outras atividades`}` : null,
+  ].filter(Boolean).join(', ');
+  const classes = ['dia', d.situacao, d.ehHoje ? 'hoje' : '', d.doMes ? '' : 'fora-do-mes', selecionado ? 'selecionado' : '', d.sessao ? classeTipo(d.sessao.tipo) : ''].filter(Boolean).join(' ');
+  return `<button class="${classes}" data-dia-calendario="${d.data}" aria-label="${esc(descricao)}" ${selecionado ? 'aria-pressed="true"' : ''}>
+    <span class="dia-nome">${numero}</span><span class="dia-marca">${marca}</span>${d.outras.length ? '<i class="dia-outra"></i>' : ''}
+  </button>`;
+}
+
+function detalheDoDia(d, dia) {
+  const conteudo = [
+    d.sessao && !d.corridas.length ? linhaSessao(d.sessao, dia) : '',
+    d.corridas.map((a) => (d.sessao ? `<button class="avulsa-linha" data-abrir="${esc(d.sessao.id)}">${corpoCorridaFeita(a, true)}</button>` : linhaCorridaFora(a))).join(''),
+    d.semDados.map(linhaSemDados).join(''),
+    d.outras.map(linhaAvulsa).join(''),
+  ].join('');
+  return `
+    <div class="cal-detalhe">
+      <h3>${esc(dataLonga(d.data))}</h3>
+      ${conteudo || '<p class="suave">Nada previsto nem registrado neste dia.</p>'}
+    </div>`;
+}
+
+function blocoCalendario(dia) {
+  const mes = mesVisto ?? mesDe(dia);
+  const grade = gradeDoMes({ mes, ...dadosDaAtividade(), hoje: dia });
+  const escolhido = diaVisto ?? (mesDe(dia) === mes ? dia : null);
+  const selecionado = grade.find((d) => d.data === escolhido);
+  const r = resumoDaAtividade({ ...dadosDaAtividade(), de: `${mes}-01`, ate: `${somarMeses(mes, 1)}-01` });
+  const corridas = r.planilha.quantidade + r.fora.quantidade;
+  const kmCorridos = r.planilha.km + r.fora.km;
+  const partes = [
+    corridas ? `${corridas === 1 ? '1 corrida' : `${corridas} corridas`}, ${km(Math.round(kmCorridos * 10) / 10)}${r.fora.quantidade ? ` (${r.fora.quantidade} fora da planilha)` : ''}` : null,
+    r.quantidadeOutras ? `${r.quantidadeOutras === 1 ? '1 outra atividade' : `${r.quantidadeOutras} outras atividades`}` : null,
+    r.tempoTotalSeg ? `${duracaoCurta(Math.round(r.tempoTotalSeg / 60))} no total` : null,
+  ].filter(Boolean);
+  return `
+    <section class="cartao" id="calendario">
+      <h2>Calendário</h2>
+      <div class="cal-mes">
+        <button data-mes="-1" aria-label="Mês anterior">‹</button>
+        <strong>${esc(nomeDoMes(mes))}</strong>
+        <button data-mes="1" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="cal-grade cal-cabecalho" aria-hidden="true">${DIAS.map((d) => `<span>${d.curto}</span>`).join('')}</div>
+      <div class="cal-grade">${grade.map((d) => celulaDoCalendario(d, d.data === escolhido)).join('')}</div>
+      <p class="cal-legenda suave">
+        <span><i class="cal-ponto planejado"></i>Previsto</span>
+        <span><i class="cal-ponto feito"></i>Da planilha</span>
+        <span><i class="cal-ponto extra"></i>Fora da planilha</span>
+        <span><i class="cal-ponto outra"></i>Outra atividade</span>
+      </p>
+      <p class="suave">${partes.length ? `Neste mês: ${esc(partes.join(', '))}.` : 'Nada registrado neste mês.'}</p>
+      ${selecionado ? detalheDoDia(selecionado, dia) : ''}
+    </section>`;
+}
+
+function blocoFeitoHoje(dia) {
+  const temTreino = estado.plano.sessoes.some((s) => s.data === dia);
+  const corridas = temTreino ? [] : atividadeDoDia(dia);
+  const semDados = estado.corridasSemDados.filter((a) => a.data === dia);
+  if (!corridas.length && !semDados.length) return '';
+  return `
+    <section class="cartao">
+      <h2>Feito hoje</h2>
+      ${corridas.map(linhaCorridaFora).join('')}
+      ${semDados.map(linhaSemDados).join('')}
+      <button style="margin-top:8px" data-acao="ver-calendario">Ver no calendário</button>
     </section>`;
 }
 
@@ -1260,7 +1394,7 @@ function telaEvolucao() {
         <h2>Ainda não há corridas</h2>
         <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
       </section>
-      ${blocoProvasRealizadas()}${blocoOutrasNaEvolucao(dia)}${atualizacao}${blocoPrevisoes}`;
+      ${blocoCalendario(dia)}${blocoOutrasNaEvolucao(dia)}${blocoProvasRealizadas()}${atualizacao}${blocoPrevisoes}`;
   }
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
@@ -1297,6 +1431,8 @@ function telaEvolucao() {
       </div>
       <p style="margin:14px 0 0">${comparacao(atual.km, anterior.km)}.</p>
     </section>
+    ${blocoCalendario(dia)}
+    ${blocoOutrasNaEvolucao(dia)}
     <section class="cartao">
       <h2>Volume por semana (km)</h2>
       ${barrasDeVolume(semanas, km)}
@@ -1329,7 +1465,6 @@ function telaEvolucao() {
       <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
     </section>
     ${blocoProvasRealizadas()}
-    ${blocoOutrasNaEvolucao(dia)}
     ${blocoPrevisoes}
     <section class="cartao">
       <h2>Baixar meus dados</h2>
@@ -1463,6 +1598,7 @@ function telaPlano() {
     </header>
     ${avisoPlanilhaAntiga()}
     ${blocoDoObjetivo(dia)}
+    ${blocoCalendario(dia)}
     ${blocoProvas(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
     ${(plano.avisos ?? []).map((a) => `<section class="cartao alerta">${esc(a)}</section>`).join('')}
@@ -1890,6 +2026,14 @@ const acoes = {
     setTimeout(enviarAutomaticamente);
   },
 
+  'ver-calendario': () => {
+    aba = 'plano';
+    sessaoAberta = null;
+    mesVisto = null;
+    diaVisto = null;
+    render();
+    document.getElementById('calendario')?.scrollIntoView({ block: 'start' });
+  },
   'ver-provas': () => {
     aba = 'plano';
     sessaoAberta = null;
@@ -1927,7 +2071,7 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       idade: perfil.idade,
       peso: perfil.pesoKg,
@@ -1940,14 +2084,34 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
   },
 };
 
+function renderMantendoRolagem() {
+  const rolagem = window.scrollY;
+  render();
+  window.scrollTo(0, rolagem);
+}
+
 app.addEventListener('click', (e) => {
+  const trocaDeMes = e.target.closest('[data-mes]');
+  if (trocaDeMes) {
+    mesVisto = somarMeses(mesVisto ?? mesDe(hoje()), Number(trocaDeMes.dataset.mes));
+    diaVisto = null;
+    renderMantendoRolagem();
+    return;
+  }
+  const diaDoCalendario = e.target.closest('[data-dia-calendario]');
+  if (diaDoCalendario) {
+    diaVisto = diaDoCalendario.dataset.diaCalendario;
+    mesVisto = mesDe(diaVisto);
+    renderMantendoRolagem();
+    return;
+  }
   const abrir = e.target.closest('[data-abrir]');
   if (abrir) {
     rolagemAnterior = window.scrollY;

@@ -55,7 +55,9 @@ export function adesaoDoPeriodo({ atividades, plano, hoje }) {
   const previstas = (plano?.sessoes ?? []).filter((s) => s.data >= inicio && s.data < hoje);
   const kmPrevistos = somar(previstas, (s) => s.distanciaKm);
   if (!kmPrevistos) return null;
-  const kmFeitos = somar(atividades.filter((a) => a.data >= inicio && a.data < hoje), (a) => a.km);
+  // Corrida de antes do primeiro treino previsto não pode inflar o "do previsto".
+  const desde = previstas.reduce((menor, s) => (s.data < menor ? s.data : menor), hoje);
+  const kmFeitos = somar(atividades.filter((a) => a.data >= desde && a.data < hoje), (a) => a.km);
   return kmFeitos / kmPrevistos;
 }
 

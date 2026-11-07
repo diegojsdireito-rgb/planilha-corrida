@@ -181,6 +181,7 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
       return {
         atividades: normalizadas.filter((a) => a.km > 0),
         semDados: normalizadas.filter((a) => a.km === 0).length,
+        corridasSemDados: normalizadas.filter((a) => a.km === 0 && a.data),
         outras: lista.filter((a) => a.type && !TIPOS_DE_CORRIDA.has(a.type) && a.moving_time > 0).map(avulsaDoIntervals),
       };
     },

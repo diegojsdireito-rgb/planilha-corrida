@@ -64,8 +64,8 @@ test('o resumo soma por categoria só dentro do período', () => {
     { data: '2026-11-01', categoria: 'natacao', minutos: 60 },
   ];
   assert.deepEqual(resumoPorCategoria(lista, '2026-11-02', '2026-11-09'), [
-    { categoria: 'bicicleta', nome: 'Bicicleta', minutos: 90, quantidade: 1 },
-    { categoria: 'caminhada', nome: 'Caminhada', minutos: 70, quantidade: 2 },
+    { categoria: 'bicicleta', nome: 'Bicicleta', minutos: 90, quantidade: 1, km: 0 },
+    { categoria: 'caminhada', nome: 'Caminhada', minutos: 70, quantidade: 2, km: 0 },
   ]);
 });
 

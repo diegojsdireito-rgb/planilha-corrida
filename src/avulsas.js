@@ -70,8 +70,9 @@ export function resumoPorCategoria(lista, de, ate) {
   const mapa = new Map();
   for (const a of lista) {
     if (a.data < de || a.data >= ate) continue;
-    const item = mapa.get(a.categoria) ?? { categoria: a.categoria, nome: nomeDaCategoria(a.categoria), minutos: 0, quantidade: 0 };
+    const item = mapa.get(a.categoria) ?? { categoria: a.categoria, nome: nomeDaCategoria(a.categoria), minutos: 0, quantidade: 0, km: 0 };
     item.minutos += a.minutos;
+    item.km += a.km ?? 0;
     item.quantidade += 1;
     mapa.set(a.categoria, item);
   }
