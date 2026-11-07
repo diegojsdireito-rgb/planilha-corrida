@@ -427,6 +427,11 @@ details.semana.atual .semana-numero { background: var(--marca); color: var(--mar
 .dia { position: relative; }
 .dia-outra { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--z-longo); }
 
+.regra { border-top: 1px solid var(--borda); }
+.regra summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-weight: 600; font-size: .92rem; cursor: pointer; list-style: none; }
+.regra summary::-webkit-details-marker { display: none; }
+.regra .selo { flex: none; }
+
 .passos-chave { margin-bottom: 12px; }
 .passos-chave summary { display: flex; align-items: center; min-height: 44px; color: var(--marca); font-size: .92rem; font-weight: 600; cursor: pointer; }
 

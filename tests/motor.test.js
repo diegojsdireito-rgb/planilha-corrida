@@ -13,6 +13,7 @@ import {
   estimarVdot,
   formatarRitmo,
   gerarPlano,
+  limiteDaCorrida,
   mudarDiaDaSessao,
   preverTempoSeg,
   proximaSegunda,
@@ -29,7 +30,7 @@ const INICIO = '2026-11-09'; // segunda
 
 const parametros = (extra = {}) => ({
   perfil,
-  objetivo: { distanciaKm: 10, dataProva: '2027-02-07' },
+  objetivo: { distanciaKm: 10, dataProva: '2027-02-07', meta: 'tempo' },
   base: { kmSemana: 25, longoKm: 10 },
   vdot: 45,
   inicio: INICIO,
@@ -41,6 +42,67 @@ const kmPorSemana = (plano) => {
   for (const s of plano.sessoes) mapa.set(s.semana, (mapa.get(s.semana) ?? 0) + s.distanciaKm);
   return [...mapa.values()];
 };
+
+const PROVAS_EM_2027 = [[5, '2027-02-07'], [10, '2027-02-07'], [21.1, '2027-04-04'], [42.2, '2027-06-06']];
+
+test('nenhuma corrida passa do limite sobre a maior dos últimos 30 dias', () => {
+  for (const [distanciaKm, dataProva] of PROVAS_EM_2027) {
+    for (const meta of ['terminar', 'tempo']) {
+      for (const base of [{ kmSemana: 0, longoKm: 0 }, { kmSemana: 25, longoKm: 10 }, { kmSemana: 50, longoKm: 20 }]) {
+        const plano = gerarPlano(parametros({ objetivo: { distanciaKm, dataProva, meta }, base }));
+        const anteriores = [{ data: INICIO, km: base.longoKm }];
+        for (const s of plano.sessoes.filter((x) => x.tipo !== 'prova')) {
+          const maior = Math.max(...anteriores.filter((c) => c.data >= somarDias(segundaDaSemana(s.data), -30)).map((c) => c.km), 0);
+          assert.ok(s.distanciaKm <= limiteDaCorrida(maior), `${distanciaKm}/${meta}: ${s.nome} com ${s.distanciaKm} km, maior recente ${maior}`);
+          anteriores.push({ data: s.data, km: s.distanciaKm });
+        }
+      }
+    }
+  }
+});
+
+test('limite da corrida é 10%, com acréscimo mínimo de 1 km e base de 5 km', () => {
+  assert.equal(limiteDaCorrida(0), 6);
+  assert.equal(limiteDaCorrida(8), 9);
+  assert.equal(limiteDaCorrida(20), 22);
+  assert.equal(limiteDaCorrida(25), 27.5);
+});
+
+test('volume e longão seguem a referência da meta, sem passar dos planos', () => {
+  const esperado = { terminar: { 5: [13, 5], 10: [17, 9], 21.1: [37, 16], 42.2: [64, 32] }, tempo: { 5: [29, 11], 10: [34, 13], 21.1: [55, 19], 42.2: [71, 32] } };
+  const rapido = { ...perfil, diasSemana: [1, 2, 3, 4, 6, 0] };
+  for (const [distanciaKm, dataProva] of PROVAS_EM_2027) {
+    for (const meta of ['terminar', 'tempo']) {
+      const plano = gerarPlano(parametros({ perfil: rapido, vdot: 55, objetivo: { distanciaKm, dataProva, meta }, base: { kmSemana: 10, longoKm: 6 } }));
+      const treinos = plano.sessoes.filter((s) => s.tipo !== 'prova');
+      const [pico, longo] = esperado[meta][distanciaKm];
+      assert.ok(Math.max(...kmPorSemana({ sessoes: treinos })) <= pico * 1.1, `${distanciaKm}/${meta} volume`);
+      assert.ok(Math.max(...treinos.map((s) => s.distanciaKm)) <= longo, `${distanciaKm}/${meta} longão`);
+    }
+  }
+});
+
+test('quem já corre mais que a referência não é rebaixado', () => {
+  const plano = gerarPlano(parametros({ objetivo: { distanciaKm: 5, dataProva: '2027-02-07', meta: 'terminar' }, base: { kmSemana: 25, longoKm: 12 } }));
+  assert.equal(Math.max(...kmPorSemana(plano).slice(0, 1)) >= 20, true);
+  assert.equal(plano.sessoes.find((s) => s.tipo === 'longo').distanciaKm > 5, true);
+});
+
+test('quem quer completar não recebe treino forte; quem busca tempo recebe', () => {
+  const FORTES = ['limiar', 'intervalado', 'ritmo'];
+  const com = (meta) => gerarPlano(parametros({ objetivo: { distanciaKm: 10, dataProva: '2027-02-07', meta } }));
+  assert.equal(com('terminar').sessoes.some((s) => FORTES.includes(s.tipo)), false);
+  assert.equal(com('tempo').sessoes.some((s) => FORTES.includes(s.tipo)), true);
+});
+
+test('avisa quando as 3 horas cortam o longão e quando a base está abaixo do plano de tempo', () => {
+  const lento = gerarPlano(parametros({ vdot: 25, objetivo: { distanciaKm: 42.2, dataProva: '2027-06-06', meta: 'terminar' }, base: { kmSemana: 30, longoKm: 14 } }));
+  assert.match(lento.avisos.join(' '), /3 horas.*32 km/);
+  const rapido = gerarPlano(parametros({ vdot: 55, objetivo: { distanciaKm: 10, dataProva: '2027-02-07', meta: 'tempo' }, base: { kmSemana: 10, longoKm: 6 } }));
+  assert.match(rapido.avisos.join(' '), /cerca de 24 km por semana/);
+  const semAviso = gerarPlano(parametros({ vdot: 55, base: { kmSemana: 30, longoKm: 10 } }));
+  assert.deepEqual(semAviso.avisos, []);
+});
 
 test('mudar o dia oferece só dias livres da mesma semana, a partir de hoje', () => {
   const plano = gerarPlano(parametros());
@@ -206,7 +268,7 @@ test('perfil com lesão progride mais devagar e começa sem treino forte', () =>
   const primeiras = plano.sessoes.filter((s) => s.semana <= 3);
   assert.ok(primeiras.every((s) => ['leve', 'longo'].includes(s.tipo)));
   const normal = gerarPlano(parametros());
-  assert.ok(Math.max(...kmPorSemana(plano)) < Math.max(...kmPorSemana(normal)));
+  assert.ok(kmPorSemana(plano)[1] < kmPorSemana(normal)[1]);
 });
 
 const maratona4Dias = () =>

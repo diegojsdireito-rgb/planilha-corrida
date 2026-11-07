@@ -8,7 +8,7 @@
 // como fatores de risco observados em iniciantes (Nielsen 2013).
 
 // Suba quando a geração mudar: planilhas salvas com outra versão pedem para ser refeitas.
-export const VERSAO_REGRAS = 2;
+export const VERSAO_REGRAS = 3;
 
 const DISTANCIA_MARATONA = 42.195;
 
@@ -149,8 +149,16 @@ export function avaliarPrudencia({ idade, pesoKg, alturaCm, lesaoRecente }) {
 
 // ---------- Geração da planilha ----------
 
-const PICO_KM = { 5: 40, 10: 50, 21.1: 60, 42.2: 75, padrao: 40 };
-const LONGO_MAX_KM = { 5: 14, 10: 18, 21.1: 22, 42.2: 32, padrao: 14 };
+// Pico semanal e maior corrida dos planos de Hal Higdon, conferidos nas tabelas originais:
+// Novice para completar, Intermediate para buscar tempo. São referência de treinador: nenhum
+// estudo define volume obrigatório. Sem prova, usar o 5 km Intermediate é decisão do app.
+const REFERENCIA_POR_META = {
+  terminar: { 5: { pico: 13, longo: 5 }, 10: { pico: 17, longo: 9 }, 21.1: { pico: 37, longo: 16 }, 42.2: { pico: 64, longo: 32 } },
+  tempo: { 5: { pico: 29, longo: 11 }, 10: { pico: 34, longo: 13 }, 21.1: { pico: 55, longo: 19 }, 42.2: { pico: 71, longo: 32 } },
+};
+const REFERENCIA_SEM_PROVA = { pico: 29, longo: 11 };
+// Volume de entrada dos planos para buscar tempo, em km por semana.
+const ENTRADA_PARA_TEMPO_KM = { 5: 24, 10: 24, 21.1: 27, 42.2: 24 };
 const POLIMENTO = { 5: [0.6], 10: [0.6], 21.1: [0.75, 0.5], 42.2: [0.8, 0.65, 0.45] };
 const SEMANAS_SEM_PROVA = 12;
 const MAXIMO_SEMANAS = 52;
@@ -163,13 +171,25 @@ const MAXIMO_TREINOS_POR_SEMANA = 6;
 const MAXIMO_TREINOS_PRUDENTE = 4;
 const KM_MINIMO_POR_SEMANA = 9;
 
-function fracaoDoLongo(dias, distancia) {
-  if (distancia === 42.2) return dias <= 4 ? 0.5 : 0.4;
-  if (distancia === 21.1) return dias <= 4 ? 0.4 : 0.33;
-  return dias <= 3 ? 0.4 : dias === 4 ? 0.33 : 0.3;
+const meioKm = (km) => Math.max(0.5, Math.round(km * 2) / 2);
+
+export function referenciaDaMeta({ distanciaKm, meta }) {
+  if (!distanciaKm) return REFERENCIA_SEM_PROVA;
+  return REFERENCIA_POR_META[meta === 'tempo' ? 'tempo' : 'terminar'][distanciaKm] ?? REFERENCIA_SEM_PROVA;
 }
 
-const meioKm = (km) => Math.max(0.5, Math.round(km * 2) / 2);
+// Nenhuma corrida planejada passa de 10% acima da maior dos últimos 30 dias: associação de
+// Frandsen 2025, sem prova de causa. O acréscimo mínimo de 1 km e a base de 5 km são decisão
+// do app, porque 10% de pouca distância travaria a progressão de quem está começando.
+const JANELA_DA_MAIOR_CORRIDA = 30;
+const AUMENTO_MAXIMO_POR_CORRIDA = 0.1;
+const ACRESCIMO_MINIMO_KM = 1;
+const MAIOR_CORRIDA_MINIMA_KM = 5;
+
+export function limiteDaCorrida(maiorRecenteKm) {
+  const maior = Math.max(maiorRecenteKm, MAIOR_CORRIDA_MINIMA_KM);
+  return Math.floor(Math.max(maior * (1 + AUMENTO_MAXIMO_POR_CORRIDA), maior + ACRESCIMO_MINIMO_KM) * 2) / 2;
+}
 
 function fasesDoPlano(totalSemanas, tamanhoPolimento) {
   const treino = Math.max(1, totalSemanas - tamanhoPolimento);
@@ -341,12 +361,13 @@ function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limi
     return sessoes;
   }
 
-  const longoMax = LONGO_MAX_KM[distancia] ?? LONGO_MAX_KM.padrao;
+  const referencia = referenciaDaMeta(objetivo);
+  const longoMax = Math.max(referencia.longo, parametros.base.longoKm || 0);
   const longoPeloTempo = (LONGO_MAX_MINUTOS * 60) / ritmos.leve.ate;
-  const kmLongo = meioKm(Math.min(km * fracaoDoLongo(dias.length, distancia), longoMax, limiteLongo, longoPeloTempo));
+  const kmLongo = Math.min(meioKm(Math.min((km * referencia.longo) / referencia.pico, longoMax, longoPeloTempo)), limiteLongo);
 
   let qtdQualidade = 0;
-  if (!semQualidade && !recuperacao && km >= 15) {
+  if (objetivo.meta === 'tempo' && !semQualidade && !recuperacao && km >= 15) {
     if (fase === 'construcao' || fase === 'polimento') qtdQualidade = 1;
     if (fase === 'pico') qtdQualidade = dias.length >= 5 && !parametros.prudencia?.prudente ? 2 : 1;
   }
@@ -400,12 +421,13 @@ export function gerarPlano(parametros) {
     perfil.diasSemana.length,
     prudencia.prudente ? MAXIMO_TREINOS_PRUDENTE : MAXIMO_TREINOS_POR_SEMANA,
   );
-  const picoPossivel = Math.min(PICO_KM[distancia] ?? PICO_KM.padrao, treinosMaximos * KM_MAX_POR_DIA_DE_TREINO);
+  const referencia = referenciaDaMeta(objetivo);
+  const picoPossivel = Math.min(referencia.pico, treinosMaximos * KM_MAX_POR_DIA_DE_TREINO);
   const pico = Math.max(picoPossivel, base.kmSemana);
   const ritmos = calcularRitmos(vdot);
 
   let carga = Math.max(base.kmSemana, KM_MINIMO_POR_SEMANA);
-  let limiteLongo = Math.max(base.longoKm || 0, 5) + 1;
+  const corridasRecentes = [{ data: segundaDaSemana(aPartirDe), km: base.longoKm || 0 }];
   let primeira = true;
   const sessoes = [];
 
@@ -420,7 +442,9 @@ export function gerarPlano(parametros) {
     if (!primeira || parametros.progredirNaPrimeira) {
       if (fase !== 'polimento' && !recuperacao) carga = Math.min(carga * (1 + taxa), pico);
     }
-    if (fase !== 'polimento' && !recuperacao && !primeira) limiteLongo *= 1.1;
+    const inicioDaJanela = somarDias(segunda, -JANELA_DA_MAIOR_CORRIDA);
+    const maiorRecente = Math.max(...corridasRecentes.filter((c) => c.data >= inicioDaJanela).map((c) => c.km), 0);
+    const limiteLongo = limiteDaCorrida(maiorRecente);
 
     const km = fase === 'polimento' ? carga * usados[i - treino] : recuperacao ? carga * 0.75 : carga;
     const prudenteNoInicio = prudencia.prudente && i < 3;
@@ -428,25 +452,39 @@ export function gerarPlano(parametros) {
     const treinos = treinosPorSemana(carga, prudencia.prudente, perfil.diasSemana.length);
     const { dias, diaLongo } = escolherDiasDeTreino(perfil.diasSemana, perfil.diaLongo, treinos);
 
-    sessoes.push(
-      ...montarSemana({
-        segunda,
-        fase,
-        km,
-        recuperacao,
-        parametros: { ...parametros, prudencia },
-        ritmos,
-        limiteLongo,
-        semQualidade: prudenteNoInicio || bloqueada,
-        indice: i,
-        dias,
-        diaLongo,
-      }).map((s) => ({ ...s, semana: i + 1, fase, recuperacao })),
-    );
+    const semana = montarSemana({
+      segunda,
+      fase,
+      km,
+      recuperacao,
+      parametros: { ...parametros, prudencia },
+      ritmos,
+      limiteLongo,
+      semQualidade: prudenteNoInicio || bloqueada,
+      indice: i,
+      dias,
+      diaLongo,
+    }).map((s) => ({ ...s, semana: i + 1, fase, recuperacao }));
+    sessoes.push(...semana);
+    corridasRecentes.push(...semana.filter((s) => s.tipo !== 'prova').map((s) => ({ data: s.data, km: s.distanciaKm })));
     primeira = false;
   }
 
-  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes };
+  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes, avisos: avisosDoPlano({ objetivo, base, ritmos, referencia }) };
+}
+
+// Mostra o limite em vez de cortar em silêncio. Nada aqui bloqueia a planilha.
+function avisosDoPlano({ objetivo, base, ritmos, referencia }) {
+  const avisos = [];
+  const longoPeloTempo = Math.floor(((LONGO_MAX_MINUTOS * 60) / ritmos.leve.ate) * 2) / 2;
+  if (longoPeloTempo < referencia.longo) {
+    avisos.push(`O limite de 3 horas, regra de prudência do app, deixa seu longão em até ${String(longoPeloTempo).replace('.', ',')} km. Os planos de referência para esta prova chegam a ${referencia.longo} km.`);
+  }
+  const entrada = ENTRADA_PARA_TEMPO_KM[objetivo.distanciaKm];
+  if (objetivo.meta === 'tempo' && entrada && base.kmSemana < entrada) {
+    avisos.push(`Os planos de referência para buscar tempo começam com cerca de ${entrada} km por semana, e sua base é de ${String(Math.round(base.kmSemana * 10) / 10).replace('.', ',')} km. Isso não impede a planilha, mas o prazo pode ficar curto.`);
+  }
+  return avisos;
 }
 
 // ---------- Detalhes de um treino ----------

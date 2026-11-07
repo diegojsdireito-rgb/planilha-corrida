@@ -35,6 +35,7 @@ import {
   VERSAO_REGRAS,
   ZONAS,
 } from './motor.js';
+import { ORIGENS, REGRAS } from './regras.js';
 import { anelDeProgresso, diasAte, diasDaSemana, fasesDoPlano, icone, MARCA, perfilDoTreino } from './visual.js';
 
 const DIAS = [
@@ -69,12 +70,12 @@ let gradePendente = null;
 let avulsaAberta = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 18;
+const VERSAO_APP = 19;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
     <h2>Esta planilha usa regras antigas</h2>
-    <p>Ela pode ter treinos em todos os dias livres e aumento rápido de volume. Gere de novo para usar a organização atual de treino e descanso. Seu cadastro continua preenchido.</p>
+    <p>As regras de volume e o limite por corrida foram revistos com base em pesquisa. Gere de novo para usar as regras atuais: seu cadastro continua preenchido. Até lá, o envio automático fica parado.</p>
     <button class="principal" data-acao="recomecar">Gerar planilha de novo</button>
   </section>`);
 
@@ -355,7 +356,13 @@ function telaCadastro(valores = {}) {
           </select>
         </label>
         <label>Data da prova<input name="dataProva" type="date" value="${esc(v.dataProva ?? '')}"></label>
-        <p class="suave">Sem prova marcada, a planilha terá 12 semanas.</p>
+        <label>O que você quer na prova
+          <select name="meta">
+            <option value="terminar" ${v.meta === 'tempo' ? '' : 'selected'}>Completar, sem treino forte</option>
+            <option value="tempo" ${v.meta === 'tempo' ? 'selected' : ''}>Buscar um tempo, com treino forte</option>
+          </select>
+        </label>
+        <p class="suave">Sem prova marcada, a planilha terá 12 semanas, sem treino forte.</p>
       </section>
 
       <section class="cartao">
@@ -443,7 +450,7 @@ async function enviarCadastro(evento) {
         diasSemana: dias,
         diaLongo: Number(form.get('diaLongo')),
       };
-      const objetivo = { distanciaKm: distancia, dataProva };
+      const objetivo = { distanciaKm: distancia, dataProva, meta: distancia ? String(form.get('meta')) : 'terminar' };
       const tempoInformado = tempoSeg ? { distanciaKm: Number(form.get('distanciaTempo')), tempoSeg } : null;
       const estimativa = estimarVdot({ atividades: estado.atividades, tempoInformado, hoje: dia });
       const historico = baseDasAtividades(estado.atividades, dia);
@@ -1130,7 +1137,7 @@ function telaPlano() {
   const semanas = new Map();
   for (const s of plano.sessoes) semanas.set(s.semana, [...(semanas.get(s.semana) ?? []), s]);
   const semanaAtual = segundaDaSemana(dia);
-  const meta = objetivo.distanciaKm ? `Prova de ${objetivo.distanciaKm} km em ${dataCurta(objetivo.dataProva)}` : 'Condicionamento';
+  const meta = objetivo.distanciaKm ? `Prova de ${String(objetivo.distanciaKm).replace('.', ',')} km em ${dataCurta(objetivo.dataProva)}` : 'Condicionamento';
   const futuras = plano.sessoes.filter((s) => s.data >= dia).length;
   const totalDaSemana = (sessoes) => sessoes.reduce((t, s) => t + s.distanciaKm, 0);
   const maiorSemana = Math.max(...[...semanas.values()].map(totalDaSemana));
@@ -1164,6 +1171,7 @@ function telaPlano() {
     ${avisoPlanilhaAntiga()}
     ${blocoDoObjetivo(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
+    ${(plano.avisos ?? []).map((a) => `<section class="cartao alerta">${esc(a)}</section>`).join('')}
     ${lista}
     ${(() => {
       const semanaVista = plano.sessoes.find((s) => s.data >= dia)?.semana;
@@ -1403,10 +1411,13 @@ function telaAjustes() {
     </section>
     <section class="cartao">
       <h2>Como a planilha é calculada</h2>
-      <p class="suave">Ritmos: fórmulas publicadas de Daniels e Gilbert (VDOT).</p>
-      <p class="suave">Modo cuidadoso: IMC acima de 30, idade a partir de 45 anos ou lesão recente, fatores de risco observados em corredores iniciantes.</p>
-      <p class="suave">Volume, dias por semana e descanso: regras próprias de prudência, porque os estudos não definem um número certo. O volume sobe até 10% por semana, ou 5% no modo cuidadoso.</p>
-      <p class="suave">Nada disso garante evitar lesões, e a planilha não substitui avaliação médica ou de um treinador.</p>
+      <p class="suave">Cada regra mostra de onde vem. Nenhuma tem evidência forte para decidir sozinha, e nada disso garante evitar lesões. A planilha não substitui avaliação médica ou de um treinador.</p>
+      ${REGRAS.map((r) => `
+        <details class="regra">
+          <summary><span>${esc(r.nome)}</span><span class="selo">${esc(ORIGENS[r.origem])}</span></summary>
+          <p class="suave">${esc(r.texto)}</p>
+          ${r.fontes.length ? `<p class="suave">${r.fontes.map(([nome, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(nome)}</a>`).join(', ')}</p>` : ''}
+        </details>`).join('')}
     </section>
     <button class="perigo largo" data-acao="recomecar">Começar novo ciclo</button>
     <p class="suave" style="margin-top:12px;text-align:center">Versão ${VERSAO_APP}</p>`;
@@ -1595,6 +1606,7 @@ const acoes = {
       diaLongo: perfil.diaLongo,
       distancia: objetivo.distanciaKm === null ? '' : objetivo.distanciaKm,
       dataProva: objetivo.dataProva,
+      meta: objetivo.meta,
     };
     sessaoAberta = null;
     estado = { ...estadoInicial(), avisoCiente: true, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
