@@ -35,6 +35,9 @@ const MINUTOS_NO_DIA = 1440;
 
 export const nomeDaCategoria = (chave) => CATEGORIAS.find((c) => c.chave === chave)?.nome ?? 'Outro exercício';
 
+// O relógio pode gravar a cadência por perna: abaixo de 110, o valor é dobrado para passos por minuto.
+export const cadenciaDe = (valor) => (valor > 0 ? Math.round(valor < 110 ? valor * 2 : valor) : null);
+
 export function avulsaDoIntervals(a) {
   const metros = a.icu_distance ?? a.distance ?? 0;
   return {
@@ -51,6 +54,8 @@ export function avulsaDoIntervals(a) {
     fcMaxima: a.max_heartrate ?? null,
     subida: a.total_elevation_gain ?? null,
     calorias: a.calories ?? null,
+    cadencia: cadenciaDe(a.average_cadence),
+    carga: a.icu_training_load ?? null,
     rpe: a.icu_rpe ?? null,
     tempoPorZonaFc: Array.isArray(a.icu_hr_zone_times) ? a.icu_hr_zone_times : [],
     origem: 'relogio',

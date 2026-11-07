@@ -27,6 +27,18 @@ export const REGRAS = [
     fontes: [],
   },
   {
+    nome: 'Esforço e sensação',
+    origem: 'app',
+    texto: 'Dois treinos leves com esforço 7 ou mais, ou média de sensação baixa em 3 respostas, seguram o aumento de volume da próxima semana. Só dor reduz a carga. É autoavaliação, e os cortes não vêm de estudo.',
+    fontes: [],
+  },
+  {
+    nome: 'Aderência ao treino',
+    origem: 'app',
+    texto: 'Média entre o quanto a distância e o ritmo ficaram perto do previsto. É uma fórmula do app para resumir o treino, sem validação em estudo.',
+    fontes: [],
+  },
+  {
     nome: 'Treinos fortes',
     origem: 'treinador',
     texto: 'Só para quem busca tempo, porque os planos iniciantes não usam tiros. Não há estudo que defina quando um iniciante deve começar.',

@@ -646,6 +646,11 @@ const LIMITE_DIF_VDOT = 3;
 const SUBIDA_MAX_VDOT_TREINO = 1.5;
 const decimal = (n) => n.toFixed(1).replace('.', ',');
 
+const ESFORCO_ALTO_EM_LEVE = 7;
+const LEVES_PESADOS_PARA_SEGURAR = 2;
+const RESPOSTAS_PARA_SENSACAO = 3;
+const SENSACAO_BAIXA = 2;
+
 export function analisarRevisao({ plano, atividades, avaliacoes = {}, dispensados = [], hoje }) {
   const de = somarDias(hoje, -JANELA_REVISAO_DIAS);
   const naJanela = (data) => data >= de && data < hoje;
@@ -664,7 +669,8 @@ export function analisarRevisao({ plano, atividades, avaliacoes = {}, dispensado
     ...realizadas.map((a) => a.rpe),
   ].filter((n) => typeof n === 'number' && n > 0);
   const esforco = esforcos.length ? esforcos.reduce((a, b) => a + b, 0) / esforcos.length : null;
-  const dor = notas.some((n) => n.dor);
+  // Dor marcada em corrida fora de treino também conta: dor nunca pode se perder.
+  const dor = notas.some((n) => n.dor) || realizadas.some((a) => a.dor);
 
   const motivos = [];
   let acao = 'seguir';
@@ -690,7 +696,22 @@ export function analisarRevisao({ plano, atividades, avaliacoes = {}, dispensado
       acao = 'manter';
       motivos.push('Sem aumento de volume na próxima semana, para consolidar a carga atual.');
     } else {
-      motivos.push('Treino em dia e esforço controlado: a progressão continua.');
+      // Cortes do app. Autoavaliação segura o aumento, mas sozinha não reduz a carga: só dor faz isso.
+      const levesPesados = daJanela.filter((s) => ['leve', 'longo'].includes(s.tipo) && avaliacoes[s.id]?.esforco >= ESFORCO_ALTO_EM_LEVE).length;
+      const sensacoes = [
+        ...notas.map((n) => n.sensacao),
+        ...realizadas.filter((a) => !a.temNotaDeTreino).map((a) => a.sensacao ?? a.sensacaoDoRelogio),
+      ].filter((n) => typeof n === 'number');
+      const sensacaoMedia = sensacoes.length ? sensacoes.reduce((a, b) => a + b, 0) / sensacoes.length : null;
+      if (levesPesados >= LEVES_PESADOS_PARA_SEGURAR) {
+        acao = 'manter';
+        motivos.push('Treinos leves estão parecendo pesados: sem aumento de volume na próxima semana. Confira sono, calor e se o ritmo está certo para você.');
+      } else if (sensacoes.length >= RESPOSTAS_PARA_SENSACAO && sensacaoMedia <= SENSACAO_BAIXA) {
+        acao = 'manter';
+        motivos.push('Sua sensação tem ficado baixa nas últimas semanas: sem aumento de volume na próxima semana.');
+      } else {
+        motivos.push('Treino em dia e esforço controlado: a progressão continua.');
+      }
     }
   }
 

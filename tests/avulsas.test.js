@@ -14,7 +14,7 @@ test('atividade do relógio chega com categoria e dados', () => {
   });
   assert.deepEqual(a, {
     id: 'i9', data: '2026-11-05', hora: '07:00', categoria: 'caminhada', nome: 'Caminhada da manhã', minutos: 45, seg: 2700, segTotal: 3000, km: 3.2,
-    fcMedia: 108, fcMaxima: 124, subida: 22, calorias: 210, rpe: 3, tempoPorZonaFc: [600, 2100], origem: 'relogio',
+    fcMedia: 108, fcMaxima: 124, subida: 22, calorias: 210, cadencia: null, carga: null, rpe: 3, tempoPorZonaFc: [600, 2100], origem: 'relogio',
   });
 });
 

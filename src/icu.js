@@ -1,12 +1,12 @@
 // Cliente do intervals.icu. A chave fica só no aparelho e vai só para intervals.icu.
-import { avulsaDoIntervals } from './avulsas.js';
+import { avulsaDoIntervals, cadenciaDe } from './avulsas.js';
 import { ZONAS } from './motor.js';
 
 const BASE = 'https://intervals.icu/api/v1/athlete/0';
 const BASE_ATIVIDADE = 'https://intervals.icu/api/v1/activity';
 const CAMINHO_DO_ARQUIVO = { fit: 'fit-file', gpx: 'gpx-file' };
 const TIPOS_DE_CORRIDA = new Set(['Run', 'TrailRun', 'VirtualRun']);
-const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,max_heartrate,total_elevation_gain,icu_hr_zone_times,source,elapsed_time,calories';
+const CAMPOS_ATIVIDADE = 'id,start_date_local,type,name,distance,icu_distance,moving_time,race,icu_rpe,average_heartrate,max_heartrate,total_elevation_gain,icu_hr_zone_times,source,elapsed_time,calories,feel,average_cadence,icu_training_load';
 
 // Texto no formato do construtor de treinos do intervals.icu. "m" significa minutos,
 // por isso distância fracionada vai em metros ("1500mtr").
@@ -123,6 +123,9 @@ export function normalizarAtividade(a) {
     segTotal: a.elapsed_time ?? null,
     calorias: a.calories ?? null,
     hora: String(a.start_date_local ?? '').slice(11, 16) || null,
+    sensacaoDoRelogio: a.feel >= 1 && a.feel <= 5 ? 6 - a.feel : null,
+    cadencia: cadenciaDe(a.average_cadence),
+    carga: a.icu_training_load ?? null,
     prova: Boolean(a.race),
     rpe: a.icu_rpe ?? null,
     fcMedia: a.average_heartrate ?? null,
