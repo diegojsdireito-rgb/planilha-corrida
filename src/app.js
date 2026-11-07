@@ -1,5 +1,6 @@
 import { compararComPrevisto, ORDEM_DAS_ZONAS, ritmoDaProva, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
+import { ehAniversario, erroDoNascimento, idadeEm } from './aniversario.js';
 import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, velocidadeDaAtividade } from './avulsas.js';
 import { feitoForaDosTreinos, gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from './calendario.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
@@ -92,7 +93,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 26;
+const VERSAO_APP = 27;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -371,7 +372,7 @@ const PASSOS_DA_CHAVE = `
 
 function telaCadastro(valores = {}) {
   abas.hidden = true;
-  const v = { idade: '', peso: '', altura: '', kmSemana: '', longo: '', distanciaTempo: '5', chave: estado.chaveApi, ...valores };
+  const v = { peso: '', altura: '', kmSemana: '', longo: '', distanciaTempo: '5', chave: estado.chaveApi, ...valores };
   const diasMarcados = valores.dias ?? [2, 4, 6, 0];
   app.innerHTML = `
     <div class="marca">${MARCA}Run Glória</div>
@@ -383,8 +384,8 @@ function telaCadastro(valores = {}) {
       <section class="cartao">
         <h2>Sobre você</h2>
         <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" value="${esc(estado.nome)}"></label>
-        <div class="linha3">
-          <label>Idade<input name="idade" type="number" inputmode="numeric" min="12" max="100" value="${esc(v.idade)}" required></label>
+        <label>Data de nascimento<input name="nascimento" type="date" autocomplete="bday" max="${hoje()}" value="${esc(estado.nascimento ?? '')}" required></label>
+        <div class="linha">
           <label>Peso (kg)<input name="peso" inputmode="decimal" value="${esc(v.peso)}" required></label>
           <label>Altura (cm)<input name="altura" type="number" inputmode="numeric" value="${esc(v.altura)}" required></label>
         </div>
@@ -471,10 +472,13 @@ async function enviarCadastro(evento) {
 
   const problema = (mensagem) => { erro.textContent = mensagem; erro.scrollIntoView({ block: 'center' }); };
 
-  const idade = numero(form, 'idade');
+  const nascimento = String(form.get('nascimento') ?? '');
+  const erroNascimento = erroDoNascimento(nascimento, dia);
+  if (erroNascimento) return problema(erroNascimento);
+  const idade = idadeEm(nascimento, dia);
   const pesoKg = numero(form, 'peso');
   const alturaCm = numero(form, 'altura');
-  if (!idade || !pesoKg || !alturaCm) return problema('Preencha idade, peso e altura.');
+  if (!pesoKg || !alturaCm) return problema('Preencha peso e altura.');
   if (dias.length < 3) return problema('Marque pelo menos 3 dias livres.');
   if (dataProva && !distancia) return problema('Escolha a distância da prova.');
   if (distancia && !dataProva) return problema('Informe a data da prova, ou escolha Condicionamento.');
@@ -517,6 +521,7 @@ async function enviarCadastro(evento) {
         ...estado,
         chaveApi: chave,
         nome: String(form.get('nome') ?? '').trim(),
+        nascimento,
         perfil,
         objetivo,
         tempoInformado,
@@ -942,6 +947,10 @@ function blocoDoObjetivo(dia, { comAtalho = false } = {}) {
     </section>`;
 }
 
+const camposDoUsuario = () => `
+  <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" value="${esc(estado.nome)}" required></label>
+  <label>Data de nascimento<input name="nascimento" type="date" autocomplete="bday" max="${hoje()}" value="${esc(estado.nascimento ?? '')}" required></label>`;
+
 function telaHoje() {
   const dia = hoje();
   const { sessoes, inicio } = estado.plano;
@@ -978,10 +987,16 @@ function telaHoje() {
       <h1>${estado.nome ? `Olá, ${esc(estado.nome.split(/\s+/)[0])}` : 'Hoje'}</h1>
     </header>
     ${avisoPlanilhaAntiga()}
-    ${estado.nome ? '' : `
+    ${estado.nascimento && ehAniversario(estado.nascimento, dia) ? `
+      <section class="cartao destaque parabens">
+        <p class="parabens-bolo" aria-hidden="true">🎂</p>
+        <h2>Parabéns${estado.nome ? `, ${esc(estado.nome.split(/\s+/)[0])}` : ''}!</h2>
+        <p>Hoje você completa ${idadeEm(estado.nascimento, dia)} anos. Que venham muitos quilômetros e muita saúde.</p>
+      </section>` : ''}
+    ${estado.nome && estado.nascimento ? '' : `
       <form class="cartao" id="form-nome">
-        <h2>Como você se chama?</h2>
-        <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" required></label>
+        <h2>Complete seu cadastro</h2>
+        ${camposDoUsuario()}
         <button class="principal" type="submit" style="margin-top:10px">Salvar</button>
       </form>`}
     ${principal}
@@ -1281,17 +1296,19 @@ function celulaDoCalendario(d, selecionado) {
   }[d.situacao];
   const descricao = [
     dataLonga(d.data),
+    d.aniversario ? `seu aniversário de ${d.aniversario} anos` : null,
     { feito: `corrida da planilha, ${km(totalKm)}`, extra: `corrida fora da planilha, ${km(totalKm)}`, 'sem-dados': 'corrida sem distância', perdido: 'treino sem registro', planejado: `treino previsto, ${d.sessao ? km(d.sessao.distanciaKm) : ''}`, outra: null, livre: null }[d.situacao],
     d.outras.length ? d.outras.map((a) => `${nomeDaCategoria(a.categoria)}, ${duracaoCurta(a.minutos)}`).join(', ') : null,
   ].filter(Boolean).join(', ');
   const classes = ['dia', d.situacao, d.ehHoje ? 'hoje' : '', d.doMes ? '' : 'fora-do-mes', selecionado ? 'selecionado' : '', d.sessao ? classeTipo(d.sessao.tipo) : ''].filter(Boolean).join(' ');
   return `<button class="${classes}" data-dia-calendario="${d.data}" aria-label="${esc(descricao)}" ${selecionado ? 'aria-pressed="true"' : ''}>
-    <span class="dia-nome">${numero}</span><span class="dia-marca">${marca}</span>${d.outras.length ? '<i class="dia-outra"></i>' : ''}
+    <span class="dia-nome">${numero}</span><span class="dia-marca">${marca}</span>${d.outras.length ? '<i class="dia-outra"></i>' : ''}${d.aniversario ? '<span class="dia-bolo" aria-hidden="true">🎂</span>' : ''}
   </button>`;
 }
 
 function detalheDoDia(d, dia) {
   const conteudo = [
+    d.aniversario ? `<p class="cal-aniversario"><span aria-hidden="true">🎂</span> Seu aniversário: ${d.aniversario} anos</p>` : '',
     d.sessao && !d.corridas.length ? linhaSessao(d.sessao, dia) : '',
     d.corridas.map((a) => (d.sessao ? `<button class="avulsa-linha" data-abrir="${esc(d.sessao.id)}">${corpoCorridaFeita(a, true)}</button>` : linhaCorridaFora(a))).join(''),
     d.semDados.map(linhaSemDados).join(''),
@@ -1306,7 +1323,7 @@ function detalheDoDia(d, dia) {
 
 function blocoCalendario(dia) {
   const mes = mesVisto ?? mesDe(dia);
-  const grade = gradeDoMes({ mes, ...dadosDaAtividade(), hoje: dia });
+  const grade = gradeDoMes({ mes, ...dadosDaAtividade(), nascimento: estado.nascimento, hoje: dia });
   const escolhido = diaVisto ?? (mesDe(dia) === mes ? dia : null);
   const selecionado = grade.find((d) => d.data === escolhido);
   const r = resumoDaAtividade({ ...dadosDaAtividade(), de: `${mes}-01`, ate: `${somarMeses(mes, 1)}-01` });
@@ -1332,6 +1349,7 @@ function blocoCalendario(dia) {
         <span><i class="cal-ponto feito"></i>Da planilha</span>
         <span><i class="cal-ponto extra"></i>Fora da planilha</span>
         <span><i class="cal-ponto outra"></i>Outra atividade</span>
+        ${grade.some((d) => d.aniversario) ? '<span><span aria-hidden="true">🎂</span>Aniversário</span>' : ''}
       </p>
       <p class="suave">${partes.length ? `Neste mês: ${esc(partes.join(', '))}.` : 'Nada registrado neste mês.'}</p>
       ${selecionado ? detalheDoDia(selecionado, dia) : ''}
@@ -2031,9 +2049,10 @@ function telaAjustes() {
     <header class="topo"><p class="sobretitulo">${estado.nome ? esc(estado.nome) : 'Sua conta neste aparelho'}</p><h1>Ajustes</h1></header>
     <form class="cartao" id="form-nome">
       <h2>Usuário</h2>
-      <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" value="${esc(estado.nome)}" required></label>
-      <button type="submit" style="margin-top:10px">Salvar nome</button>
-      <p class="suave" style="margin:10px 0 0">Fica só neste aparelho e entra na sua cópia de segurança. Não há cadastro central.</p>
+      ${camposDoUsuario()}
+      ${estado.nascimento ? `<p class="suave" style="margin:10px 0 0">${idadeEm(estado.nascimento, hoje())} anos. A idade é atualizada sozinha.</p>` : ''}
+      <button type="submit" style="margin-top:10px">Salvar</button>
+      <p class="suave" style="margin:10px 0 0">Ficam só neste aparelho e entram na sua cópia de segurança. Não há cadastro central.</p>
     </form>
     <section class="heroi">
       <p class="sobretitulo">Seu nível atual (VDOT)</p>
@@ -2106,7 +2125,13 @@ function renderAbas() {
     .join('');
 }
 
+// A idade entra na prudência da planilha: com a data de nascimento, ela nunca envelhece no cadastro.
+function atualizarIdade() {
+  if (estado.nascimento && estado.perfil) estado.perfil = { ...estado.perfil, idade: idadeEm(estado.nascimento, hoje()) };
+}
+
 function render() {
+  atualizarIdade();
   if (!estado.plano && !estado.avisoCiente) return telaBoasVindas();
   if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
@@ -2323,9 +2348,8 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { nome, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
-      idade: perfil.idade,
       peso: perfil.pesoKg,
       altura: perfil.alturaCm,
       lesao: perfil.lesaoRecente,
@@ -2336,7 +2360,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, nome, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -2464,13 +2488,19 @@ app.addEventListener('submit', (e) => {
   }
 
   if (e.target.id === 'form-nome') {
-    const nome = String(new FormData(e.target).get('nome') ?? '').trim();
+    const dados = new FormData(e.target);
+    const nome = String(dados.get('nome') ?? '').trim();
+    const nascimento = String(dados.get('nascimento') ?? '');
     if (!nome) return mostrarAviso('Digite o seu nome.');
+    const erro = erroDoNascimento(nascimento, hoje());
+    if (erro) return mostrarAviso(erro);
     estado.nome = nome;
+    estado.nascimento = nascimento;
+    atualizarIdade();
     guardar();
     document.activeElement?.blur();
     render();
-    return mostrarAviso('Nome salvo.');
+    return mostrarAviso('Cadastro salvo.');
   }
   if (e.target.id === 'form-dias') return verNovaGrade(e.target);
   if (e.target.id === 'form-avulsa') return salvarAvulsa(e.target);

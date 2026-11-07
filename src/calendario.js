@@ -1,5 +1,6 @@
 // Calendário e totais de tudo o que foi feito, dentro ou fora da planilha. Funções puras.
 
+import { ehAniversario, idadeEm } from './aniversario.js';
 import { resumoPorCategoria } from './avulsas.js';
 import { segundaDaSemana, somarDias } from './motor.js';
 
@@ -21,7 +22,7 @@ function situacaoDoDia({ sessao, corridas, semDados, outras, data, hoje }) {
 }
 
 // Semanas inteiras, de segunda a domingo, para o mês caber na grade.
-export function gradeDoMes({ mes, sessoes = [], corridas = [], semDados = [], outras = [], hoje }) {
+export function gradeDoMes({ mes, sessoes = [], corridas = [], semDados = [], outras = [], nascimento = null, hoje }) {
   const primeiro = `${mes}-01`;
   const proximo = `${somarMeses(mes, 1)}-01`;
   const fim = somarDias(segundaDaSemana(somarDias(proximo, -1)), 7);
@@ -32,6 +33,7 @@ export function gradeDoMes({ mes, sessoes = [], corridas = [], semDados = [], ou
       data,
       doMes: mesDe(data) === mes,
       ehHoje: data === hoje,
+      aniversario: nascimento && ehAniversario(nascimento, data) ? idadeEm(nascimento, data) : null,
       sessao: sessoes.find((s) => s.data === data) ?? null,
       corridas: doDia(corridas, data),
       semDados: doDia(semDados, data),

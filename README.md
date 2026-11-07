@@ -34,6 +34,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/motor.js` | Ritmos (VDOT de Daniels e Gilbert), geração da planilha e revisão. Só funções puras. |
 | `src/analise.js` | Análise da corrida feita: tempo em cada ritmo, porcentagem na meta e estimativa anaeróbica. |
 | `src/avulsas.js` | Caminhadas e outros exercícios, do relógio ou lançados à mão. |
+| `src/aniversario.js` | Idade calculada pela data de nascimento e dia do aniversário. |
 | `src/calendario.js` | Calendário do mês e totais de tudo o que foi feito, dentro ou fora da planilha. |
 | `src/percurso.js` | Enquadramento do mapa e curvas de pace, frequência cardíaca e altitude. O percurso fica só na memória da tela. |
 | `src/provas.js` | Calendário de provas: principal, secundárias, volume comparado à referência e avisos de prazo. |
