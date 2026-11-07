@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { criarCliente, eventoDaSessao, normalizarAtividade, textoDoTreino } from '../src/icu.js';
+import { criarCliente, eventoDaSessao, faixaDoTreino, normalizarAtividade, notasDoTreino, textoDoTreino } from '../src/icu.js';
 import { formatarRitmo, gerarPlano } from '../src/motor.js';
 
 const sessaoForte = {
@@ -58,6 +58,52 @@ test('evento de treino e de prova', () => {
   const prova = eventoDaSessao({ id: 'pc-x', data: '2027-02-07', tipo: 'prova', nome: 'Prova', distanciaKm: 10, blocos: [] }, formatarRitmo);
   assert.equal(prova.category, 'RACE_A');
   assert.equal(prova.distance, 10000);
+});
+
+test('faixa do treino soma repetições, distância fixa e trechos por tempo', () => {
+  const sessao = {
+    blocos: [
+      { repeticoes: 1, passos: [{ km: 2, ritmo: { de: 300, ate: 360 } }] },
+      { repeticoes: 2, passos: [{ km: 1, ritmo: 240 }, { minutos: 1, ritmo: { de: 300, ate: 360 } }] },
+    ],
+  };
+  assert.deepEqual(faixaDoTreino(sessao), { distancia: '4,3 a 4,4 km', tempo: '20 a 22 min' });
+  const fixa = { blocos: [{ repeticoes: 1, passos: [{ km: 5, ritmo: 300 }] }] };
+  assert.deepEqual(faixaDoTreino(fixa), { distancia: '5 km', tempo: '25 min' });
+});
+
+test('as notas vêm inteiras no primeiro parágrafo, e os passos continuam intactos depois', () => {
+  const forte = {
+    ...sessaoForte,
+    porque: 'Eleva o ritmo.',
+    blocos: sessaoForte.blocos.map((b) => (b.repeticoes > 1
+      ? { ...b, passos: [{ ...b.passos[0], zona: 'limiar' }, { ...b.passos[1], zona: 'recuperacao' }] }
+      : b)),
+  };
+  const treino = eventoDaSessao(forte, formatarRitmo);
+  assert.match(treino.name, /^10\/11 Ter - .+ km - \d+( a \d+)? min$/);
+  const [notas, ...resto] = treino.description.split('\n\n');
+  assert.equal(resto.join('\n\n'), textoDoTreino(forte, formatarRitmo));
+  assert.match(notas, /Principal, repetir 4 vezes:\n• 1 km, Z4 Limiar \(4:15 min\/km\)\n• 1 min, Z1 Recuperação/);
+  assert.match(notas, /Tipo: Limiar\nTotal: .+\nPor que: Eleva o ritmo\.$/);
+});
+
+test('as notas nunca viram passo ou repetição no intervals.icu', () => {
+  const plano = gerarPlano({
+    perfil: { idade: 35, pesoKg: 72, alturaCm: 178, lesaoRecente: false, diasSemana: [1, 2, 4, 5, 6, 0], diaLongo: 0 },
+    objetivo: { distanciaKm: 42.2, dataProva: '2027-06-06' },
+    base: { kmSemana: 40, longoKm: 16 },
+    vdot: 50,
+    inicio: '2026-11-09',
+  });
+  for (const s of plano.sessoes.filter((x) => x.tipo !== 'prova')) {
+    const notas = notasDoTreino(s, formatarRitmo);
+    assert.doesNotMatch(notas, /undefined|NaN/);
+    for (const linha of notas.split('\n')) {
+      assert.doesNotMatch(linha, /^\s*-/, linha);
+      assert.doesNotMatch(linha, /\d\s*x\b/i, linha);
+    }
+  }
 });
 
 test('normaliza atividade da API', () => {

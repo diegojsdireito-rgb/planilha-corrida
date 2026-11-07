@@ -13,7 +13,7 @@ import {
 } from './estatisticas.js';
 import { abaDoGesto, ligarGestos, ligarPuxada } from './gestos.js';
 import { barrasDeVolume, linhaDeEvolucao } from './graficos.js';
-import { criarCliente, eventoDaSessao } from './icu.js';
+import { criarCliente, eventoDaSessao, faixaDoTreino } from './icu.js';
 import {
   analisarRevisao,
   aplicarRevisao,
@@ -69,7 +69,7 @@ let gradePendente = null;
 let avulsaAberta = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 16;
+const VERSAO_APP = 17;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -1103,7 +1103,7 @@ function telaDetalhe(sessao) {
       ${seloTipo(sessao.tipo)}
       ${perfilDoTreino(d)}
       <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
-      <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : 'Estimativa pelo meio das faixas de ritmo, com o seu nível atual.'}</p>
+      <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : `Estimativa pelo meio das faixas de ritmo, com o seu nível atual. Nessas faixas, o treino leva ${faixaDoTreino(sessao).tempo}.`}</p>
     </section>
     ${blocoMudarDia(sessao, dia)}
     ${estado.chaveApi ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}

@@ -1,5 +1,6 @@
 // Cliente do intervals.icu. A chave fica só no aparelho e vai só para intervals.icu.
 import { avulsaDoIntervals } from './avulsas.js';
+import { ZONAS } from './motor.js';
 
 const BASE = 'https://intervals.icu/api/v1/athlete/0';
 const BASE_ATIVIDADE = 'https://intervals.icu/api/v1/activity';
@@ -29,6 +30,70 @@ export function textoDoTreino(sessao, formatar) {
     .join('\n\n');
 }
 
+const DIAS_NO_TITULO = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const TIPOS_NAS_NOTAS = { leve: 'Corrida leve', longo: 'Longão', limiar: 'Limiar', intervalado: 'Intervalado', ritmo: 'Ritmo de prova' };
+
+const bordaDoRitmo = (ritmo) => (typeof ritmo === 'number' ? { de: ritmo, ate: ritmo } : ritmo);
+const umaCasa = (valor) => String(Math.round(valor * 10) / 10).replace('.', ',');
+
+// Quanto o treino pode durar e medir dentro das faixas de ritmo prescritas.
+export function faixaDoTreino(sessao) {
+  const soma = { kmMin: 0, kmMax: 0, segMin: 0, segMax: 0 };
+  for (const { repeticoes, passos } of sessao.blocos) {
+    for (const passo of passos) {
+      const { de, ate } = bordaDoRitmo(passo.ritmo);
+      const kmMin = passo.km ?? (passo.minutos * 60) / ate;
+      const kmMax = passo.km ?? (passo.minutos * 60) / de;
+      soma.kmMin += kmMin * repeticoes;
+      soma.kmMax += kmMax * repeticoes;
+      soma.segMin += (passo.km !== undefined ? passo.km * de : passo.minutos * 60) * repeticoes;
+      soma.segMax += (passo.km !== undefined ? passo.km * ate : passo.minutos * 60) * repeticoes;
+    }
+  }
+  const [kmDe, kmAte] = [umaCasa(soma.kmMin), umaCasa(soma.kmMax)];
+  const [minDe, minAte] = [Math.round(soma.segMin / 60), Math.round(soma.segMax / 60)];
+  return {
+    distancia: kmDe === kmAte ? `${kmDe} km` : `${kmDe} a ${kmAte} km`,
+    tempo: minDe === minAte ? `${minDe} min` : `${minDe} a ${minAte} min`,
+  };
+}
+
+function tituloDoTreino(sessao) {
+  const [, mes, dia] = sessao.data.split('-');
+  const semana = DIAS_NO_TITULO[new Date(`${sessao.data}T12:00:00Z`).getUTCDay()];
+  const { distancia, tempo } = faixaDoTreino(sessao);
+  return `${dia}/${mes} ${semana} - ${sessao.nome} - ${distancia} - ${tempo}`;
+}
+
+function textoDaIntensidade(ritmo, formatar) {
+  const { de, ate } = bordaDoRitmo(ritmo);
+  return de === ate ? `${formatar(de)} min/km` : `${formatar(de)} a ${formatar(ate)} min/km`;
+}
+
+function textoDoPasso(passo, formatar) {
+  const zona = ZONAS[passo.zona ?? 'leve'];
+  const duracao = passo.km !== undefined ? `${umaCasa(passo.km)} km` : `${passo.minutos} min`;
+  return `${duracao}, ${zona.codigo} ${zona.nome} (${textoDaIntensidade(passo.ritmo, formatar)})`;
+}
+
+// O Garmin recebeu nas Notas só o primeiro parágrafo da descrição, então tudo fica nele, antes
+// dos passos e sem linha em branco. Sem linha começando com "-" nem "3x" colado: no intervals.icu,
+// esses padrões viram passos e repetições.
+export function notasDoTreino(sessao, formatar) {
+  const linhas = sessao.blocos.flatMap((bloco) => {
+    if (bloco.repeticoes === 1 && bloco.passos.length === 1) return [`${bloco.rotulo}: ${textoDoPasso(bloco.passos[0], formatar)}`];
+    const titulo = bloco.repeticoes > 1 ? `${bloco.rotulo}, repetir ${bloco.repeticoes} vezes:` : `${bloco.rotulo}:`;
+    return [titulo, ...bloco.passos.map((p) => `• ${textoDoPasso(p, formatar)}`)];
+  });
+  const { distancia, tempo } = faixaDoTreino(sessao);
+  return [
+    ...linhas,
+    `Tipo: ${TIPOS_NAS_NOTAS[sessao.tipo]}`,
+    `Total: ${distancia}, ${tempo}`,
+    sessao.porque ? `Por que: ${sessao.porque}` : null,
+  ].filter(Boolean).join('\n');
+}
+
 export function eventoDaSessao(sessao, formatar) {
   const comum = {
     type: 'Run',
@@ -39,7 +104,12 @@ export function eventoDaSessao(sessao, formatar) {
   if (sessao.tipo === 'prova') {
     return { ...comum, category: 'RACE_A', distance: sessao.distanciaKm * 1000 };
   }
-  return { ...comum, category: 'WORKOUT', description: textoDoTreino(sessao, formatar) };
+  return {
+    ...comum,
+    name: tituloDoTreino(sessao),
+    category: 'WORKOUT',
+    description: `${notasDoTreino(sessao, formatar)}\n\n${textoDoTreino(sessao, formatar)}`,
+  };
 }
 
 export function normalizarAtividade(a) {
