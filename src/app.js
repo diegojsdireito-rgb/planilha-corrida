@@ -69,7 +69,7 @@ let gradePendente = null;
 let avulsaAberta = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 17;
+const VERSAO_APP = 18;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -322,6 +322,7 @@ const PASSOS_DA_CHAVE = `
     <li>Crie uma conta gratuita no <a href="https://intervals.icu" target="_blank" rel="noopener">intervals.icu</a>.</li>
     <li>Em Settings, conecte o Garmin diretamente, não pelo Strava, e ligue Upload planned workouts.</li>
     <li>Em Settings, Developer Settings, gere a chave de API e cole aqui. Não passe essa chave a ninguém.</li>
+    <li>Depois de gerar a planilha, em Settings, na parte de corrida (Run), preencha Threshold Pace com o seu ritmo de Limiar, que aparece nos Ajustes do app. Sem isso, o relógio pode não receber o alvo de pace.</li>
   </ol>`;
 
 function telaCadastro(valores = {}) {

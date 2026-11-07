@@ -21,6 +21,7 @@ npm test
 1. Crie a conta no intervals.icu e conecte o Garmin **diretamente**, em Settings. Corridas que entram só pelo Strava não ficam disponíveis pela API.
 2. Na mesma conexão, ligue **Upload planned workouts**.
 3. Em Settings, Developer Settings, gere a chave de API e cole no app, em Ajustes.
+4. Em Settings, na parte de corrida (Run), preencha Threshold Pace com o ritmo de Limiar mostrado em Ajustes. Usuários do fórum do intervals.icu relatam que, sem isso, o alvo de pace não chega ao Garmin.
 
 ## Instalar no iPhone
 
