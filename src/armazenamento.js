@@ -7,6 +7,7 @@ export const estadoInicial = () => ({
   chaveApi: '',
   nome: '',
   nascimento: null,
+  historicoPeso: [],
   perfil: null,
   objetivo: null,
   provas: [],

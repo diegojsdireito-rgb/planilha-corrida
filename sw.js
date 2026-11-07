@@ -1,6 +1,6 @@
 // Abre sem internet. Só guarda os arquivos do próprio app: nada do intervals.icu passa por aqui.
 
-const VERSAO = 'corrida-v2.8';
+const VERSAO = 'corrida-v2.9';
 const ARQUIVOS = [
   './',
   'index.html',
@@ -20,6 +20,7 @@ const ARQUIVOS = [
   'src/medalhas.js',
   'src/motor.js',
   'src/percurso.js',
+  'src/peso.js',
   'src/provas.js',
   'src/regras.js',
   'src/visual.js',

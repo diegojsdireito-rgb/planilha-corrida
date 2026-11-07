@@ -37,7 +37,8 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/aniversario.js` | Idade calculada pela data de nascimento e dia do aniversário. |
 | `src/calendario.js` | Calendário do mês e totais de tudo o que foi feito, dentro ou fora da planilha. |
 | `src/medalhas.js` | Conquistas: recordes, marcos, datas especiais, constância semanal e provas, além do resumo que guarda as corridas com mais de 12 meses. |
-| `src/percurso.js` | Enquadramento do mapa e curvas de pace, frequência cardíaca e altitude. O percurso fica só na memória da tela. |
+| `src/peso.js` | Histórico de peso e IMC, com as faixas da OMS. |
+| `src/percurso.js` | Enquadramento do mapa, voltas, parciais por km e curvas de pace, frequência cardíaca e altitude. O percurso fica só na memória da tela. |
 | `src/provas.js` | Calendário de provas: principal, secundárias, volume comparado à referência e avisos de prazo. |
 | `src/regras.js` | Origem de cada regra (estudo, treinador ou decisão do app) mostrada em Ajustes. |
 | `src/icu.js` | Leitura de corridas e envio de treinos ao intervals.icu. |

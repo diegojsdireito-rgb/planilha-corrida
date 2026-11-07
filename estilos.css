@@ -161,6 +161,14 @@ p { margin: 0 0 8px; }
 .medalha-recente { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
 .medalha-recente small { font-size: .7rem; line-height: 1.2; color: var(--suave); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.voltas-rolagem { overflow-x: auto; margin-top: 8px; }
+.voltas { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.voltas th { padding: 6px 4px; border-bottom: 1px solid var(--borda); font-size: .75rem; font-weight: 600; color: var(--suave); text-align: right; }
+.voltas td { padding: 8px 4px; border-bottom: 1px solid var(--borda); text-align: right; }
+.voltas th:first-child, .voltas td:first-child { text-align: left; color: var(--suave); }
+.voltas tr.volta-melhor td { background: var(--marca-suave); font-weight: 700; }
+.voltas tr.volta-recuperacao td { color: var(--suave); }
+#form-peso { padding-bottom: 8px; }
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }

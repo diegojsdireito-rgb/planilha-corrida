@@ -179,9 +179,10 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
     // Curvas e percurso. Atividade sem GPS não tem mapa, e isso não pode derrubar as curvas.
     async percursoDaAtividade(id) {
       const base = `${BASE_ATIVIDADE}/${encodeURIComponent(id)}`;
-      const [curvas, mapa] = await Promise.allSettled([
+      const [curvas, mapa, voltas] = await Promise.allSettled([
         chamar(`${base}/streams.json?types=time,distance,velocity_smooth,heartrate,altitude`).then((r) => r.json()),
         chamar(`${base}/map`).then((r) => r.json()),
+        chamar(`${base}/intervals`).then((r) => r.json()),
       ]);
       if (curvas.status === 'rejected' && mapa.status === 'rejected') throw curvas.reason;
       const lista = curvas.status === 'fulfilled' ? curvas.value : [];
@@ -196,6 +197,7 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
         fc: dados('heartrate'),
         altitude: dados('altitude'),
         latlngs: mapa.status === 'fulfilled' ? mapa.value?.latlngs ?? null : null,
+        intervalos: voltas.status === 'fulfilled' ? voltas.value?.icu_intervals ?? [] : [],
       };
     },
 

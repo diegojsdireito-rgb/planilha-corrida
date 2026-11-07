@@ -16,7 +16,8 @@ import {
 import { abaDoGesto, ligarGestos, ligarPuxada } from './gestos.js';
 import { barrasDeVolume, curvaDaAtividade, linhaDeEvolucao } from './graficos.js';
 import { arquivarCorridas, calcularMedalhas, chavesConquistadas, GRUPOS, juntarCorridas, medalhasNovas, situacaoDasSemanas } from './medalhas.js';
-import { curvasDaAtividade, enquadrarMapa, pontosDoMapa } from './percurso.js';
+import { curvasDaAtividade, enquadrarMapa, parciaisPorKm, pontosDoMapa, voltasDaAtividade } from './percurso.js';
+import { erroDoPeso, registrarPeso, resumoDoPeso, imcDe } from './peso.js';
 import { criarCliente, eventoDaSessao, faixaDoTreino } from './icu.js';
 import {
   analisarRevisao,
@@ -96,7 +97,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '2.8';
+const VERSAO_APP = '2.9';
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -550,6 +551,7 @@ async function enviarCadastro(evento) {
         chaveApi: chave,
         nome: String(form.get('nome') ?? '').trim(),
         nascimento,
+        historicoPeso: registrarPeso(estado.historicoPeso, { data: dia, kg: pesoKg }),
         perfil,
         objetivo,
         tempoInformado,
@@ -1210,6 +1212,60 @@ function htmlDasCurvas(dados, categoria) {
   return graficos.map(([titulo, nota, grafico]) => `<h3>${titulo}</h3>${nota ? `<p class="suave">${nota}</p>` : ''}${grafico}`).join('');
 }
 
+function tabelaDeVoltas(linhas, categoria, titulo) {
+  const noPace = categoria === 'corrida' || categoria === 'caminhada' || categoria === 'trilha';
+  const naBicicleta = categoria === 'bicicleta';
+  const temFc = linhas.some((l) => l.fc);
+  const velocidadeDe = (l) => (noPace ? formatarRitmo(l.seg / l.km) : `${numeroKm(l.km / (l.seg / 3600))}`);
+  const validas = linhas.filter((l) => l.km >= 0.5);
+  const melhor = noPace || naBicicleta ? validas.reduce((m, l) => (!m || l.seg / l.km < m.seg / m.km ? l : m), null) : null;
+  return `
+    <div class="voltas-rolagem" data-sem-gesto>
+      <table class="voltas" aria-label="${esc(titulo)}">
+        <thead><tr><th>Nº</th><th>Dist.</th><th>Tempo</th>${noPace ? '<th>Pace</th>' : naBicicleta ? '<th>km/h</th>' : ''}${temFc ? '<th>FC</th>' : ''}</tr></thead>
+        <tbody>${linhas.map((l, i) => `
+          <tr class="${l === melhor && linhas.length > 1 ? 'volta-melhor' : ''}${l.recuperacao ? ' volta-recuperacao' : ''}">
+            <td>${i + 1}</td>
+            <td>${String(Math.round(l.km * 100) / 100).replace('.', ',')}</td>
+            <td>${formatarDuracaoCurta(l.seg)}</td>
+            ${noPace || naBicicleta ? `<td>${velocidadeDe(l)}</td>` : ''}
+            ${temFc ? `<td>${l.fc ? Math.round(l.fc) : ''}</td>` : ''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${melhor && linhas.length > 1 ? '<p class="suave mapa-nota">Em destaque, a mais rápida.</p>' : ''}`;
+}
+
+const formatarDuracaoCurta = (seg) => {
+  const total = Math.round(seg);
+  const horas = Math.floor(total / 3600);
+  const minutos = Math.floor((total % 3600) / 60);
+  const segundos = String(total % 60).padStart(2, '0');
+  return horas ? `${horas}:${String(minutos).padStart(2, '0')}:${segundos}` : `${minutos}:${segundos}`;
+};
+
+function htmlDasVoltas(dados, categoria) {
+  const voltas = voltasDaAtividade(dados.intervalos);
+  const parciais = parciaisPorKm(dados);
+  if (voltas.length >= 2) {
+    return `
+      <h2 style="margin-top:18px">Voltas</h2>
+      ${tabelaDeVoltas(voltas, categoria, 'Voltas da atividade')}
+      <p class="suave mapa-nota">Conforme o intervals.icu, em km, minutos e bpm.</p>
+      ${parciais.length ? `
+        <details class="tabela-grafico">
+          <summary>Ver parciais por km</summary>
+          ${tabelaDeVoltas(parciais, categoria, 'Parciais por quilômetro')}
+        </details>` : ''}`;
+  }
+  if (!parciais.length) return '';
+  return `
+    <h2 style="margin-top:18px">Parciais por km</h2>
+    ${tabelaDeVoltas(parciais, categoria, 'Parciais por quilômetro')}
+    <p class="suave mapa-nota">Calculadas pelas curvas do relógio, sem contar paradas.</p>`;
+}
+
 function blocoPercurso(a) {
   if (!a.id || !estado.chaveApi) return '';
   const atributo = `data-percurso="${esc(a.id)}"`;
@@ -1226,10 +1282,12 @@ function blocoPercurso(a) {
   if (!dados) return `<section class="cartao" ${atributo}><h2>Mapa e gráficos</h2><p class="suave">Buscando no intervals.icu...</p></section>`;
   const mapa = htmlDoMapa(dados.latlngs);
   const curvas = htmlDasCurvas(dados, a.categoria ?? 'corrida');
-  if (!mapa && !curvas) return `<section class="cartao" ${atributo}><h2>Mapa e gráficos</h2><p class="suave">O relógio não gravou percurso nem curvas nesta atividade.</p></section>`;
+  const voltas = htmlDasVoltas(dados, a.categoria ?? 'corrida');
+  if (!mapa && !curvas && !voltas) return `<section class="cartao" ${atributo}><h2>Mapa e gráficos</h2><p class="suave">O relógio não gravou percurso nem curvas nesta atividade.</p></section>`;
   return `
     <section class="cartao" ${atributo}>
       ${mapa ? `<h2>Percurso</h2>${mapa}` : '<h2>Gráficos</h2><p class="suave">Sem percurso de GPS nesta atividade.</p>'}
+      ${voltas}
       ${mapa && curvas ? '<h2 style="margin-top:18px">Gráficos</h2>' : ''}
       ${curvas}
     </section>`;
@@ -1299,7 +1357,7 @@ function telaAtividade(a) {
     ${nota ? `<section class="cartao"><p class="suave" style="margin:0">${esc(nota)}</p></section>` : ''}
     <section class="cartao">
       <h2>Mais detalhes</h2>
-      <p class="suave">Análises completas, como potência e voltas, ficam no intervals.icu.</p>
+      <p class="suave">As análises completas ficam no intervals.icu.</p>
       <a class="botao-link" href="https://intervals.icu/activities/${encodeURIComponent(a.id)}" target="_blank" rel="noopener noreferrer">Abrir no intervals.icu</a>
       ${estado.chaveApi && a.tipoDaAtividade !== 'semDados' ? `
         <div class="botoes" style="margin-top:10px">
@@ -1448,6 +1506,60 @@ function blocoFeitoHoje(dia) {
       ${semDados.map(linhaSemDados).join('')}
       <button style="margin-top:8px" data-acao="ver-calendario">Ver no calendário</button>
     </section>`;
+}
+
+// ---------- Peso e IMC ----------
+
+const numeroPeso = (kg) => String(kg).replace('.', ',');
+
+function blocoPeso() {
+  const { perfil } = estado;
+  const lista = estado.historicoPeso;
+  const r = resumoDoPeso(lista, perfil.alturaCm);
+  if (!r) return '';
+  const sinal = (v) => (v > 0 ? `+${numeroPeso(v)}` : numeroPeso(v));
+  const grafPeso = linhaDeEvolucao(lista.map((p) => ({ data: p.data, valor: p.kg })), { nome: 'Peso', formatar: (v) => `${v.toFixed(1).replace('.', ',')} kg`, formatarEixo: (v) => v.toFixed(1).replace('.', ','), menorEhMelhor: false, passoMinimo: 0.5 });
+  const grafImc = linhaDeEvolucao(lista.map((p) => ({ data: p.data, valor: imcDe(p.kg, perfil.alturaCm) })), { nome: 'IMC', formatar: (v) => v.toFixed(1).replace('.', ','), passoMinimo: 0.2 });
+  return `
+    <section class="cartao" id="peso">
+      <h2>Peso e IMC</h2>
+      <div class="numeros numeros-2">
+        <div><b>${numeroPeso(r.atual.kg)} kg</b><span>Peso em ${dataCompleta(r.atual.data)}</span></div>
+        <div><b>${numeroPeso(r.imc)}</b><span>IMC, ${esc(r.classe.toLowerCase())}</span></div>
+      </div>
+      ${r.variacaoKg === null
+        ? '<p class="suave" style="margin-top:12px">Registre o peso de novo quando mudar, para acompanhar a evolução.</p>'
+        : `<p class="suave" style="margin-top:12px">Desde ${dataCompleta(r.primeiro.data)}: ${sinal(r.variacaoKg)} kg e ${sinal(r.variacaoImc)} de IMC.</p>`}
+      ${grafPeso ? `<h3>Peso</h3>${grafPeso}` : ''}
+      ${grafImc ? `<h3>IMC</h3>${grafImc}` : ''}
+      <details class="tabela-grafico">
+        <summary>Registrar peso</summary>
+        <form id="form-peso">
+          <div class="linha">
+            <label>Peso (kg)<input name="kg" inputmode="decimal" placeholder="Ex.: 72,5" required></label>
+            <label>Data<input name="data" type="date" max="${hoje()}" value="${hoje()}" required></label>
+          </div>
+          <button class="principal" type="submit" style="margin-top:10px">Salvar peso</button>
+        </form>
+      </details>
+      <details class="tabela-grafico">
+        <summary>Ver registros (${lista.length})</summary>
+        ${[...lista].reverse().map((p) => `
+          <div class="avulsa-linha">
+            <span class="sessao-corpo"><strong>${numeroPeso(p.kg)} kg</strong><span class="suave">${dataCompleta(p.data)}, IMC ${numeroPeso(imcDe(p.kg, perfil.alturaCm))}</span></span>
+            ${lista.length > 1 ? `<button data-remover-peso="${esc(p.data)}" aria-label="Apagar o registro de ${dataCompleta(p.data)}">Apagar</button>` : ''}
+          </div>`).join('')}
+      </details>
+      <p class="suave" style="margin:10px 0 0">O IMC usa sua altura de ${esc(perfil.alturaCm)} cm e é só uma referência: não separa músculo de gordura. A carga da planilha só considera o peso novo quando ela é refeita.</p>
+    </section>`;
+}
+
+// Quem já tinha cadastro começa o histórico com o peso informado. O último registro é o peso atual.
+function atualizarPeso() {
+  if (!estado.perfil) return;
+  if (!estado.historicoPeso?.length) estado.historicoPeso = registrarPeso([], { data: hoje(), kg: estado.perfil.pesoKg });
+  const atual = estado.historicoPeso.at(-1).kg;
+  if (estado.perfil.pesoKg !== atual) estado.perfil = { ...estado.perfil, pesoKg: atual };
 }
 
 // ---------- Conquistas ----------
@@ -1742,7 +1854,7 @@ function telaEvolucao() {
         <h2>Ainda não há corridas</h2>
         <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
       </section>
-      ${blocoConquistas()}${blocoCalendario(dia)}${blocoOutrasNaEvolucao(dia)}${blocoProvasRealizadas()}${atualizacao}${blocoPrevisoes}`;
+      ${blocoConquistas()}${blocoPeso()}${blocoCalendario(dia)}${blocoOutrasNaEvolucao(dia)}${blocoProvasRealizadas()}${atualizacao}${blocoPrevisoes}`;
   }
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
@@ -1780,6 +1892,7 @@ function telaEvolucao() {
       <p style="margin:14px 0 0">${comparacao(atual.km, anterior.km)}.</p>
     </section>
     ${blocoConquistas()}
+    ${blocoPeso()}
     ${blocoCalendario(dia)}
     ${blocoOutrasNaEvolucao(dia)}
     <section class="cartao">
@@ -2198,8 +2311,8 @@ function telaAjustes() {
     </section>
     <section class="cartao">
       <h2>Perfil</h2>
-      <p>${perfil.idade} anos, ${esc(perfil.pesoKg)} kg, ${esc(perfil.alturaCm)} cm${plano.prudencia?.imc ? `, IMC ${String(plano.prudencia.imc).replace('.', ',')}` : ''}</p>
-      <p class="suave">Para mudar perfil ou objetivo, comece um novo ciclo.</p>
+      <p>${perfil.idade} anos, ${numeroPeso(perfil.pesoKg)} kg, ${esc(perfil.alturaCm)} cm, IMC ${numeroPeso(imcDe(perfil.pesoKg, perfil.alturaCm))}</p>
+      <p class="suave">O peso se registra em Evolução, em Peso e IMC. Para mudar altura ou objetivo, comece um novo ciclo.</p>
     </section>
     <form class="cartao" id="form-chave">
       <h2>Intervals.icu</h2>
@@ -2260,6 +2373,7 @@ function atualizarIdade() {
 
 function render() {
   atualizarIdade();
+  atualizarPeso();
   if (!estado.plano && !estado.avisoCiente) return telaBoasVindas();
   if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
@@ -2507,7 +2621,7 @@ const acoes = {
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
     arquivarHistorico();
-    const { arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       peso: perfil.pesoKg,
       altura: perfil.alturaCm,
@@ -2519,7 +2633,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -2544,6 +2658,15 @@ app.addEventListener('click', (e) => {
   if (diaDoCalendario) {
     diaVisto = diaDoCalendario.dataset.diaCalendario;
     mesVisto = mesDe(diaVisto);
+    renderMantendoRolagem();
+    return;
+  }
+  const removerPeso = e.target.closest('[data-remover-peso]');
+  if (removerPeso) {
+    if (!window.confirm('Apagar este registro de peso? Não dá para desfazer.')) return;
+    estado.historicoPeso = estado.historicoPeso.filter((p) => p.data !== removerPeso.dataset.removerPeso);
+    atualizarPeso();
+    guardar();
     renderMantendoRolagem();
     return;
   }
@@ -2661,6 +2784,18 @@ app.addEventListener('submit', (e) => {
     document.activeElement?.blur();
     render();
     return mostrarAviso('Cadastro salvo.');
+  }
+  if (e.target.id === 'form-peso') {
+    const dados = new FormData(e.target);
+    const registro = { kg: numero(dados, 'kg'), data: String(dados.get('data') ?? '') };
+    const erro = erroDoPeso(registro, hoje());
+    if (erro) return mostrarAviso(erro);
+    estado.historicoPeso = registrarPeso(estado.historicoPeso, registro);
+    atualizarPeso();
+    guardar();
+    document.activeElement?.blur();
+    renderMantendoRolagem();
+    return mostrarAviso('Peso registrado.');
   }
   if (e.target.id === 'form-dias') return verNovaGrade(e.target);
   if (e.target.id === 'form-avulsa') return salvarAvulsa(e.target);

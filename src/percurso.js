@@ -57,6 +57,52 @@ export function enquadrarMapa(pontos, { largura = 340, altura = 240, margem = 24
   return { zoom, largura, altura, tamanhoDoBloco: TAMANHO_DO_BLOCO, blocos, traco };
 }
 
+// Voltas como o intervals.icu as entrega. Trecho sem distância ou sem tempo não é volta.
+export function voltasDaAtividade(intervalos) {
+  return (intervalos ?? [])
+    .filter((v) => v.distance > 0 && v.moving_time > 0)
+    .map((v) => ({
+      km: v.distance / 1000,
+      seg: v.moving_time,
+      fc: v.average_heartrate ?? null,
+      subida: v.total_elevation_gain ?? null,
+      recuperacao: v.type === 'RECOVERY',
+      rotulo: v.label ?? null,
+    }));
+}
+
+const LACUNA_MAXIMA = 10; // segundos: gravação interrompida não conta como tempo correndo.
+const RESTO_MINIMO_KM = 0.1;
+
+// Cada quilômetro, calculado pelas curvas. Parada não entra no tempo, como no resto do app.
+export function parciaisPorKm({ tempo, distancia, velocidade, fc }) {
+  if (!distancia?.length || !tempo?.length) return [];
+  const parciais = [];
+  let km = 1;
+  let inicioKm = 0;
+  let seg = 0;
+  let batimentos = [];
+  const fechar = (fim) => {
+    parciais.push({ km: fim - inicioKm, seg, fc: media(batimentos) });
+    inicioKm = fim;
+    seg = 0;
+    batimentos = [];
+  };
+  for (let i = 1; i < distancia.length; i++) {
+    const passo = Math.min((tempo[i] ?? 0) - (tempo[i - 1] ?? 0), LACUNA_MAXIMA);
+    const parado = velocidade ? !(velocidade[i] >= VELOCIDADE_MINIMA) : false;
+    if (passo > 0 && !parado) seg += passo;
+    if (fc?.[i] > 0) batimentos.push(fc[i]);
+    if (distancia[i] / 1000 >= km) {
+      fechar(km);
+      km += 1;
+    }
+  }
+  const total = (distancia.at(-1) ?? 0) / 1000;
+  if (total - inicioKm >= RESTO_MINIMO_KM && seg > 0) fechar(total);
+  return parciais.filter((p) => p.seg > 0);
+}
+
 const media = (lista) => (lista.length ? lista.reduce((t, v) => t + v, 0) / lista.length : null);
 
 // Agrupa as amostras em trechos, para o gráfico não carregar milhares de pontos.
