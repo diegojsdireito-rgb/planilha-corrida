@@ -2,7 +2,7 @@
 
 App web gratuito, instalável no iPhone, que monta uma planilha de corrida e a ajusta pelo que foi realmente treinado. Os dados do Garmin chegam pelo [intervals.icu](https://intervals.icu), que também leva os treinos ao relógio.
 
-Não tem servidor próprio, banco de dados nem login: tudo fica no aparelho de cada pessoa, e quem tiver o link pode usar. A chave de API só é enviada ao intervals.icu e não entra na cópia de segurança.
+Não tem servidor próprio, banco de dados nem login: tudo fica no aparelho de cada pessoa, e quem tiver o link pode usar. A chave de API só é enviada ao intervals.icu e não entra na cópia de segurança. O fundo dos mapas vem do OpenStreetMap, que recebe a região exibida, não o percurso.
 
 ## Rodar no computador
 
@@ -35,6 +35,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/analise.js` | Análise da corrida feita: tempo em cada ritmo, porcentagem na meta e estimativa anaeróbica. |
 | `src/avulsas.js` | Caminhadas e outros exercícios, do relógio ou lançados à mão. |
 | `src/calendario.js` | Calendário do mês e totais de tudo o que foi feito, dentro ou fora da planilha. |
+| `src/percurso.js` | Enquadramento do mapa e curvas de pace, frequência cardíaca e altitude. O percurso fica só na memória da tela. |
 | `src/provas.js` | Calendário de provas: principal, secundárias, volume comparado à referência e avisos de prazo. |
 | `src/regras.js` | Origem de cada regra (estudo, treinador ou decisão do app) mostrada em Ajustes. |
 | `src/icu.js` | Leitura de corridas e envio de treinos ao intervals.icu. |

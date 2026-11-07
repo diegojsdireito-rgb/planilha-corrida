@@ -115,6 +115,19 @@ p { margin: 0 0 8px; }
 .cal-ponto.outra { background: var(--z-longo); }
 .botao-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--borda); border-radius: 13px; color: var(--texto); font-weight: 600; text-decoration: none; }
 .avulsa-linha > .icone { flex: none; width: 16px; height: 16px; color: var(--suave); }
+.mapa { position: relative; overflow: hidden; aspect-ratio: 340 / 240; margin-top: 8px; border-radius: 14px; background: var(--borda); }
+.mapa img { position: absolute; max-width: none; }
+.mapa svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mapa polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.mapa-contorno { stroke: #fff; stroke-width: 6; }
+.mapa-traco { stroke: #c8421f; stroke-width: 3.5; }
+.mapa-inicio { fill: #fff; stroke: #181b22; stroke-width: 2.5; }
+.mapa-fim { fill: #c8421f; stroke: #fff; stroke-width: 2.5; }
+.mapa-nota { margin: 8px 0 0; font-size: .78rem; }
+.mapa-nota a { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .mapa img { filter: brightness(.8) contrast(1.05); }
+}
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }

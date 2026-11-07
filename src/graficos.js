@@ -96,6 +96,53 @@ export function barrasDeVolume(semanas, formatarKm) {
   return figura(svg, legenda, tabela(['Semana', 'Corrido', 'Previsto'], linhas));
 }
 
+const MAXIMO_NA_TABELA = 12;
+const numeroDoEixo = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
+
+// Curva de uma atividade. pontos: [{ x, valor }], com x em km ou minutos; valor nulo deixa um vão.
+export function curvaDaAtividade(pontos, { nome, eixo, formatar, formatarEixo = formatar, menorEhMelhor = false, passoMinimo = 0 }) {
+  const validos = pontos.filter((p) => p.valor !== null);
+  if (validos.length < 2) return '';
+  const valores = validos.map((p) => p.valor);
+  const menor = Math.min(...valores);
+  const maior = Math.max(...valores);
+  const folga = Math.max((maior - menor) * 0.15, passoMinimo);
+  const minimo = menor - folga;
+  const maximo = maior + folga;
+  const xMaximo = pontos.at(-1).x || 1;
+  const posX = (x) => MARGEM.esquerda + (x / xMaximo) * AREA_X;
+  const proporcao = (v) => (v - minimo) / (maximo - minimo);
+  const y = (v) => (menorEhMelhor ? MARGEM.topo + proporcao(v) * AREA_Y : BASE - proporcao(v) * AREA_Y);
+
+  let caminho = '';
+  let continuando = false;
+  for (const p of pontos) {
+    if (p.valor === null) {
+      continuando = false;
+      continue;
+    }
+    caminho += `${continuando ? 'L' : 'M'}${posX(p.x).toFixed(1)} ${y(p.valor).toFixed(1)}`;
+    continuando = true;
+  }
+  const rotulo = (x) => `${numeroDoEixo(x)} ${eixo}`;
+  const marcasX = [[0, 'start'], [xMaximo / 2, 'middle'], [xMaximo, 'end']]
+    .map(([x, ancora]) => `<text class="g-texto" x="${posX(x).toFixed(1)}" y="${ALTURA - 8}" text-anchor="${ancora}">${rotulo(x)}</text>`)
+    .join('');
+  const toques = pontos.map((p, i) => {
+    if (p.valor === null) return '';
+    const inicio = i === 0 ? 0 : (pontos[i - 1].x + p.x) / 2;
+    const fim = i === pontos.length - 1 ? xMaximo : (p.x + pontos[i + 1].x) / 2;
+    return `<rect class="g-toque" data-dica="${rotulo(p.x)}: ${formatar(p.valor)}" x="${posX(inicio).toFixed(1)}" y="${MARGEM.topo}" width="${Math.max(posX(fim) - posX(inicio), 0.5).toFixed(1)}" height="${AREA_Y + MARGEM.baixo}"/>`;
+  }).join('');
+  const svg = moldura(
+    grade([menor, maior], y, formatarEixo) + marcasX + `<path class="g-linha" d="${caminho}"/>${toques}`,
+    `${nome}, de ${formatar(menor)} a ${formatar(maior)}`,
+  );
+  const passo = Math.max(1, Math.ceil(validos.length / MAXIMO_NA_TABELA));
+  const linhas = validos.filter((_, i) => i % passo === 0).map((p) => [rotulo(p.x), formatar(p.valor)]);
+  return figura(svg, '', tabela([eixo === 'km' ? 'Distância' : 'Tempo', nome], linhas));
+}
+
 // pontos: [{ data, valor }]; valor nulo interrompe a linha em vez de cair a zero.
 export function linhaDeEvolucao(pontos, { nome, formatar, formatarEixo = formatar, menorEhMelhor = false, passoMinimo = 0 }) {
   const validos = pontos.filter((p) => p.valor !== null);

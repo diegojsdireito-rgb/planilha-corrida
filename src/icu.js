@@ -176,6 +176,29 @@ export function criarCliente({ chave, buscar = (...args) => fetch(...args) }) {
       return velocidade?.length ? { tempo: dados('time'), velocidade } : null;
     },
 
+    // Curvas e percurso. Atividade sem GPS não tem mapa, e isso não pode derrubar as curvas.
+    async percursoDaAtividade(id) {
+      const base = `${BASE_ATIVIDADE}/${encodeURIComponent(id)}`;
+      const [curvas, mapa] = await Promise.allSettled([
+        chamar(`${base}/streams.json?types=time,distance,velocity_smooth,heartrate,altitude`).then((r) => r.json()),
+        chamar(`${base}/map`).then((r) => r.json()),
+      ]);
+      if (curvas.status === 'rejected' && mapa.status === 'rejected') throw curvas.reason;
+      const lista = curvas.status === 'fulfilled' ? curvas.value : [];
+      const dados = (tipo) => {
+        const serie = lista.find((s) => s.type === tipo);
+        return !serie || serie.allNull ? null : serie.data ?? null;
+      };
+      return {
+        tempo: dados('time'),
+        distancia: dados('distance'),
+        velocidade: dados('velocity_smooth'),
+        fc: dados('heartrate'),
+        altitude: dados('altitude'),
+        latlngs: mapa.status === 'fulfilled' ? mapa.value?.latlngs ?? null : null,
+      };
+    },
+
     // Atividades que vieram só do Strava chegam sem dados pela API, por decisão do Strava.
     async atividades(de, ate) {
       const lista = await pedir(`/activities?oldest=${de}&newest=${ate}&fields=${CAMPOS_ATIVIDADE}`);

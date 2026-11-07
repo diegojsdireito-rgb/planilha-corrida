@@ -13,7 +13,8 @@ import {
   zonasDoPeriodo,
 } from './estatisticas.js';
 import { abaDoGesto, ligarGestos, ligarPuxada } from './gestos.js';
-import { barrasDeVolume, linhaDeEvolucao } from './graficos.js';
+import { barrasDeVolume, curvaDaAtividade, linhaDeEvolucao } from './graficos.js';
+import { curvasDaAtividade, enquadrarMapa, pontosDoMapa } from './percurso.js';
 import { criarCliente, eventoDaSessao, faixaDoTreino } from './icu.js';
 import {
   analisarRevisao,
@@ -91,7 +92,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 24;
+const VERSAO_APP = 25;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -1105,6 +1106,100 @@ function atividadePorId(id) {
   return outra ? { ...outra, seg: outra.seg ?? outra.minutos * 60, tipoDaAtividade: 'outra' } : null;
 }
 
+// O percurso revela onde a pessoa mora e corre: fica só na memória, nunca no armazenamento nem na cópia.
+const percursos = new Map();
+const percursosEmAndamento = new Set();
+const errosDePercurso = new Map();
+
+function htmlDoMapa(latlngs) {
+  const mapa = enquadrarMapa(pontosDoMapa(latlngs));
+  if (!mapa) return '';
+  const { largura, altura, tamanhoDoBloco, blocos, traco } = mapa;
+  const pct = (valor, total) => `${((valor / total) * 100).toFixed(3)}%`;
+  const imagens = blocos.map((b) => `<img alt="" loading="lazy" src="https://tile.openstreetmap.org/${b.z}/${b.x}/${b.y}.png" style="left:${pct(b.esquerda, largura)};top:${pct(b.topo, altura)};width:${pct(tamanhoDoBloco + 0.6, largura)};height:${pct(tamanhoDoBloco + 0.6, altura)}">`).join('');
+  const linha = traco.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const [inicio, fim] = [traco[0], traco.at(-1)];
+  return `
+    <div class="mapa" role="img" aria-label="Mapa do percurso da atividade">
+      ${imagens}
+      <svg viewBox="0 0 ${largura} ${altura}" aria-hidden="true">
+        <polyline class="mapa-contorno" points="${linha}"/>
+        <polyline class="mapa-traco" points="${linha}"/>
+        <circle class="mapa-fim" cx="${fim[0].toFixed(1)}" cy="${fim[1].toFixed(1)}" r="6"/>
+        <circle class="mapa-inicio" cx="${inicio[0].toFixed(1)}" cy="${inicio[1].toFixed(1)}" r="6"/>
+      </svg>
+    </div>
+    <p class="suave mapa-nota">Círculo branco: início. Círculo colorido: fim. Mapa: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© colaboradores do OpenStreetMap</a>, que recebe a região exibida para entregar o fundo. O percurso em si não é enviado.</p>`;
+}
+
+function htmlDasCurvas(dados, categoria) {
+  const curvas = curvasDaAtividade(dados);
+  if (!curvas) return '';
+  const { eixo, pontos } = curvas;
+  const serie = (valorDe) => pontos.map((p) => ({ x: p.x, valor: valorDe(p) }));
+  const graficos = [];
+  const naBicicleta = categoria === 'bicicleta';
+  if (categoria === 'corrida' || categoria === 'caminhada' || categoria === 'trilha') {
+    const grafico = curvaDaAtividade(serie((p) => (p.velocidade ? 1000 / p.velocidade : null)), {
+      nome: 'Pace', eixo, menorEhMelhor: true, passoMinimo: 5,
+      formatar: (v) => `${formatarRitmo(v)}/km`, formatarEixo: formatarRitmo,
+    });
+    if (grafico) graficos.push(['Pace', 'Mais rápido fica no alto. Paradas deixam um vão na linha.', grafico]);
+  } else if (naBicicleta) {
+    const grafico = curvaDaAtividade(serie((p) => (p.velocidade ? p.velocidade * 3.6 : null)), {
+      nome: 'Velocidade', eixo, passoMinimo: 1, formatar: (v) => `${numeroKm(v)} km/h`, formatarEixo: (v) => numeroKm(v),
+    });
+    if (grafico) graficos.push(['Velocidade', '', grafico]);
+  }
+  const fc = curvaDaAtividade(serie((p) => p.fc), { nome: 'FC', eixo, passoMinimo: 2, formatar: (v) => `${Math.round(v)} bpm`, formatarEixo: (v) => `${Math.round(v)}` });
+  if (fc) graficos.push(['Frequência cardíaca', '', fc]);
+  const altitude = curvaDaAtividade(serie((p) => p.altitude), { nome: 'Altitude', eixo, passoMinimo: 2, formatar: (v) => `${Math.round(v)} m`, formatarEixo: (v) => `${Math.round(v)}` });
+  if (altitude) graficos.push(['Altitude', 'Pelo GPS ou barômetro do relógio.', altitude]);
+  return graficos.map(([titulo, nota, grafico]) => `<h3>${titulo}</h3>${nota ? `<p class="suave">${nota}</p>` : ''}${grafico}`).join('');
+}
+
+function blocoPercurso(a) {
+  if (!a.id || !estado.chaveApi) return '';
+  const atributo = `data-percurso="${esc(a.id)}"`;
+  const erro = errosDePercurso.get(String(a.id));
+  if (erro) {
+    return `
+      <section class="cartao" ${atributo}>
+        <h2>Mapa e gráficos</h2>
+        <p class="erro">${esc(erro)}</p>
+        <button data-tentar-percurso="${esc(a.id)}">Tentar de novo</button>
+      </section>`;
+  }
+  const dados = percursos.get(String(a.id));
+  if (!dados) return `<section class="cartao" ${atributo}><h2>Mapa e gráficos</h2><p class="suave">Buscando no intervals.icu...</p></section>`;
+  const mapa = htmlDoMapa(dados.latlngs);
+  const curvas = htmlDasCurvas(dados, a.categoria ?? 'corrida');
+  if (!mapa && !curvas) return `<section class="cartao" ${atributo}><h2>Mapa e gráficos</h2><p class="suave">O relógio não gravou percurso nem curvas nesta atividade.</p></section>`;
+  return `
+    <section class="cartao" ${atributo}>
+      ${mapa ? `<h2>Percurso</h2>${mapa}` : '<h2>Gráficos</h2><p class="suave">Sem percurso de GPS nesta atividade.</p>'}
+      ${mapa && curvas ? '<h2 style="margin-top:18px">Gráficos</h2>' : ''}
+      ${curvas}
+    </section>`;
+}
+
+async function carregarPercurso(a) {
+  const id = String(a.id);
+  if (!a.id || !estado.chaveApi || percursos.has(id) || percursosEmAndamento.has(id) || errosDePercurso.has(id)) return;
+  percursosEmAndamento.add(id);
+  try {
+    const dados = await criarCliente({ chave: estado.chaveApi }).percursoDaAtividade(a.id);
+    percursos.set(id, { ...dados, latlngs: pontosDoMapa(dados.latlngs) });
+  } catch (erro) {
+    errosDePercurso.set(id, erro.message);
+  } finally {
+    percursosEmAndamento.delete(id);
+  }
+  // Troca só este cartão, para a tela não voltar ao topo enquanto a pessoa lê.
+  const cartao = document.querySelector(`[data-percurso="${CSS.escape(id)}"]`);
+  if (cartao) cartao.outerHTML = blocoPercurso(a);
+}
+
 function telaAtividade(a) {
   const ehCorrida = a.tipoDaAtividade === 'corrida';
   const naPlanilha = estado.plano.sessoes.some((s) => s.data === a.data);
@@ -1140,6 +1235,7 @@ function telaAtividade(a) {
       <span class="selo">${selo}</span>
       ${numeros.length ? `<div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>` : ''}
     </section>
+    ${a.tipoDaAtividade === 'semDados' ? '' : blocoPercurso(a)}
     ${extras.length ? `<section class="cartao"><h2>Dados</h2><table class="ritmos"><tbody>${extras.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table></section>` : ''}
     ${totalZonas ? `
       <section class="cartao">
@@ -1151,7 +1247,7 @@ function telaAtividade(a) {
     ${nota ? `<section class="cartao"><p class="suave" style="margin:0">${esc(nota)}</p></section>` : ''}
     <section class="cartao">
       <h2>Mais detalhes</h2>
-      <p class="suave">Mapa e gráficos completos ficam no intervals.icu.</p>
+      <p class="suave">Análises completas, como potência e voltas, ficam no intervals.icu.</p>
       <a class="botao-link" href="https://intervals.icu/activities/${encodeURIComponent(a.id)}" target="_blank" rel="noopener noreferrer">Abrir no intervals.icu</a>
       ${estado.chaveApi && a.tipoDaAtividade !== 'semDados' ? `
         <div class="botoes" style="margin-top:10px">
@@ -1666,6 +1762,7 @@ function telaDetalhe(sessao) {
     ${sessao.tipo === 'prova' && realizadas.length ? blocoResultadoDaProva(sessao, realizadas.find((a) => a.prova) ?? realizadas[0]) : ''}
     ${estado.chaveApi ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}
     ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
+    ${realizadas.map(blocoPercurso).join('')}
     <section class="cartao">
       <h2>Por que este treino</h2>
       <p>${esc(sessao.porque)}</p>
@@ -2009,13 +2106,17 @@ function render() {
     app.innerHTML = telaAtividade(atividade);
     window.scrollTo(0, 0);
     if (atividade.tipoDaAtividade === 'corrida' && estado.chaveApi && !analisePronta(atividade) && !errosDeAnalise.has(atividade.id)) carregarAnalise(atividade);
+    if (atividade.tipoDaAtividade !== 'semDados') carregarPercurso(atividade);
     return;
   }
   const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
   const telas = { hoje: telaHoje, plano: telaPlano, evolucao: telaEvolucao, revisao: telaRevisao, ajustes: telaAjustes };
   app.innerHTML = aberta ? telaDetalhe(aberta) : telas[aba]();
   window.scrollTo(0, 0);
-  if (aberta) pedirAnalises(aberta);
+  if (aberta) {
+    pedirAnalises(aberta);
+    atividadeDoDia(aberta.data).forEach(carregarPercurso);
+  }
 }
 
 abas.addEventListener('click', (e) => {
@@ -2247,6 +2348,17 @@ app.addEventListener('click', (e) => {
     diaVisto = diaDoCalendario.dataset.diaCalendario;
     mesVisto = mesDe(diaVisto);
     renderMantendoRolagem();
+    return;
+  }
+  const tentarPercurso = e.target.closest('[data-tentar-percurso]');
+  if (tentarPercurso) {
+    const id = tentarPercurso.dataset.tentarPercurso;
+    errosDePercurso.delete(id);
+    const alvo = atividadePorId(id);
+    if (alvo) {
+      document.querySelector(`[data-percurso="${CSS.escape(id)}"]`).outerHTML = blocoPercurso(alvo);
+      carregarPercurso(alvo);
+    }
     return;
   }
   const verAtividade = e.target.closest('[data-atividade]');
