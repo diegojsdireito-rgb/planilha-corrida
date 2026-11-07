@@ -92,7 +92,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 25;
+const VERSAO_APP = 26;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -382,6 +382,7 @@ function telaCadastro(valores = {}) {
     <form id="form-cadastro" novalidate>
       <section class="cartao">
         <h2>Sobre você</h2>
+        <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" value="${esc(estado.nome)}"></label>
         <div class="linha3">
           <label>Idade<input name="idade" type="number" inputmode="numeric" min="12" max="100" value="${esc(v.idade)}" required></label>
           <label>Peso (kg)<input name="peso" inputmode="decimal" value="${esc(v.peso)}" required></label>
@@ -515,6 +516,7 @@ async function enviarCadastro(evento) {
       estado = {
         ...estado,
         chaveApi: chave,
+        nome: String(form.get('nome') ?? '').trim(),
         perfil,
         objetivo,
         tempoInformado,
@@ -973,9 +975,15 @@ function telaHoje() {
     <div class="marca">${MARCA}Run Glória</div>
     <header class="topo">
       <p class="sobretitulo">${dataLonga(dia)}</p>
-      <h1>Hoje</h1>
+      <h1>${estado.nome ? `Olá, ${esc(estado.nome.split(/\s+/)[0])}` : 'Hoje'}</h1>
     </header>
     ${avisoPlanilhaAntiga()}
+    ${estado.nome ? '' : `
+      <form class="cartao" id="form-nome">
+        <h2>Como você se chama?</h2>
+        <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" required></label>
+        <button class="principal" type="submit" style="margin-top:10px">Salvar</button>
+      </form>`}
     ${principal}
     ${blocoFeitoHoje(dia)}
     ${blocoDaSemana(dia)}
@@ -2020,7 +2028,13 @@ function telaAjustes() {
     ['Intervalado', textoRitmo(r.intervalado)],
   ];
   return `
-    <header class="topo"><p class="sobretitulo">Sua conta neste aparelho</p><h1>Ajustes</h1></header>
+    <header class="topo"><p class="sobretitulo">${estado.nome ? esc(estado.nome) : 'Sua conta neste aparelho'}</p><h1>Ajustes</h1></header>
+    <form class="cartao" id="form-nome">
+      <h2>Usuário</h2>
+      <label>Seu nome<input name="nome" autocomplete="name" maxlength="60" placeholder="Ex.: Maria Silva" value="${esc(estado.nome)}" required></label>
+      <button type="submit" style="margin-top:10px">Salvar nome</button>
+      <p class="suave" style="margin:10px 0 0">Fica só neste aparelho e entra na sua cópia de segurança. Não há cadastro central.</p>
+    </form>
     <section class="heroi">
       <p class="sobretitulo">Seu nível atual (VDOT)</p>
       <p class="heroi-numero">${String(plano.vdot).replace('.', ',')}</p>
@@ -2309,7 +2323,7 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { nome, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       idade: perfil.idade,
       peso: perfil.pesoKg,
@@ -2322,7 +2336,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, nome, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -2449,6 +2463,15 @@ app.addEventListener('submit', (e) => {
     return undefined;
   }
 
+  if (e.target.id === 'form-nome') {
+    const nome = String(new FormData(e.target).get('nome') ?? '').trim();
+    if (!nome) return mostrarAviso('Digite o seu nome.');
+    estado.nome = nome;
+    guardar();
+    document.activeElement?.blur();
+    render();
+    return mostrarAviso('Nome salvo.');
+  }
   if (e.target.id === 'form-dias') return verNovaGrade(e.target);
   if (e.target.id === 'form-avulsa') return salvarAvulsa(e.target);
   if (e.target.id === 'form-prova') return salvarProva(e.target);
