@@ -87,7 +87,7 @@ let provaAberta = null;
 let provasPendentes = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 20;
+const VERSAO_APP = 21;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -765,9 +765,10 @@ function blocoProvas(dia) {
   const principal = principalAtual();
   const avisos = principal ? avisosDaProva({ prova: principal, base: baseAtual(dia), hoje: dia, todas: estado.provas }) : [];
   return `
-    <section class="cartao">
+    <section class="cartao" id="minhas-provas">
       <h2>Minhas provas</h2>
-      ${futuras.length ? futuras.map((p) => linhaProva(p, dia, principal)).join('') : '<p class="suave">Nenhuma prova marcada. Inclua as provas em que se inscreveu para a planilha se organizar em torno delas.</p>'}
+      ${futuras.length ? futuras.map((p) => linhaProva(p, dia, principal)).join('') : '<p class="suave">Nenhuma prova marcada.</p>'}
+      <p class="suave">Inclua aqui as provas em que se inscreveu, e a planilha se organiza em torno delas. Depois da prova, o resultado entra sozinho quando a corrida chegar do relógio.</p>
       <button style="margin-top:8px" data-prova="nova">Adicionar prova</button>
       ${principal && principal.data >= dia ? `
         <h3>Volume para ${esc(principal.nome)}</h3>
@@ -897,7 +898,7 @@ function salvarProva(formulario) {
   }
 }
 
-function blocoDoObjetivo(dia) {
+function blocoDoObjetivo(dia, { comAtalho = false } = {}) {
   const { plano, objetivo } = estado;
   const atual = plano.sessoes.find((s) => s.data >= dia) ?? plano.sessoes[plano.sessoes.length - 1];
   const prova = objetivo.distanciaKm && objetivo.dataProva >= dia;
@@ -912,6 +913,7 @@ function blocoDoObjetivo(dia) {
       <h2>${prova ? (dias === 0 ? 'É hoje!' : `Falta${dias > 1 ? 'm' : ''} ${dias} dia${dias > 1 ? 's' : ''}`) : `Semana ${atual.semana} de ${plano.totalSemanas}`}</h2>
       <div class="fases" role="img" aria-label="Avanço pelas fases da planilha">${barras}</div>
       <p class="suave" style="margin:0">Fase de ${FASES[atual.fase].toLowerCase()}${prova ? `, semana ${atual.semana} de ${plano.totalSemanas}` : ''}${atual.recuperacao ? ', semana de recuperação' : ''}</p>
+      ${comAtalho ? '<button style="margin-top:12px" data-acao="ver-provas">Minhas provas</button>' : ''}
     </section>`;
 }
 
@@ -954,7 +956,7 @@ function telaHoje() {
     ${principal}
     ${blocoDaSemana(dia)}
     ${blocoOutrasDaSemana(dia)}
-    ${blocoDoObjetivo(dia)}
+    ${blocoDoObjetivo(dia, { comAtalho: true })}
     ${avaliar && avaliar.tipo !== 'prova' ? formularioAvaliacao(avaliar) : ''}`;
 }
 
@@ -1044,7 +1046,14 @@ function blocoResultadoDaProva(sessao, atividade) {
 
 function blocoProvasRealizadas() {
   const lista = provasRealizadas(estado.provas, estado.atividades);
-  if (!lista.length) return '';
+  if (!lista.length) {
+    return `
+      <section class="cartao">
+        <h2>Minhas provas realizadas</h2>
+        <p class="suave">Nenhuma prova concluída ainda. Inclua suas provas na Planilha: depois de cada uma, o tempo, o pace e o nível aparecem aqui sozinhos.</p>
+        <button data-acao="ver-provas">Minhas provas</button>
+      </section>`;
+  }
   const nome = (p) => `${String(Math.round(p.distanciaKm * 10) / 10).replace('.', ',')} km`;
   const grafico = linhaDeEvolucao(
     [...lista].reverse().map((p) => ({ data: p.data, valor: p.vdot })),
@@ -1543,7 +1552,7 @@ function telaRevisao() {
         <button data-acao="sincronizar">Atualizar corridas</button>
       </section>` : `
       <section class="cartao alerta">Sem o intervals.icu conectado, a revisão não enxerga suas corridas. Conecte nos Ajustes.</section>`}
-    ${estado.semDados ? `<section class="cartao alerta">${estado.semDados} corrida(s) vieram sem dados, provavelmente porque entraram pelo Strava. Conecte o Garmin diretamente no intervals.icu.</section>` : ''}
+    ${estado.semDados ? `<section class="cartao alerta">${estado.semDados === 1 ? '1 corrida veio' : `${estado.semDados} corridas vieram`} sem distância e ficou de fora da análise. Isso acontece em esteira sem sensor e em atividade que entrou pelo Strava. Se foi na rua, confira no intervals.icu se o Garmin está conectado diretamente.</section>` : ''}
     <section class="cartao veredito ${analise.acao}">
       <h2>${TITULOS_ACAO[analise.acao]}</h2>
       <ul class="motivos">${analise.motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
@@ -1881,6 +1890,12 @@ const acoes = {
     setTimeout(enviarAutomaticamente);
   },
 
+  'ver-provas': () => {
+    aba = 'plano';
+    sessaoAberta = null;
+    render();
+    document.getElementById('minhas-provas')?.scrollIntoView({ block: 'start' });
+  },
   sincronizar: (botao) => comOcupado(botao, async () => {
     await sincronizar();
     render();

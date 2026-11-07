@@ -88,6 +88,7 @@ p { margin: 0 0 8px; }
 .suave { color: var(--suave); font-size: .92rem; }
 .sobretitulo { margin: 0; font-size: .74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); }
 .topo { margin: 4px 2px 16px; }
+#minhas-provas { scroll-margin-top: calc(env(safe-area-inset-top) + 12px); }
 
 .marca { display: flex; align-items: center; gap: 8px; margin: 0 2px 12px; font-family: var(--titulos); font-weight: 800; letter-spacing: -.01em; }
 .marca-sol { width: 26px; height: 26px; flex: none; }
