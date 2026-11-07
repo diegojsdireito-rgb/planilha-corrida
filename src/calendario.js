@@ -13,10 +13,10 @@ export function somarMeses(mes, quantos) {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
 
-function situacaoDoDia({ sessao, corridas, semDados, data, hoje }) {
+function situacaoDoDia({ sessao, corridas, semDados, outras, data, hoje }) {
   if (corridas.length) return sessao ? 'feito' : 'extra';
   if (semDados.length) return 'sem-dados';
-  if (!sessao) return 'livre';
+  if (!sessao) return outras.length ? 'outra' : 'livre';
   return data < hoje ? 'perdido' : 'planejado';
 }
 
@@ -40,6 +40,18 @@ export function gradeDoMes({ mes, sessoes = [], corridas = [], semDados = [], ou
     dias.push({ ...dia, situacao: situacaoDoDia({ ...dia, hoje }) });
   }
   return dias;
+}
+
+// O que foi feito na semana além dos treinos previstos, em ordem de data.
+export function feitoForaDosTreinos({ segunda, sessoes = [], corridas = [], semDados = [], outras = [] }) {
+  const fim = somarDias(segunda, 7);
+  const naSemana = (a) => a.data >= segunda && a.data < fim;
+  const previstos = new Set(sessoes.map((s) => s.data));
+  return [
+    ...corridas.filter((a) => naSemana(a) && !previstos.has(a.data)).map((item) => ({ tipo: 'corrida', data: item.data, item })),
+    ...semDados.filter(naSemana).map((item) => ({ tipo: 'semDados', data: item.data, item })),
+    ...outras.filter(naSemana).map((item) => ({ tipo: 'outra', data: item.data, item })),
+  ].sort((a, b) => a.data.localeCompare(b.data));
 }
 
 const totaisDe = (lista) => ({ quantidade: lista.length, km: somar(lista, (a) => a.km), seg: somar(lista, (a) => a.seg) });

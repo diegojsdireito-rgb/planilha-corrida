@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from '../src/calendario.js';
+import { feitoForaDosTreinos, gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from '../src/calendario.js';
 
 const HOJE = '2026-11-07'; // sábado, antes de a planilha começar
 const sessoes = [
@@ -40,10 +40,34 @@ test('cada dia recebe a sua situação', () => {
   assert.equal(dia('2026-11-08').situacao, 'livre');
 });
 
-test('só caminhada não transforma o dia em corrida', () => {
+test('dia só com caminhada tem situação própria, sem virar corrida', () => {
   const [d] = gradeDoMes({ mes: '2026-11', outras, hoje: HOJE }).filter((x) => x.data === HOJE);
-  assert.equal(d.situacao, 'livre');
+  assert.equal(d.situacao, 'outra');
+  assert.equal(d.corridas.length, 0);
   assert.equal(d.outras.length, 1);
+});
+
+test('caminhada em dia de treino não esconde o treino previsto', () => {
+  const lista = [{ data: '2026-11-10', categoria: 'caminhada', minutos: 30, km: 2 }];
+  const [d] = gradeDoMes({ mes: '2026-11', sessoes, outras: lista, hoje: HOJE }).filter((x) => x.data === '2026-11-10');
+  assert.equal(d.situacao, 'planejado');
+  assert.equal(d.outras.length, 1);
+});
+
+test('a semana lista o que foi feito além dos treinos, em ordem de data', () => {
+  const lista = feitoForaDosTreinos({ segunda: '2026-11-02', sessoes, corridas, semDados, outras });
+  assert.deepEqual(lista.map((f) => [f.tipo, f.data]), [
+    ['semDados', '2026-11-06'],
+    ['corrida', HOJE],
+    ['outra', HOJE],
+  ]);
+});
+
+test('corrida em dia de treino não aparece como extra, e outra semana fica de fora', () => {
+  const lista = feitoForaDosTreinos({ segunda: '2026-11-09', sessoes, corridas, outras });
+  assert.equal(lista.length, 0);
+  const comTreino = feitoForaDosTreinos({ segunda: '2026-11-02', sessoes, corridas: [corridas[1]] });
+  assert.equal(comTreino.length, 0);
 });
 
 test('o resumo separa planilha, fora dela, sem dados e outras, e soma o tempo de tudo', () => {

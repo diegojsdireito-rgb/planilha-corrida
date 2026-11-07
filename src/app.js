@@ -1,7 +1,7 @@
 import { compararComPrevisto, ORDEM_DAS_ZONAS, ritmoDaProva, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
 import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria } from './avulsas.js';
-import { gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from './calendario.js';
+import { feitoForaDosTreinos, gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from './calendario.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
 import {
   adesaoDoPeriodo,
@@ -90,7 +90,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 22;
+const VERSAO_APP = 23;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -1097,7 +1097,10 @@ const linhaSemDados = (a) => `
 function celulaDoCalendario(d, selecionado) {
   const numero = Number(d.data.slice(8));
   const totalKm = d.corridas.reduce((t, a) => t + a.km, 0);
+  const kmOutras = d.outras.reduce((t, a) => t + (a.km ?? 0), 0);
+  const minutosOutras = d.outras.reduce((t, a) => t + a.minutos, 0);
   const marca = {
+    outra: kmOutras ? numeroKm(kmOutras) : `${minutosOutras}'`,
     feito: numeroKm(totalKm),
     extra: numeroKm(totalKm),
     'sem-dados': '?',
@@ -1107,8 +1110,8 @@ function celulaDoCalendario(d, selecionado) {
   }[d.situacao];
   const descricao = [
     dataLonga(d.data),
-    { feito: `corrida da planilha, ${km(totalKm)}`, extra: `corrida fora da planilha, ${km(totalKm)}`, 'sem-dados': 'corrida sem distância', perdido: 'treino sem registro', planejado: `treino previsto, ${d.sessao ? km(d.sessao.distanciaKm) : ''}`, livre: null }[d.situacao],
-    d.outras.length ? `${d.outras.length === 1 ? 'outra atividade' : `${d.outras.length} outras atividades`}` : null,
+    { feito: `corrida da planilha, ${km(totalKm)}`, extra: `corrida fora da planilha, ${km(totalKm)}`, 'sem-dados': 'corrida sem distância', perdido: 'treino sem registro', planejado: `treino previsto, ${d.sessao ? km(d.sessao.distanciaKm) : ''}`, outra: null, livre: null }[d.situacao],
+    d.outras.length ? d.outras.map((a) => `${nomeDaCategoria(a.categoria)}, ${duracaoCurta(a.minutos)}`).join(', ') : null,
   ].filter(Boolean).join(', ');
   const classes = ['dia', d.situacao, d.ehHoje ? 'hoje' : '', d.doMes ? '' : 'fora-do-mes', selecionado ? 'selecionado' : '', d.sessao ? classeTipo(d.sessao.tipo) : ''].filter(Boolean).join(' ');
   return `<button class="${classes}" data-dia-calendario="${d.data}" aria-label="${esc(descricao)}" ${selecionado ? 'aria-pressed="true"' : ''}>
@@ -1162,6 +1165,57 @@ function blocoCalendario(dia) {
       <p class="suave">${partes.length ? `Neste mês: ${esc(partes.join(', '))}.` : 'Nada registrado neste mês.'}</p>
       ${selecionado ? detalheDoDia(selecionado, dia) : ''}
     </section>`;
+}
+
+// Corrida extra, corrida sem distância ou outro exercício, na mesma lista dos treinos da semana.
+function linhaFeitaNaSemana({ tipo, data, item }) {
+  const quando = new Date(`${data}T12:00:00Z`);
+  const dataDaLinha = `<span class="sessao-data"><small>${DIAS[(quando.getUTCDay() + 6) % 7].curto}</small><b>${quando.getUTCDate()}</b></span><span class="sessao-faixa"></span>`;
+  if (tipo === 'outra') {
+    const nome = item.categoria === 'outro' && item.nome ? item.nome : nomeDaCategoria(item.categoria);
+    const corpo = `${dataDaLinha}
+      <span class="sessao-corpo"><strong>${esc(nome)}</strong><span class="suave">${item.origem === 'relogio' ? 'Do relógio' : 'Registro manual'}, ${duracaoCurta(item.minutos)}</span></span>`;
+    const distancia = item.km ? km(Math.round(item.km * 10) / 10) : '';
+    if (item.origem === 'relogio') return `<div class="sessao t-outra">${corpo}<span class="sessao-fim"><span class="status">${distancia}</span></span></div>`;
+    return `<button class="sessao t-outra" data-avulsa="${esc(item.id)}" aria-label="Editar ${esc(nome)}, ${dataCurta(data)}">${corpo}<span class="sessao-fim"><span class="status">${distancia}</span>${icone('seta')}</span></button>`;
+  }
+  if (tipo === 'semDados') {
+    return `<div class="sessao t-sem-dados">${dataDaLinha}
+      <span class="sessao-corpo"><strong>${esc(item.nome ?? 'Corrida')}</strong><span class="suave">Chegou sem distância</span></span>
+      <span class="sessao-fim"><span class="status">?</span></span></div>`;
+  }
+  return `<div class="sessao t-extra">${dataDaLinha}
+    <span class="sessao-corpo"><strong>${esc(item.nome ?? 'Corrida')}</strong><span class="suave">Fora da planilha${item.seg ? `, ${formatarRitmo(item.seg / item.km)}/km` : ''}</span></span>
+    <span class="sessao-fim"><span class="status feito">${km(Math.round(item.km * 10) / 10)} feitos</span></span></div>`;
+}
+
+function contagemDoFeito(lista) {
+  const corridas = lista.filter((f) => f.tipo !== 'outra').length;
+  const outras = lista.length - corridas;
+  return [
+    corridas ? `${corridas} fora da planilha` : null,
+    outras ? (outras === 1 ? '1 outra atividade' : `${outras} outras atividades`) : null,
+  ].filter(Boolean).join(', ');
+}
+
+// A semana em andamento antes do início da planilha não tem treinos, mas o que foi feito nela aparece.
+function semanaAntesDoInicio(dia) {
+  const { plano } = estado;
+  const segunda = segundaDaSemana(dia);
+  if (plano.sessoes.some((s) => segundaDaSemana(s.data) === segunda)) return '';
+  const feito = feitoForaDosTreinos({ segunda, ...dadosDaAtividade() });
+  if (!feito.length) return '';
+  return `
+    <details class="semana atual" open>
+      <summary>
+        <span class="semana-numero" aria-hidden="true">·</span>
+        <span class="semana-info">
+          <strong>Esta semana</strong>
+          <span class="suave">${dia < plano.inicio ? 'Antes do início da planilha. ' : ''}${esc(contagemDoFeito(feito))}</span>
+        </span>
+      </summary>
+      ${feito.map(linhaFeitaNaSemana).join('')}
+    </details>`;
 }
 
 function blocoFeitoHoje(dia) {
@@ -1575,18 +1629,23 @@ function telaPlano() {
     const total = totalDaSemana(sessoes);
     const atual = segundaDaSemana(primeira.data) === semanaAtual;
     const aberta = atual || (dia < plano.inicio && primeira.semana === semanas.keys().next().value);
+    const feito = feitoForaDosTreinos({ segunda: segundaDaSemana(primeira.data), ...dadosDaAtividade() });
+    const linhas = [
+      ...sessoes.map((s) => ({ data: s.data, html: linhaSessao(s, dia) })),
+      ...feito.map((f) => ({ data: f.data, html: linhaFeitaNaSemana(f) })),
+    ].sort((a, b) => a.data.localeCompare(b.data));
     return `
       <details class="semana ${atual ? 'atual' : ''}" ${aberta ? 'open' : ''}>
         <summary>
           <span class="semana-numero" aria-label="Semana ${primeira.semana}">${primeira.semana}</span>
           <span class="semana-info">
             <strong>${FASES[primeira.fase]}${primeira.recuperacao ? ', recuperação' : ''}</strong>
-            <span class="suave">${sessoes.length} treinos</span>
+            <span class="suave">${sessoes.length} treinos${feito.length ? `, ${esc(contagemDoFeito(feito))}` : ''}</span>
             <span class="semana-carga"><i style="width:${(total / maiorSemana) * 100}%"></i></span>
           </span>
           <span class="status">${km(Math.round(total * 2) / 2)}</span>
         </summary>
-        ${sessoes.map((s) => linhaSessao(s, dia)).join('')}
+        ${linhas.map((l) => l.html).join('')}
       </details>`;
   }).join('');
 
@@ -1602,6 +1661,7 @@ function telaPlano() {
     ${blocoProvas(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
     ${(plano.avisos ?? []).map((a) => `<section class="cartao alerta">${esc(a)}</section>`).join('')}
+    ${semanaAntesDoInicio(dia)}
     ${lista}
     ${(() => {
       const semanaVista = plano.sessoes.find((s) => s.data >= dia)?.semana;

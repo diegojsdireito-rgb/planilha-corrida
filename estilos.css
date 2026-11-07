@@ -99,14 +99,20 @@ p { margin: 0 0 8px; }
 .cal-grade .dia.selecionado { outline: 2px solid var(--marca); outline-offset: -2px; }
 .dia.extra .dia-marca { background: var(--z-maratona); color: #181b22; }
 .dia.sem-dados .dia-marca { background: var(--alerta-suave); color: var(--alerta); }
+.dia.outra .dia-marca { background: var(--z-longo); color: var(--cartao); }
+.cal-grade .dia-outra { bottom: 2px; width: 7px; height: 7px; }
+.dia.outra .dia-outra { display: none; }
 .dia.livre .dia-marca:empty { visibility: hidden; }
+.sessao.t-outra { --tipo: var(--z-longo); }
+.sessao.t-extra { --tipo: var(--z-maratona); }
+.sessao.t-sem-dados { --tipo: var(--alerta); }
 .cal-legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 12px 0 8px; font-size: .8rem; }
 .cal-legenda span { display: inline-flex; align-items: center; gap: 6px; }
 .cal-ponto { width: 11px; height: 11px; border-radius: 50%; }
 .cal-ponto.planejado { border: 2px solid var(--suave); }
 .cal-ponto.feito { background: var(--ok); }
 .cal-ponto.extra { background: var(--z-maratona); }
-.cal-ponto.outra { width: 7px; height: 7px; background: var(--z-longo); }
+.cal-ponto.outra { background: var(--z-longo); }
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }
