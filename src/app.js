@@ -111,11 +111,25 @@ let medalhasAbertas = false;
 let editandoUsuario = false;
 let editandoChave = false;
 let corridaManualAberta = null;
+const secoes = { plano: 'semanas', evolucao: 'resumo' };
+const ajustesAbertos = new Set();
 let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.4';
+const VERSAO_APP = '3.5';
+
+const barraDeSecoes = (aba_, opcoes) => `
+  <div class="secoes" role="group" aria-label="Seções">
+    ${opcoes.map(([id, nome]) => `<button data-secao="${id}" data-secao-de="${aba_}" aria-pressed="${secoes[aba_] === id}">${nome}</button>`).join('')}
+  </div>`;
+
+// Recolhível que continua aberto quando a tela é redesenhada.
+const grupoDeAjuste = (id, titulo, resumo, conteudo) => `
+  <details class="cartao ajuste" data-ajuste="${id}" ${ajustesAbertos.has(id) ? 'open' : ''}>
+    <summary><span>${titulo}</span>${resumo ? `<small>${resumo}</small>` : ''}</summary>
+    <div class="ajuste-corpo">${conteudo}</div>
+  </details>`;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -641,7 +655,7 @@ function cartaoDeFeedback({ chave, data, titulo, comPular = false }) {
       </div>
       <label class="marcar"><input type="checkbox" data-feedback-dor ${v.dor ? 'checked' : ''}> Senti dor</label>
       ${comPular ? '<button class="botao-texto" data-feedback-pular>Responder depois</button>' : ''}
-      <p class="suave" style="margin:8px 0 0">O esforço e a dor entram na Revisão. Dor reduz a carga, e se ela persistir, procure um profissional.</p>
+      ${v.dor ? '<p class="suave" style="margin:4px 0 0">Dor reduz a carga na Revisão. Se ela persistir, procure um profissional.</p>' : ''}
     </section>`;
 }
 
@@ -1179,17 +1193,17 @@ function telaHoje() {
         <h2>Parabéns${estado.nome ? `, ${esc(estado.nome.split(/\s+/)[0])}` : ''}!</h2>
         <p>Hoje você completa ${idadeEm(estado.nascimento, dia)} anos. Que venham muitos quilômetros e muita saúde.</p>
       </section>` : ''}
+    ${principal}
     ${estado.nome && estado.nascimento ? '' : `
       <form class="cartao" id="form-nome">
         <h2>Complete seu cadastro</h2>
         ${camposDoUsuario()}
         <button class="principal" type="submit" style="margin-top:10px">Salvar</button>
       </form>`}
-    ${blocoNovasConquistas()}
     ${blocoDeFeedbackPendente(dia)}
-    ${principal}
     ${blocoFeitoHoje(dia)}
     ${blocoDaSemana(dia)}
+    ${blocoNovasConquistas()}
     ${blocoOutrasDaSemana(dia)}
     ${blocoDoObjetivo(dia, { comAtalho: true })}`;
 }
@@ -2030,7 +2044,7 @@ function telaEvolucao() {
       <button data-acao="sincronizar">Atualizar corridas</button>
     </section>` : '';
 
-  const cabecalho = `<header class="topo"><p class="sobretitulo">Seu progresso</p><h1>Evolução</h1><p class="suave">Suas corridas e seu nível ao longo do tempo.</p></header>`;
+  const cabecalho = `<header class="topo"><h1>Evolução</h1></header>${barraDeSecoes('evolucao', [['resumo', 'Resumo'], ['graficos', 'Gráficos'], ['corpo', 'Corpo'], ['provas', 'Provas']])}`;
   const previsoes = [[5, '5 km'], [10, '10 km'], [21.1, 'Meia maratona'], [42.2, 'Maratona']]
     .map(([distancia, nome]) => `<tr><td>${nome}</td><td>${formatarTempo(preverTempoSeg(plano.vdot, distancia))}</td></tr>`)
     .join('');
@@ -2041,13 +2055,21 @@ function telaEvolucao() {
       <table class="ritmos"><tbody>${previsoes}</tbody></table>
     </section>`;
 
+  const secaoCorpo = blocoPeso();
+  const secaoProvas = `${blocoProvasRealizadas()}${blocoPrevisoes}`;
+
   if (!atividades.length) {
-    return `${cabecalho}
+    const vazio = `
       <section class="cartao alerta">
         <h2>Ainda não há corridas</h2>
         <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
-      </section>
-      ${blocoConquistas()}${blocoFeedbackNaEvolucao(dia)}${blocoPeso()}${blocoCalendario(dia)}${blocoOutrasNaEvolucao(dia)}${blocoProvasRealizadas()}${atualizacao}${blocoPrevisoes}`;
+      </section>`;
+    return `${cabecalho}${{
+      resumo: `${vazio}${blocoConquistas()}${blocoOutrasNaEvolucao(dia)}${atualizacao}`,
+      graficos: `${vazio}${blocoFeedbackNaEvolucao(dia)}`,
+      corpo: secaoCorpo,
+      provas: secaoProvas,
+    }[secoes.evolucao]}`;
   }
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
@@ -2074,22 +2096,7 @@ function telaEvolucao() {
     ['Maior semana', `${km(recordes.maiorSemana.km)}, a partir de ${dataCurta(recordes.maiorSemana.segunda)}`],
   ];
 
-  return `${cabecalho}
-    <section class="heroi">
-      <p class="sobretitulo">Últimos 28 dias</p>
-      <p class="heroi-numero">${numeroKm(Math.round(atual.km * 10) / 10)}<small>km</small></p>
-      <div class="heroi-dados">
-        <div><b>${atual.corridas}</b><span>Corridas</span></div>
-        <div><b>${formatarTempo(atual.seg)}</b><span>Tempo</span></div>
-        ${adesao === null ? '' : `<div><b>${Math.round(adesao * 100)}%</b><span>Do previsto</span></div>`}
-      </div>
-      <p style="margin:14px 0 0">${comparacao(atual.km, anterior.km)}.</p>
-    </section>
-    ${blocoConquistas()}
-    ${blocoFeedbackNaEvolucao(dia)}
-    ${blocoPeso()}
-    ${blocoCalendario(dia)}
-    ${blocoOutrasNaEvolucao(dia)}
+  const secaoGraficos = `
     <section class="cartao">
       <h2>Volume por semana (km)</h2>
       ${barrasDeVolume(semanas, km)}
@@ -2100,6 +2107,7 @@ function telaEvolucao() {
         <p class="suave">Mais rápido fica no alto. Sem provas e corridas abaixo de 3 km.</p>
         ${grafRitmo}
       </section>` : ''}
+    ${blocoFeedbackNaEvolucao(dia)}
     ${grafEficiencia ? `
       <section class="cartao">
         <h2>Eficiência</h2>
@@ -2116,14 +2124,33 @@ function telaEvolucao() {
         <h2>Zonas de frequência cardíaca nos últimos 28 dias</h2>
         ${zonas.map((z) => barraDeZona(`Z${z.zona}`, z.seg, z.fracao)).join('')}
         <p class="suave">Zonas calculadas pelo intervals.icu.</p>
-      </section>` : ''}
-    ${recordes ? `
-      <section class="cartao">
-        <h2>Recordes em 12 meses</h2>
-        <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
-      </section>` : ''}
-    ${blocoProvasRealizadas()}
-    ${blocoPrevisoes}
+      </section>` : ''}`;
+
+  if (secoes.evolucao === 'graficos') return `${cabecalho}${secaoGraficos}`;
+  if (secoes.evolucao === 'corpo') return `${cabecalho}${secaoCorpo}`;
+  if (secoes.evolucao === 'provas') {
+    return `${cabecalho}
+      ${recordes ? `
+        <section class="cartao">
+          <h2>Recordes em 12 meses</h2>
+          <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
+        </section>` : ''}
+      ${secaoProvas}`;
+  }
+
+  return `${cabecalho}
+    <section class="heroi">
+      <p class="sobretitulo">Últimos 28 dias</p>
+      <p class="heroi-numero">${numeroKm(Math.round(atual.km * 10) / 10)}<small>km</small></p>
+      <div class="heroi-dados">
+        <div><b>${atual.corridas}</b><span>Corridas</span></div>
+        <div><b>${formatarTempo(atual.seg)}</b><span>Tempo</span></div>
+        ${adesao === null ? '' : `<div><b>${Math.round(adesao * 100)}%</b><span>Do previsto</span></div>`}
+      </div>
+      <p style="margin:14px 0 0">${comparacao(atual.km, anterior.km)}.</p>
+    </section>
+    ${blocoConquistas()}
+    ${blocoOutrasNaEvolucao(dia)}
     <section class="cartao">
       <h2>Baixar meus dados</h2>
       <p class="suave">Planilha com ${atividades.length} corridas dos últimos 12 meses, para abrir no Excel. O arquivo FIT ou GPX de cada corrida fica nos detalhes do treino.</p>
@@ -2376,9 +2403,11 @@ function telaPlano() {
       <p class="suave">${esc(meta)}, ${plano.totalSemanas} semanas</p>
     </header>
     ${avisoPlanilhaAntiga()}
+    ${barraDeSecoes('plano', [['semanas', 'Semanas'], ['calendario', 'Calendário'], ['provas', 'Provas']])}
+    ${secoes.plano === 'calendario' ? blocoCalendario(dia) : ''}
+    ${secoes.plano === 'provas' ? blocoProvas(dia) : ''}
+    ${secoes.plano === 'semanas' ? `
     ${blocoDoObjetivo(dia)}
-    ${blocoCalendario(dia)}
-    ${blocoProvas(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
     ${(plano.avisos ?? []).map((a) => `<section class="cartao alerta">${esc(a)}</section>`).join('')}
     ${semanaAntesDoInicio(dia)}
@@ -2399,7 +2428,7 @@ function telaPlano() {
            ${estado.ultimoEnvio ? `<p class="suave">Último envio: ${new Date(estado.ultimoEnvio).toLocaleString('pt-BR')}</p>` : ''}
            <button data-acao="enviar" ${futuras ? '' : 'disabled'}>Enviar toda a planilha agora (${futuras})</button>`
         : '<p class="suave">Conecte o intervals.icu nos Ajustes para enviar os treinos.</p>'}
-    </section>`;
+    </section>` : ''}`;
 }
 
 // ---------- Revisão ----------
@@ -2637,52 +2666,42 @@ function telaAjustes() {
     ['Intervalado', textoRitmo(r.intervalado)],
   ];
   return `
-    <header class="topo"><p class="sobretitulo">${estado.nome ? esc(estado.nome) : 'Sua conta neste aparelho'}</p><h1>Ajustes</h1></header>
-    ${blocoUsuario()}
+    <header class="topo"><h1>Ajustes</h1></header>
     <section class="heroi">
       <p class="sobretitulo">Seu nível atual (VDOT)</p>
       <p class="heroi-numero">${String(plano.vdot).replace('.', ',')}</p>
       ${estado.origemVdot ? `<p style="margin:8px 0 0;font-size:.85rem">Base: ${esc(estado.origemVdot)}</p>` : ''}
     </section>
-    ${blocoDiasDeTreino()}
-    <section class="cartao">
-      <h2>Seus ritmos</h2>
-      <table class="ritmos"><tbody>${linhasRitmo.map(([nome, valor]) => `<tr><td>${nome}</td><td>${valor}</td></tr>`).join('')}</tbody></table>
-    </section>
-    <section class="cartao">
-      <h2>Gestos</h2>
-      <p class="suave">Deslize para os lados para trocar de aba. Dentro de um treino, deslize para a direita para voltar. No topo da tela, puxe para baixo para buscar corridas novas.</p>
-    </section>
-    <section class="cartao">
-      <h2>Perfil</h2>
+    <p class="grupo-titulo">Você</p>
+    ${grupoDeAjuste('usuario', 'Usuário', esc(estado.nome), blocoUsuario())}
+    ${grupoDeAjuste('perfil', 'Perfil', `${numeroPeso(perfil.pesoKg)} kg, ${esc(perfil.alturaCm)} cm`, `
       <p>${perfil.idade} anos, ${numeroPeso(perfil.pesoKg)} kg, ${esc(perfil.alturaCm)} cm, IMC ${numeroPeso(imcDe(perfil.pesoKg, perfil.alturaCm))}</p>
-      <p class="suave">O peso se registra em Evolução, em Peso e IMC. Para mudar altura ou objetivo, comece um novo ciclo.</p>
-    </section>
-    ${blocoChave()}
-    <section class="cartao">
-      <h2>Envio automático</h2>
+      <p class="suave" style="margin:0">O peso se registra em Evolução, em Corpo. Para mudar altura ou objetivo, comece um novo ciclo.</p>`)}
+    <p class="grupo-titulo">Treino</p>
+    ${grupoDeAjuste('dias', 'Dias de treino', DIAS.filter((d) => perfil.diasSemana.includes(d.valor)).map((d) => d.curto).join(', '), blocoDiasDeTreino())}
+    ${grupoDeAjuste('ritmos', 'Seus ritmos', `Leve ${textoRitmo(r.leve)}`, `<table class="ritmos"><tbody>${linhasRitmo.map(([nome, valor]) => `<tr><td>${nome}</td><td>${valor}</td></tr>`).join('')}</tbody></table>`)}
+    ${grupoDeAjuste('regras', 'Como a planilha é calculada', '', `
+      <p class="suave">Cada regra mostra de onde vem. Nenhuma tem evidência forte para decidir sozinha, e nada disso garante evitar lesões. A planilha não substitui avaliação médica ou de um treinador.</p>
+      ${REGRAS.map((regra) => `
+        <details class="regra">
+          <summary><span>${esc(regra.nome)}</span><span class="selo">${esc(ORIGENS[regra.origem])}</span></summary>
+          <p class="suave">${esc(regra.texto)}</p>
+          ${regra.fontes.length ? `<p class="suave">${regra.fontes.map(([nome, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(nome)}</a>`).join(', ')}</p>` : ''}
+        </details>`).join('')}`)}
+    <p class="grupo-titulo">Relógio</p>
+    ${grupoDeAjuste('chave', 'Intervals.icu', estado.chaveApi ? 'Conectado' : 'Não conectado', blocoChave())}
+    ${grupoDeAjuste('envio', 'Envio automático', estado.envioAutomatico ? 'Ligado' : 'Desligado', `
       <label class="marcar"><input type="checkbox" id="envio-automatico" ${estado.envioAutomatico ? 'checked' : ''}> Enviar os treinos de cada semana</label>
-      <p class="suave">A semana vai ao relógio na primeira vez que você abrir o app, a partir de ${DIAS_DE_ANTECEDENCIA} dias antes do primeiro treino dela. O iPhone não deixa o app rodar fechado, então ele precisa ser aberto nesse período.</p>
-    </section>
-    <section class="cartao">
-      <h2>Cópia de segurança</h2>
+      <p class="suave" style="margin:0">A semana vai ao relógio na primeira vez que você abrir o app, a partir de ${DIAS_DE_ANTECEDENCIA} dias antes do primeiro treino dela. O iPhone não deixa o app rodar fechado, então ele precisa ser aberto nesse período.</p>`)}
+    <p class="grupo-titulo">App</p>
+    ${grupoDeAjuste('copia', 'Cópia de segurança', '', `
       <p class="suave">Seus dados ficam só neste aparelho. A cópia não inclui a chave de API.</p>
       <div class="botoes">
         <button data-acao="exportar">Exportar</button>
         <label style="margin:0"><span class="suave">Importar arquivo</span><input type="file" id="importar" accept="application/json,.json"></label>
-      </div>
-    </section>
-    <section class="cartao">
-      <h2>Como a planilha é calculada</h2>
-      <p class="suave">Cada regra mostra de onde vem. Nenhuma tem evidência forte para decidir sozinha, e nada disso garante evitar lesões. A planilha não substitui avaliação médica ou de um treinador.</p>
-      ${REGRAS.map((r) => `
-        <details class="regra">
-          <summary><span>${esc(r.nome)}</span><span class="selo">${esc(ORIGENS[r.origem])}</span></summary>
-          <p class="suave">${esc(r.texto)}</p>
-          ${r.fontes.length ? `<p class="suave">${r.fontes.map(([nome, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(nome)}</a>`).join(', ')}</p>` : ''}
-        </details>`).join('')}
-    </section>
-    <button class="perigo largo" data-acao="recomecar">Começar novo ciclo</button>
+      </div>`)}
+    ${grupoDeAjuste('gestos', 'Gestos', '', `<p class="suave" style="margin:0">Deslize para os lados para trocar de aba. Dentro de um treino, deslize para a direita para voltar. No topo da tela, puxe para baixo para buscar corridas novas.</p>`)}
+    <button class="perigo largo" style="margin-top:8px" data-acao="recomecar">Começar novo ciclo</button>
     <p class="suave" style="margin-top:12px;text-align:center">Versão ${VERSAO_APP}</p>`;
 }
 
@@ -2937,17 +2956,17 @@ const acoes = {
   },
   'ver-calendario': () => {
     aba = 'plano';
+    secoes.plano = 'calendario';
     sessaoAberta = null;
     mesVisto = null;
     diaVisto = null;
     render();
-    document.getElementById('calendario')?.scrollIntoView({ block: 'start' });
   },
   'ver-provas': () => {
     aba = 'plano';
+    secoes.plano = 'provas';
     sessaoAberta = null;
     render();
-    document.getElementById('minhas-provas')?.scrollIntoView({ block: 'start' });
   },
   sincronizar: (botao) => comOcupado(botao, async () => {
     await sincronizar();
@@ -3031,6 +3050,12 @@ app.addEventListener('click', (e) => {
     renderMantendoRolagem();
     return;
   }
+  const botaoSecao = e.target.closest('[data-secao]');
+  if (botaoSecao) {
+    secoes[botaoSecao.dataset.secaoDe] = botaoSecao.dataset.secao;
+    render();
+    return;
+  }
   const botaoNota = e.target.closest('[data-nota], [data-sensacao]');
   if (botaoNota) {
     const mudanca = botaoNota.dataset.nota ? { esforco: Number(botaoNota.dataset.nota) } : { sensacao: Number(botaoNota.dataset.sensacao) };
@@ -3040,7 +3065,8 @@ app.addEventListener('click', (e) => {
   }
   const dorDoFeedback = e.target.closest('[data-feedback-dor]');
   if (dorDoFeedback) {
-    atualizarFeedback(dorDoFeedback, { dor: dorDoFeedback.checked });
+    const { cartao, ...contexto } = atualizarFeedback(dorDoFeedback, { dor: dorDoFeedback.checked });
+    cartao.outerHTML = cartaoDeFeedback(contexto);
     return;
   }
   const pularFeedback = e.target.closest('[data-feedback-pular]');
@@ -3161,6 +3187,14 @@ app.addEventListener('click', (e) => {
   const botao = e.target.closest('[data-acao]');
   if (botao) acoes[botao.dataset.acao]?.(botao);
 });
+
+// O evento toggle não sobe pela árvore: só é ouvido na fase de captura.
+app.addEventListener('toggle', (e) => {
+  const id = e.target.dataset?.ajuste;
+  if (!id) return;
+  if (e.target.open) ajustesAbertos.add(id);
+  else ajustesAbertos.delete(id);
+}, true);
 
 function mostrarDica(marca) {
   const figura = marca.closest('.figura');

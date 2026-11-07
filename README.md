@@ -68,7 +68,7 @@ Regras principais:
 - **Treino cumprido**: a corrida do dia, ou uma corrida da mesma semana ligada por você, conta como cumprido a partir de 80% da distância e como parcial abaixo disso (corte do app). Na virada do dia, o treino sem corrida fica sem registro. O botão Não fiz este treino guarda o motivo: doença ou dor não contam como falta na Revisão nem quebram a sequência de semanas.
 - **Corrida manual**, para treino sem relógio, conta no volume e nos marcos, mas não no nível nem nos recordes.
 - **Conquistas**, na Evolução, não mudam treino nem nível. Só corrida conta. A constância é medida por semana, nunca por dias seguidos, e uma semana com dor registrada não quebra a sequência: premiar dias seguidos contrariaria o descanso da planilha.
-- **Calendário**, na Planilha e na Evolução, mostra por mês o previsto, as corridas da planilha, as corridas fora dela e as outras atividades, inclusive antes de a planilha começar.
+- **Calendário**, na Planilha, mostra por mês o previsto, as corridas da planilha, as corridas fora dela e as outras atividades, inclusive antes de a planilha começar.
 - **Corrida fora da planilha** conta no volume e no nível, porque é carga real de corrida.
 - **Outras atividades** (caminhada, bicicleta, musculação etc.) chegam do relógio ou são registradas à mão. Aparecem em Hoje, no calendário e nos totais da Evolução, mas não entram no volume de corrida, no nível nem na revisão.
 - **Mudar o dia** move um treino para outro dia livre da mesma semana, com aviso se ficar colado em outro treino. Fora da semana, a carga semanal mudaria.
