@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { avulsaDoIntervals, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, resumoPorCategoria } from '../src/avulsas.js';
+import { avulsaDoIntervals, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, resumoPorCategoria, velocidadeDaAtividade } from '../src/avulsas.js';
 import { criarCliente } from '../src/icu.js';
 
 const HOJE = '2026-11-06';
@@ -9,12 +9,20 @@ const valida = { categoria: 'caminhada', data: HOJE, minutos: 45, km: null };
 test('atividade do relógio chega com categoria e dados', () => {
   const a = avulsaDoIntervals({
     id: 'i9', start_date_local: '2026-11-05T07:00:00', type: 'Walk', name: 'Caminhada da manhã',
-    distance: 3200, moving_time: 2700, average_heartrate: 108, max_heartrate: 124, total_elevation_gain: 22,
+    distance: 3200, moving_time: 2700, elapsed_time: 3000, calories: 210, icu_rpe: 3, icu_hr_zone_times: [600, 2100],
+    average_heartrate: 108, max_heartrate: 124, total_elevation_gain: 22,
   });
   assert.deepEqual(a, {
-    id: 'i9', data: '2026-11-05', categoria: 'caminhada', nome: 'Caminhada da manhã', minutos: 45, km: 3.2,
-    fcMedia: 108, fcMaxima: 124, subida: 22, origem: 'relogio',
+    id: 'i9', data: '2026-11-05', hora: '07:00', categoria: 'caminhada', nome: 'Caminhada da manhã', minutos: 45, seg: 2700, segTotal: 3000, km: 3.2,
+    fcMedia: 108, fcMaxima: 124, subida: 22, calorias: 210, rpe: 3, tempoPorZonaFc: [600, 2100], origem: 'relogio',
   });
+});
+
+test('caminhada mostra pace, bicicleta mostra velocidade e os demais nenhuma', () => {
+  assert.deepEqual(velocidadeDaAtividade({ categoria: 'caminhada', km: 8, seg: 5280 }), { nome: 'Pace médio', segPorKm: 660 });
+  assert.deepEqual(velocidadeDaAtividade({ categoria: 'bicicleta', km: 30, seg: 3600 }), { nome: 'Velocidade média', kmPorHora: 30 });
+  assert.equal(velocidadeDaAtividade({ categoria: 'natacao', km: 1, seg: 1800 }), null);
+  assert.equal(velocidadeDaAtividade({ categoria: 'caminhada', km: null, seg: 1800 }), null);
 });
 
 test('musculação fica sem distância e tipo desconhecido vira outro exercício', () => {

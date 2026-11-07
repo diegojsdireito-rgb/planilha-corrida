@@ -43,12 +43,28 @@ export function avulsaDoIntervals(a) {
     categoria: CATEGORIA_DO_TIPO[a.type] ?? 'outro',
     nome: a.name ?? null,
     minutos: Math.round((a.moving_time ?? 0) / 60),
+    seg: a.moving_time ?? 0,
+    segTotal: a.elapsed_time ?? null,
+    hora: String(a.start_date_local ?? '').slice(11, 16) || null,
     km: metros > 0 ? metros / 1000 : null,
     fcMedia: a.average_heartrate ?? null,
     fcMaxima: a.max_heartrate ?? null,
     subida: a.total_elevation_gain ?? null,
+    calorias: a.calories ?? null,
+    rpe: a.icu_rpe ?? null,
+    tempoPorZonaFc: Array.isArray(a.icu_hr_zone_times) ? a.icu_hr_zone_times : [],
     origem: 'relogio',
   };
+}
+
+// Caminhar se mede em pace, pedalar em km/h. Nos demais, a velocidade não diz nada útil.
+const EM_PACE = new Set(['caminhada', 'trilha', 'corrida']);
+
+export function velocidadeDaAtividade({ categoria, km, seg }) {
+  if (!km || !seg) return null;
+  if (EM_PACE.has(categoria)) return { nome: 'Pace médio', segPorKm: seg / km };
+  if (categoria === 'bicicleta') return { nome: 'Velocidade média', kmPorHora: km / (seg / 3600) };
+  return null;
 }
 
 export function erroDaAvulsa({ categoria, data, minutos, km }, hoje) {

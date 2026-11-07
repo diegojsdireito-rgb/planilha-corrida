@@ -1,6 +1,6 @@
 import { compararComPrevisto, ORDEM_DAS_ZONAS, ritmoDaProva, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
-import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria } from './avulsas.js';
+import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, velocidadeDaAtividade } from './avulsas.js';
 import { feitoForaDosTreinos, gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from './calendario.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
 import {
@@ -86,11 +86,12 @@ let gradePendente = null;
 let avulsaAberta = null;
 let provaAberta = null;
 let provasPendentes = null;
+let atividadeAberta = null;
 let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 23;
+const VERSAO_APP = 24;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -626,7 +627,7 @@ function linhaAvulsa(a) {
       <span class="suave">${esc(dados)}</span>
       ${a.nota ? `<span class="suave avulsa-nota">${esc(a.nota)}</span>` : ''}
     </span>`;
-  if (a.origem === 'relogio') return `<div class="avulsa-linha">${corpo}<span class="selo">Relógio</span></div>`;
+  if (a.origem === 'relogio') return `<button class="avulsa-linha" data-atividade="${esc(a.id)}" aria-label="Ver dados: ${esc(nomeDaCategoria(a.categoria))}, ${dataCurta(a.data)}">${corpo}<span class="sessao-fim"><span class="selo">Relógio</span>${icone('seta')}</span></button>`;
   return `<button class="avulsa-linha" data-avulsa="${esc(a.id)}" aria-label="Editar ${esc(nomeDaCategoria(a.categoria))}, ${dataCurta(a.data)}">${corpo}<span class="sessao-fim"><span class="selo">Manual</span>${icone('seta')}</span></button>`;
 }
 
@@ -1086,13 +1087,79 @@ function corpoCorridaFeita(a, naPlanilha) {
     <span class="selo">${naPlanilha ? 'Da planilha' : 'Fora da planilha'}</span>`;
 }
 
-const linhaCorridaFora = (a) => `<div class="avulsa-linha">${corpoCorridaFeita(a, false)}</div>`;
+const linhaCorridaFora = (a) => `<button class="avulsa-linha" data-atividade="${esc(a.id)}" aria-label="Ver dados: ${esc(a.nome ?? 'Corrida')}, ${dataCurta(a.data)}">${corpoCorridaFeita(a, false)}${icone('seta')}</button>`;
 
 const linhaSemDados = (a) => `
-  <div class="avulsa-linha">
+  <button class="avulsa-linha" data-atividade="${esc(a.id)}" aria-label="Ver dados: ${esc(a.nome ?? 'Corrida')}, ${dataCurta(a.data)}">
     <span class="sessao-corpo"><strong>${esc(a.nome ?? 'Corrida')}</strong><span class="suave">${dataCurta(a.data)}${a.seg ? `, ${formatarTempo(a.seg)}` : ''}. Chegou sem distância e fica fora do volume.</span></span>
-    <span class="selo">Sem dados</span>
-  </div>`;
+    <span class="selo">Sem dados</span>${icone('seta')}
+  </button>`;
+
+function atividadePorId(id) {
+  const igual = (a) => String(a.id) === String(id);
+  const corrida = estado.atividades.find(igual);
+  if (corrida) return { ...corrida, categoria: 'corrida', tipoDaAtividade: 'corrida' };
+  const semDistancia = estado.corridasSemDados.find(igual);
+  if (semDistancia) return { ...semDistancia, categoria: 'corrida', tipoDaAtividade: 'semDados' };
+  const outra = estado.outrasDoRelogio.find(igual);
+  return outra ? { ...outra, seg: outra.seg ?? outra.minutos * 60, tipoDaAtividade: 'outra' } : null;
+}
+
+function telaAtividade(a) {
+  const ehCorrida = a.tipoDaAtividade === 'corrida';
+  const naPlanilha = estado.plano.sessoes.some((s) => s.data === a.data);
+  const nome = a.tipoDaAtividade === 'outra' && (a.categoria !== 'outro' || !a.nome) ? nomeDaCategoria(a.categoria) : a.nome ?? 'Corrida';
+  const selo = { corrida: naPlanilha ? 'Da planilha' : 'Fora da planilha', semDados: 'Sem dados', outra: 'Do relógio' }[a.tipoDaAtividade];
+  const velocidade = velocidadeDaAtividade(a);
+  const numeros = [
+    a.km ? ['Distância', km(Math.round(a.km * 10) / 10)] : null,
+    a.seg ? ['Tempo em movimento', formatarTempo(a.seg)] : null,
+    velocidade?.segPorKm ? [velocidade.nome, `${formatarRitmo(velocidade.segPorKm)}/km`] : null,
+    velocidade?.kmPorHora ? [velocidade.nome, `${numeroKm(velocidade.kmPorHora)} km/h`] : null,
+  ].filter(Boolean);
+  const extras = [
+    a.segTotal && a.seg && a.segTotal - a.seg >= 60 ? ['Tempo total, com paradas', formatarTempo(a.segTotal)] : null,
+    a.fcMedia ? ['FC média', `${Math.round(a.fcMedia)} bpm`] : null,
+    a.fcMaxima ? ['FC máxima', `${Math.round(a.fcMaxima)} bpm`] : null,
+    a.subida ? ['Subida', `${Math.round(a.subida)} m`] : null,
+    a.calorias ? ['Calorias', `${Math.round(a.calorias)} kcal`] : null,
+    a.rpe ? ['Esforço no intervals.icu', `${a.rpe} de 10`] : null,
+  ].filter(Boolean);
+  const tempoPorZona = a.tempoPorZonaFc ?? [];
+  const totalZonas = tempoPorZona.reduce((t, s) => t + s, 0);
+  const nota = {
+    corrida: naPlanilha ? '' : 'Corrida em dia sem treino previsto. Conta no volume e no nível.',
+    semDados: 'O intervals.icu entregou esta atividade sem distância, por isso ela fica fora do volume. Isso acontece em esteira sem sensor e em atividade que entrou pelo Strava.',
+    outra: 'Conta no calendário e nos totais da Evolução, mas não no volume de corrida nem no nível.',
+  }[a.tipoDaAtividade];
+  return `
+    <section class="heroi">
+      <button class="voltar" data-acao="voltar">‹ Voltar</button>
+      <p class="sobretitulo">${esc(dataLonga(a.data))}${a.hora ? `, ${esc(a.hora)}` : ''}</p>
+      <h1>${esc(nome)}</h1>
+      <span class="selo">${selo}</span>
+      ${numeros.length ? `<div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>` : ''}
+    </section>
+    ${extras.length ? `<section class="cartao"><h2>Dados</h2><table class="ritmos"><tbody>${extras.map(([n, v]) => `<tr><td>${n}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table></section>` : ''}
+    ${totalZonas ? `
+      <section class="cartao">
+        <h2>Tempo por zona de frequência cardíaca</h2>
+        ${tempoPorZona.map((s, i) => (s > 0 ? barraDeZona(`Z${i + 1} de FC`, s, s / totalZonas) : '')).join('')}
+        <p class="suave">Zonas calculadas pelo intervals.icu.</p>
+      </section>` : ''}
+    ${ehCorrida && estado.chaveApi ? blocoAnalise(a, null, null) : ''}
+    ${nota ? `<section class="cartao"><p class="suave" style="margin:0">${esc(nota)}</p></section>` : ''}
+    <section class="cartao">
+      <h2>Mais detalhes</h2>
+      <p class="suave">Mapa e gráficos completos ficam no intervals.icu.</p>
+      <a class="botao-link" href="https://intervals.icu/activities/${encodeURIComponent(a.id)}" target="_blank" rel="noopener noreferrer">Abrir no intervals.icu</a>
+      ${estado.chaveApi && a.tipoDaAtividade !== 'semDados' ? `
+        <div class="botoes" style="margin-top:10px">
+          <button data-baixar="fit" data-id="${esc(a.id)}" data-data="${esc(a.data)}">Arquivo FIT</button>
+          <button data-baixar="gpx" data-id="${esc(a.id)}" data-data="${esc(a.data)}">Arquivo GPX</button>
+        </div>` : ''}
+    </section>`;
+}
 
 function celulaDoCalendario(d, selecionado) {
   const numero = Number(d.data.slice(8));
@@ -1176,17 +1243,17 @@ function linhaFeitaNaSemana({ tipo, data, item }) {
     const corpo = `${dataDaLinha}
       <span class="sessao-corpo"><strong>${esc(nome)}</strong><span class="suave">${item.origem === 'relogio' ? 'Do relógio' : 'Registro manual'}, ${duracaoCurta(item.minutos)}</span></span>`;
     const distancia = item.km ? km(Math.round(item.km * 10) / 10) : '';
-    if (item.origem === 'relogio') return `<div class="sessao t-outra">${corpo}<span class="sessao-fim"><span class="status">${distancia}</span></span></div>`;
+    if (item.origem === 'relogio') return `<button class="sessao t-outra" data-atividade="${esc(item.id)}" aria-label="Ver dados: ${esc(nome)}, ${dataCurta(data)}">${corpo}<span class="sessao-fim"><span class="status">${distancia}</span>${icone('seta')}</span></button>`;
     return `<button class="sessao t-outra" data-avulsa="${esc(item.id)}" aria-label="Editar ${esc(nome)}, ${dataCurta(data)}">${corpo}<span class="sessao-fim"><span class="status">${distancia}</span>${icone('seta')}</span></button>`;
   }
   if (tipo === 'semDados') {
-    return `<div class="sessao t-sem-dados">${dataDaLinha}
+    return `<button class="sessao t-sem-dados" data-atividade="${esc(item.id)}" aria-label="Ver dados: ${esc(item.nome ?? 'Corrida')}, ${dataCurta(data)}">${dataDaLinha}
       <span class="sessao-corpo"><strong>${esc(item.nome ?? 'Corrida')}</strong><span class="suave">Chegou sem distância</span></span>
-      <span class="sessao-fim"><span class="status">?</span></span></div>`;
+      <span class="sessao-fim"><span class="status">?</span>${icone('seta')}</span></button>`;
   }
-  return `<div class="sessao t-extra">${dataDaLinha}
+  return `<button class="sessao t-extra" data-atividade="${esc(item.id)}" aria-label="Ver dados: ${esc(item.nome ?? 'Corrida')}, ${dataCurta(data)}">${dataDaLinha}
     <span class="sessao-corpo"><strong>${esc(item.nome ?? 'Corrida')}</strong><span class="suave">Fora da planilha${item.seg ? `, ${formatarRitmo(item.seg / item.km)}/km` : ''}</span></span>
-    <span class="sessao-fim"><span class="status feito">${km(Math.round(item.km * 10) / 10)} feitos</span></span></div>`;
+    <span class="sessao-fim"><span class="status feito">${km(Math.round(item.km * 10) / 10)} feitos</span>${icone('seta')}</span></button>`;
 }
 
 function contagemDoFeito(lista) {
@@ -1267,6 +1334,7 @@ function blocoProvasRealizadas() {
 }
 
 function blocoAnalise(atividade, sessao, previsto) {
+  // Sem sessão é corrida fora da planilha: mostra como correu, sem comparar com previsto.
   const atributo = `data-analise="${esc(atividade.id)}"`;
   const analise = estado.analises[atividade.id];
   const atual = analise?.vdot === estado.plano.vdot ? analise : null;
@@ -1284,14 +1352,14 @@ function blocoAnalise(atividade, sessao, previsto) {
     return `<section class="cartao" ${atributo}><h2>Análise do treino</h2><p class="suave">Esta corrida não tem pace segundo a segundo. Corridas em esteira sem sensor costumam vir assim.</p></section>`;
   }
 
-  const comparacao = compararComPrevisto(atual.seg, previsto.zonas);
+  const comparacao = previsto ? compararComPrevisto(atual.seg, previsto.zonas) : null;
   const veredito = comparacao && vereditoDoTreino(comparacao);
   const partes = comparacao && [['abaixo', 'Abaixo', comparacao.abaixo], ['dentro', 'Na meta', comparacao.dentro], ['acima', 'Acima', comparacao.acima]];
   const anaerobico = atual.anaerobico / atual.total;
 
   return `
     <section class="cartao" ${atributo}>
-      <p class="sobretitulo">${sessao.tipo === 'prova' ? 'Análise da prova' : 'Análise do treino'}</p>
+      <p class="sobretitulo">${sessao?.tipo === 'prova' ? 'Análise da prova' : sessao ? 'Análise do treino' : 'Análise da corrida'}</p>
       ${comparacao ? `
         <h2>${esc(veredito.titulo)}</h2>
         <p class="meta-numero"><b>${pct(comparacao.dentro)}</b> do tempo na meta</p>
@@ -1303,7 +1371,7 @@ function blocoAnalise(atividade, sessao, previsto) {
         </div>
         ${veredito.tendencia ? `<p class="suave">${esc(veredito.tendencia)}</p>` : ''}
         ${sessao.tipo === 'prova' ? '' : `<p class="suave">Distância: ${km(Math.round(atividade.km * 10) / 10)} de ${km(previsto.distanciaKm)} previstos (${pct(atividade.km / previsto.distanciaKm)}).</p>`}` : '<h2>Como você correu</h2>'}
-      ${sessao.tipo === 'prova' && atual.metades ? blocoDasMetades(atual.metades) : ''}
+      ${sessao?.tipo === 'prova' && atual.metades ? blocoDasMetades(atual.metades) : ''}
       <h3>Tempo em cada ritmo</h3>
       ${ORDEM_DAS_ZONAS.filter((z) => atual.seg[z] > 0).map((z) => barraDeZona(NOMES_DAS_ZONAS[z], atual.seg[z], atual.seg[z] / atual.total, z)).join('')}
       <h3>Aeróbico e anaeróbico (estimativa)</h3>
@@ -1337,7 +1405,7 @@ async function carregarAnalise(atividade) {
   const id = CSS.escape(String(atividade.id));
   const sessao = estado.plano.sessoes.find((s) => s.data === atividade.data);
   const cartao = document.querySelector(`[data-analise="${id}"]`);
-  if (cartao && sessao) cartao.outerHTML = blocoAnalise(atividade, sessao, detalharSessao(sessao, estado.plano.vdot));
+  if (cartao) cartao.outerHTML = sessao ? blocoAnalise(atividade, sessao, detalharSessao(sessao, estado.plano.vdot)) : blocoAnalise(atividade, null, null);
   const feito = document.querySelector(`[data-feito="${id}"]`);
   if (feito && sessao) feito.textContent = textoFeito(atividade, sessao);
 }
@@ -1936,6 +2004,13 @@ function render() {
     window.scrollTo(0, 0);
     return;
   }
+  const atividade = atividadeAberta && atividadePorId(atividadeAberta);
+  if (atividade) {
+    app.innerHTML = telaAtividade(atividade);
+    window.scrollTo(0, 0);
+    if (atividade.tipoDaAtividade === 'corrida' && estado.chaveApi && !analisePronta(atividade) && !errosDeAnalise.has(atividade.id)) carregarAnalise(atividade);
+    return;
+  }
   const aberta = sessaoAberta && estado.plano.sessoes.find((s) => s.id === sessaoAberta);
   const telas = { hoje: telaHoje, plano: telaPlano, evolucao: telaEvolucao, revisao: telaRevisao, ajustes: telaAjustes };
   app.innerHTML = aberta ? telaDetalhe(aberta) : telas[aba]();
@@ -1948,6 +2023,7 @@ abas.addEventListener('click', (e) => {
   if (!botao) return;
   aba = botao.dataset.aba;
   sessaoAberta = null;
+  atividadeAberta = null;
   avulsaAberta = null;
   provaAberta = null;
   provasPendentes = null;
@@ -1956,6 +2032,7 @@ abas.addEventListener('click', (e) => {
 
 function voltarDoTreino() {
   sessaoAberta = null;
+  atividadeAberta = null;
   avulsaAberta = null;
   provaAberta = null;
   provasPendentes = null;
@@ -1966,9 +2043,9 @@ function voltarDoTreino() {
 // Dentro de um treino, só voltar. Nas abas, trocar para a vizinha.
 ligarGestos(app, {
   podeIniciar: () => Boolean(estado.plano) && !ocupado,
-  temDestino: (direcao) => (sessaoAberta || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
+  temDestino: (direcao) => (sessaoAberta || atividadeAberta || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
   aoDeslizar: (direcao) => {
-    if (sessaoAberta || avulsaAberta || provaAberta) {
+    if (sessaoAberta || atividadeAberta || avulsaAberta || provaAberta) {
       voltarDoTreino();
       return;
     }
@@ -2172,6 +2249,13 @@ app.addEventListener('click', (e) => {
     renderMantendoRolagem();
     return;
   }
+  const verAtividade = e.target.closest('[data-atividade]');
+  if (verAtividade) {
+    rolagemAnterior = window.scrollY;
+    atividadeAberta = verAtividade.dataset.atividade;
+    render();
+    return;
+  }
   const abrir = e.target.closest('[data-abrir]');
   if (abrir) {
     rolagemAnterior = window.scrollY;
@@ -2196,8 +2280,7 @@ app.addEventListener('click', (e) => {
   }
   const analisar = e.target.closest('[data-analisar]');
   if (analisar) {
-    const sessao = estado.plano.sessoes.find((s) => s.id === sessaoAberta);
-    const atividade = atividadeDoDia(sessao.data).find((a) => String(a.id) === analisar.dataset.analisar);
+    const atividade = estado.atividades.find((a) => String(a.id) === analisar.dataset.analisar);
     analisar.disabled = true;
     carregarAnalise(atividade);
     return;
@@ -2217,7 +2300,7 @@ app.addEventListener('click', (e) => {
     const { baixar: formato, id, data } = baixar.dataset;
     comOcupado(baixar, async () => {
       const conteudo = await criarCliente({ chave: estado.chaveApi }).arquivoDaCorrida(id, formato);
-      await salvarArquivo(conteudo, `corrida-${data}.${formato}`, 'application/octet-stream');
+      await salvarArquivo(conteudo, `atividade-${data}.${formato}`, 'application/octet-stream');
       render();
     });
     return;

@@ -113,6 +113,8 @@ p { margin: 0 0 8px; }
 .cal-ponto.feito { background: var(--ok); }
 .cal-ponto.extra { background: var(--z-maratona); }
 .cal-ponto.outra { background: var(--z-longo); }
+.botao-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--borda); border-radius: 13px; color: var(--texto); font-weight: 600; text-decoration: none; }
+.avulsa-linha > .icone { flex: none; width: 16px; height: 16px; color: var(--suave); }
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }
