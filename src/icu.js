@@ -102,7 +102,7 @@ export function eventoDaSessao(sessao, formatar) {
     external_id: sessao.id,
   };
   if (sessao.tipo === 'prova') {
-    return { ...comum, category: 'RACE_A', distance: sessao.distanciaKm * 1000 };
+    return { ...comum, category: `RACE_${sessao.prioridade ?? 'A'}`, distance: sessao.distanciaKm * 1000 };
   }
   return {
     ...comum,

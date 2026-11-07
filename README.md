@@ -34,6 +34,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/motor.js` | Ritmos (VDOT de Daniels e Gilbert), geração da planilha e revisão. Só funções puras. |
 | `src/analise.js` | Análise da corrida feita: tempo em cada ritmo, porcentagem na meta e estimativa anaeróbica. |
 | `src/avulsas.js` | Caminhadas e outros exercícios, do relógio ou lançados à mão. |
+| `src/provas.js` | Calendário de provas: principal, secundárias, volume comparado à referência e avisos de prazo. |
 | `src/regras.js` | Origem de cada regra (estudo, treinador ou decisão do app) mostrada em Ajustes. |
 | `src/icu.js` | Leitura de corridas e envio de treinos ao intervals.icu. |
 | `src/armazenamento.js` | Dados no aparelho e cópia de segurança. |
@@ -51,6 +52,8 @@ Regras principais:
 - **Dias livres são um limite, não uma obrigação.** Os treinos por semana dependem do volume (3 abaixo de 20 km, 4 abaixo de 35 km, 5 abaixo de 55 km, no máximo 6) e são espalhados para dar o maior descanso possível. No modo cuidadoso, o limite é 4.
 - **Volume** segue, como referência, planos publicados de Hal Higdon por prova e objetivo (`REFERENCIA_POR_META`), porque nenhum estudo define volume obrigatório. Sobe até 10% por semana, ou 5% no modo cuidadoso (lesão recente, 45 anos ou mais, IMC 30 ou mais), com semanas de recuperação e polimento: esses limites são decisão do app, não limiar comprovado.
 - **Limite por corrida**: nenhuma corrida planejada passa de 10% acima da maior dos últimos 30 dias, com acréscimo mínimo de 1 km (associação de Frandsen 2025, sem prova de causa). A prova fica de fora.
+- **Minhas provas**, na Planilha, guarda as provas inscritas. A principal define o ciclo e as anteriores entram como secundárias: importante reduz os 2 dias antes, de preparação só alivia longão na véspera, e as duas substituem o treino forte da semana. Toda mudança mostra o antes e depois antes de aplicar, e os avisos de prazo comparam com a referência, sem bloquear.
+- **Prova concluída**: a corrida do dia com distância até 20% diferente da prova (corte do app) vira o resultado. O app compara com a previsão congelada antes da prova e mostra as duas metades, as zonas e o VDOT. O resultado fica guardado na prova e aparece na Evolução, com o melhor tempo por distância. Ele conta para o nível, mas os ritmos só mudam por confirmação em Atualizar análise ou na Revisão.
 - **Treino forte** só entra para quem busca tempo. A origem de cada regra aparece em Ajustes e fica em `src/regras.js`.
 - **Detalhes do treino** mostram tempo e pace estimados pelo meio das faixas de ritmo, e zonas Z1 a Z5 de ritmo calculadas pelo app. Depois da corrida, trazem os dados reais e as zonas de frequência cardíaca do intervals.icu.
 - **Análise do treino** compara o tempo real em cada zona de ritmo com o previsto e mostra quanto ficou na meta, acima e abaixo (80% ou mais é "dentro da meta", 60% ou mais é "parcialmente": corte do app, não de estudo). A parte anaeróbica é aproximada pelo pace, porque o Training Effect do Garmin não vem pela API.

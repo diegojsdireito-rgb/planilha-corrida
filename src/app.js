@@ -1,4 +1,4 @@
-import { compararComPrevisto, ORDEM_DAS_ZONAS, temposPorZona, vereditoDoTreino } from './analise.js';
+import { compararComPrevisto, ORDEM_DAS_ZONAS, ritmoDaProva, temposPorZona, vereditoDoTreino } from './analise.js';
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
 import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, resumoPorCategoria } from './avulsas.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
@@ -29,12 +29,27 @@ import {
   preverTempoSeg,
   proximaSegunda,
   reanalisarPlano,
+  referenciaDaMeta,
   refazerComNovosDias,
+  refazerComProvas,
   segundaDaSemana,
   somarDias,
   VERSAO_REGRAS,
   ZONAS,
 } from './motor.js';
+import {
+  avisosDaProva,
+  erroDaProva,
+  escolherPrincipal,
+  marcarCorridasDeProva,
+  melhoresPorDistancia,
+  objetivoDaProva,
+  PRIORIDADES,
+  provasDoCiclo,
+  provasRealizadas,
+  registrarResultados,
+  volumeDoPlano,
+} from './provas.js';
 import { ORIGENS, REGRAS } from './regras.js';
 import { anelDeProgresso, diasAte, diasDaSemana, fasesDoPlano, icone, MARCA, perfilDoTreino } from './visual.js';
 
@@ -68,9 +83,11 @@ let cadastroAnterior = {};
 let analisePendente = null;
 let gradePendente = null;
 let avulsaAberta = null;
+let provaAberta = null;
+let provasPendentes = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = 19;
+const VERSAO_APP = 20;
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -132,7 +149,26 @@ const numero = (form, nome) => {
 const textoRitmo = (ritmo) =>
   typeof ritmo === 'number' ? `${formatarRitmo(ritmo)}/km` : `${formatarRitmo(ritmo.de)} a ${formatarRitmo(ritmo.ate)}/km`;
 
-const parametrosAtuais = () => ({ perfil: estado.perfil, objetivo: estado.objetivo, prudencia: avaliarPrudencia(estado.perfil) });
+const principalAtual = () => estado.provas.find((p) => p.data === estado.objetivo?.dataProva) ?? null;
+
+const parametrosAtuais = () => ({
+  perfil: estado.perfil,
+  objetivo: estado.objetivo,
+  prudencia: avaliarPrudencia(estado.perfil),
+  provas: provasDoCiclo(estado.provas, principalAtual(), hoje()),
+});
+
+// A prova do cadastro também aparece no calendário, inclusive em planilhas de versões anteriores.
+function garantirProvaDoObjetivo() {
+  const { dataProva, distanciaKm, meta, nome } = estado.objetivo ?? {};
+  if (!dataProva) return;
+  const dados = { data: dataProva, distanciaKm, meta: meta ?? 'terminar' };
+  if (estado.provas.some((p) => p.data === dataProva)) {
+    estado.provas = estado.provas.map((p) => (p.data === dataProva ? { ...p, ...dados } : p));
+    return;
+  }
+  estado.provas = [...estado.provas, { ...dados, id: `pr-${dataProva}`, nome: nome ?? `Prova de ${String(distanciaKm).replace('.', ',')} km`, prioridade: 'A' }];
+}
 
 const atividadeDoDia = (data) => estado.atividades.filter((a) => a.data === data);
 
@@ -152,7 +188,7 @@ async function comOcupado(botao, tarefa) {
 }
 
 // Redesenhar apagaria o que está sendo preenchido.
-const podeRedesenhar = () => !avulsaAberta && !document.activeElement?.matches('input, select, textarea');
+const podeRedesenhar = () => !avulsaAberta && !provaAberta && !document.activeElement?.matches('input, select, textarea');
 
 const todasAvulsas = () => juntarAvulsas(estado.avulsas, estado.outrasDoRelogio);
 
@@ -161,7 +197,8 @@ const todasAvulsas = () => juntarAvulsas(estado.avulsas, estado.outrasDoRelogio)
 async function sincronizar(chave = estado.chaveApi) {
   const dia = hoje();
   const { atividades, semDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
-  estado.atividades = atividades;
+  estado.atividades = marcarCorridasDeProva(atividades, estado.provas);
+  if (estado.plano) estado.provas = registrarResultados(estado.provas, atividades, estado.plano.vdot);
   estado.outrasDoRelogio = outras;
   estado.semDados = semDados;
   estado.ultimaSincronizacao = new Date().toISOString();
@@ -466,6 +503,7 @@ async function enviarCadastro(evento) {
           kmSemana: historico.kmSemana || numero(form, 'kmSemana') || 0,
           longoKm: Math.max(historico.longoKm, numero(form, 'longo') || 0),
         },
+        provas: provasDoCiclo(estado.provas, dataProva ? { id: null, data: dataProva } : null, dia).filter((p) => p.data !== dataProva),
       });
 
       estado = {
@@ -478,6 +516,7 @@ async function enviarCadastro(evento) {
         origemVdot: estimativa.origem,
         historicoNivel: registrarNivel(estado.historicoNivel, dia, plano.vdot),
       };
+      garantirProvaDoObjetivo();
       guardar();
       aba = 'plano';
       render();
@@ -679,6 +718,185 @@ function salvarAvulsa(formulario) {
   mostrarAviso('Atividade salva.');
 }
 
+function baseAtual(dia) {
+  const real = baseDasAtividades(estado.atividades, dia);
+  if (real.kmSemana > 0) return real;
+  const segunda = segundaDaSemana(dia);
+  const semana = estado.plano?.sessoes.filter((s) => s.data >= segunda && s.data < somarDias(segunda, 7) && s.tipo !== 'prova') ?? [];
+  return { kmSemana: semana.reduce((t, s) => t + s.distanciaKm, 0), longoKm: Math.max(0, ...semana.map((s) => s.distanciaKm)) };
+}
+
+function tabelaDeVolume(prova, sessoes) {
+  const ref = referenciaDaMeta({ distanciaKm: prova.distanciaKm, meta: prova.meta });
+  const seu = volumeDoPlano(sessoes);
+  const inteiro = (valor) => `${Math.round(valor)} km`;
+  const linhas = [
+    ['Pico por semana', inteiro(ref.pico), inteiro(seu.pico)],
+    ['4 semanas seguidas de maior volume', inteiro(ref.quatroSemanas), inteiro(seu.quatroSemanas)],
+    ['Maior corrida', inteiro(ref.longo), inteiro(seu.maior)],
+  ];
+  return `
+    <table class="ritmos comparacao">
+      <thead><tr><th></th><th>Referência</th><th>Sua planilha</th></tr></thead>
+      <tbody>${linhas.map(([nome, a, b]) => `<tr><td>${nome}</td><td>${a}</td><td>${b}</td></tr>`).join('')}</tbody>
+    </table>
+    <p class="suave" style="margin-top:10px">Referência para ${prova.meta === 'tempo' ? 'buscar tempo' : 'completar'}: planos de Hal Higdon, com ${ref.semanas} semanas de preparação. Nenhum estudo define um volume obrigatório, e trechos em minutos não entram nas somas.</p>`;
+}
+
+function linhaProva(p, dia, principal) {
+  const faltam = diasAte(dia, p.data);
+  const quando = p.resultado ? `Feita em ${formatarTempo(p.resultado.seg)}` : p.data < dia ? 'Sem corrida registrada' : faltam === 0 ? 'É hoje' : `Faltam ${faltam} dia${faltam > 1 ? 's' : ''}`;
+  const sessao = p.data <= dia && estado.plano.sessoes.find((s) => s.data === p.data && s.tipo === 'prova');
+  const destino = sessao ? `data-abrir="${esc(sessao.id)}" aria-label="Abrir resultado de ${esc(p.nome)}"` : `data-prova="${esc(p.id)}" aria-label="Editar ${esc(p.nome)}"`;
+  return `
+    <button class="avulsa-linha" ${destino}>
+      <span class="sessao-corpo">
+        <strong>${esc(p.nome)}</strong>
+        <span class="suave">${dataCurta(p.data)}, ${String(p.distanciaKm).replace('.', ',')} km, ${p.meta === 'tempo' ? 'buscar tempo' : 'completar'}. ${quando}.</span>
+      </span>
+      <span class="sessao-fim"><span class="selo">${p.id === principal?.id ? 'Principal' : p.prioridade === 'B' ? 'Importante' : p.prioridade === 'C' ? 'Preparação' : 'Próximo ciclo'}</span>${icone('seta')}</span>
+    </button>`;
+}
+
+function blocoProvas(dia) {
+  const emOrdem = [...estado.provas].sort((a, b) => a.data.localeCompare(b.data));
+  const futuras = emOrdem.filter((p) => p.data >= dia);
+  const passadas = emOrdem.filter((p) => p.data < dia).reverse();
+  const principal = principalAtual();
+  const avisos = principal ? avisosDaProva({ prova: principal, base: baseAtual(dia), hoje: dia, todas: estado.provas }) : [];
+  return `
+    <section class="cartao">
+      <h2>Minhas provas</h2>
+      ${futuras.length ? futuras.map((p) => linhaProva(p, dia, principal)).join('') : '<p class="suave">Nenhuma prova marcada. Inclua as provas em que se inscreveu para a planilha se organizar em torno delas.</p>'}
+      <button style="margin-top:8px" data-prova="nova">Adicionar prova</button>
+      ${principal && principal.data >= dia ? `
+        <h3>Volume para ${esc(principal.nome)}</h3>
+        ${tabelaDeVolume(principal, estado.plano.sessoes)}
+        ${avisos.length ? `<ul class="motivos">${avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}` : ''}
+      ${passadas.length ? `
+        <details class="tabela-grafico">
+          <summary>Provas realizadas (${passadas.length})</summary>
+          ${passadas.map((p) => linhaProva(p, dia, principal)).join('')}
+        </details>` : ''}
+    </section>`;
+}
+
+function telaProva() {
+  const dia = hoje();
+  if (provasPendentes) {
+    const { resultado, objetivo, novas, editada } = provasPendentes;
+    const nome = (o) => (o.dataProva ? esc(o.nome ?? `Prova de ${String(o.distanciaKm).replace('.', ',')} km`) : 'Condicionamento');
+    const principal = escolherPrincipal(novas, resultado.aPartirDe);
+    const avisos = editada ? avisosDaProva({ prova: editada, base: baseAtual(dia), hoje: dia, todas: novas }) : [];
+    return `
+      <header class="topo"><p class="sobretitulo">Antes de aplicar</p><h1>Como fica a planilha</h1></header>
+      <section class="cartao destaque">
+        <p><strong>Prova principal:</strong> ${nome(objetivo)}</p>
+        <p class="suave">Mudanças a partir de ${dataCurta(resultado.aPartirDe)}. Treinos passados não mudam, e uma prova nesta semana só altera os dias que faltam.</p>
+        <table class="ritmos comparacao">
+          <thead><tr><th>Na semana</th><th>Hoje</th><th>Nova</th></tr></thead>
+          <tbody>
+            <tr><td>Treinos</td><td>${resultado.antes.treinos}</td><td>${resultado.depois.treinos}</td></tr>
+            <tr><td>Volume</td><td>${km(resultado.antes.km)}</td><td>${km(resultado.depois.km)}</td></tr>
+          </tbody>
+        </table>
+      </section>
+      ${principal ? `<section class="cartao"><h2>Volume para ${esc(principal.nome)}</h2>${tabelaDeVolume(principal, resultado.plano.sessoes)}</section>` : ''}
+      ${avisos.length ? `<section class="cartao alerta"><h2>Compare com a referência</h2><ul class="motivos">${avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul><p class="suave">São comparações, não um veto: não há critério validado para dizer se uma meta é realista.</p></section>` : ''}
+      <div class="botoes">
+        <button class="principal" data-acao="aplicar-provas">Aplicar à planilha</button>
+        <button data-acao="cancelar-provas">Cancelar</button>
+      </div>`;
+  }
+
+  const item = estado.provas.find((p) => p.id === provaAberta);
+  const padrao = [5, 10, 21.1, 42.2];
+  const padronizada = item && padrao.includes(item.distanciaKm);
+  return `
+    <button class="voltar" data-acao="voltar">‹ Voltar</button>
+    <header class="topo">
+      <h1>${item ? 'Editar prova' : 'Adicionar prova'}</h1>
+      <p class="suave">A planilha se organiza em torno da prova principal. As anteriores a ela entram como secundárias.</p>
+    </header>
+    <form class="cartao" id="form-prova">
+      <label>Nome da prova<input name="nome" maxlength="60" value="${esc(item?.nome ?? '')}"></label>
+      <label>Data<input name="data" type="date" min="${dia}" value="${esc(item?.data ?? '')}"></label>
+      <label>Distância
+        <select name="distancia">
+          ${[[5, '5 km'], [10, '10 km'], [21.1, 'Meia maratona'], [42.2, 'Maratona']].map(([v, nome]) => `<option value="${v}" ${item?.distanciaKm === v ? 'selected' : ''}>${nome}</option>`).join('')}
+          <option value="outra" ${item && !padronizada ? 'selected' : ''}>Outra distância</option>
+        </select>
+      </label>
+      <label>Outra distância em km<input name="outra" inputmode="decimal" value="${item && !padronizada ? String(item.distanciaKm).replace('.', ',') : ''}"></label>
+      <label>O que você quer nesta prova
+        <select name="meta">
+          <option value="terminar" ${item?.meta === 'tempo' ? '' : 'selected'}>Completar, sem treino forte</option>
+          <option value="tempo" ${item?.meta === 'tempo' ? 'selected' : ''}>Buscar um tempo, com treino forte</option>
+        </select>
+      </label>
+      <label>Importância
+        <select name="prioridade">
+          ${Object.entries(PRIORIDADES).map(([v, nome]) => `<option value="${v}" ${item?.prioridade === v ? 'selected' : ''}>${esc(nome)}</option>`).join('')}
+        </select>
+      </label>
+      <p id="erro-prova" class="erro" role="alert"></p>
+      <div class="botoes">
+        <button class="principal" type="submit">Ver como fica</button>
+        ${item ? '<button type="button" class="perigo" data-acao="excluir-prova">Excluir</button>' : ''}
+      </div>
+    </form>`;
+}
+
+function prepararProvas(novas, editada) {
+  const dia = hoje();
+  const aPartirDe = dia < estado.plano.inicio ? estado.plano.inicio : proximaSegunda(dia);
+  const principal = escolherPrincipal(novas, aPartirDe);
+  const objetivo = objetivoDaProva(principal);
+  const resultado = refazerComProvas({
+    plano: estado.plano,
+    parametros: { perfil: estado.perfil, objetivo, prudencia: avaliarPrudencia(estado.perfil) },
+    provas: provasDoCiclo(novas, principal, dia),
+    hoje: dia,
+  });
+  if (!resultado) {
+    estado.provas = novas;
+    guardar();
+    provaAberta = null;
+    render();
+    mostrarAviso('Prova salva. Esta planilha já terminou: comece um novo ciclo nos Ajustes.');
+    return;
+  }
+  provasPendentes = { novas, objetivo, resultado, editada };
+  render();
+}
+
+function salvarProva(formulario) {
+  const form = new FormData(formulario);
+  const escolha = String(form.get('distancia'));
+  const dados = {
+    nome: String(form.get('nome') ?? '').trim(),
+    data: String(form.get('data') ?? ''),
+    distanciaKm: escolha === 'outra' ? Number(String(form.get('outra') ?? '').replace(',', '.')) : Number(escolha),
+    meta: String(form.get('meta')),
+    prioridade: String(form.get('prioridade')),
+  };
+  const erro = document.getElementById('erro-prova');
+  erro.textContent = erroDaProva(dados, hoje()) ?? '';
+  if (erro.textContent) return;
+  const repetida = estado.provas.find((p) => p.data === dados.data && p.id !== provaAberta);
+  if (repetida) {
+    erro.textContent = `Já há uma prova nesta data: ${repetida.nome}.`;
+    return;
+  }
+  const editando = estado.provas.some((p) => p.id === provaAberta);
+  const registro = { ...dados, id: editando ? provaAberta : `pr-${Date.now()}` };
+  try {
+    prepararProvas(editando ? estado.provas.map((p) => (p.id === provaAberta ? registro : p)) : [...estado.provas, registro], registro);
+  } catch (falha) {
+    erro.textContent = falha.message;
+  }
+}
+
 function blocoDoObjetivo(dia) {
   const { plano, objetivo } = estado;
   const atual = plano.sessoes.find((s) => s.data >= dia) ?? plano.sessoes[plano.sessoes.length - 1];
@@ -690,7 +908,7 @@ function blocoDoObjetivo(dia) {
   const dias = prova ? diasAte(dia, objetivo.dataProva) : 0;
   return `
     <section class="cartao">
-      <p class="sobretitulo">${prova ? `Prova de ${String(objetivo.distanciaKm).replace('.', ',')} km` : 'Condicionamento'}</p>
+      <p class="sobretitulo">${prova ? esc(objetivo.nome ?? `Prova de ${String(objetivo.distanciaKm).replace('.', ',')} km`) : 'Condicionamento'}</p>
       <h2>${prova ? (dias === 0 ? 'É hoje!' : `Falta${dias > 1 ? 'm' : ''} ${dias} dia${dias > 1 ? 's' : ''}`) : `Semana ${atual.semana} de ${plano.totalSemanas}`}</h2>
       <div class="fases" role="img" aria-label="Avanço pelas fases da planilha">${barras}</div>
       <p class="suave" style="margin:0">Fase de ${FASES[atual.fase].toLowerCase()}${prova ? `, semana ${atual.semana} de ${plano.totalSemanas}` : ''}${atual.recuperacao ? ', semana de recuperação' : ''}</p>
@@ -788,6 +1006,69 @@ const analisesEmAndamento = new Set();
 const errosDeAnalise = new Map();
 const pct = (fracao) => `${Math.round(fracao * 100)}%`;
 
+const TEXTO_DAS_METADES = {
+  perdeu: 'Você terminou mais devagar do que começou. Largar um pouco mais controlado pode ajudar.',
+  ganhou: 'Você terminou mais rápido do que começou, com a segunda metade mais forte.',
+  manteve: 'Você manteve o ritmo do início ao fim.',
+};
+
+function blocoDasMetades(metades) {
+  return `
+    <h3>Primeira e segunda metade</h3>
+    <div class="numeros numeros-2">
+      <div><b>${formatarRitmo(metades.primeira)}/km</b><span>1ª metade</span></div>
+      <div><b>${formatarRitmo(metades.segunda)}/km</b><span>2ª metade</span></div>
+    </div>
+    <p class="suave" style="margin-top:10px">${TEXTO_DAS_METADES[ritmoDaProva(metades)]} Diferença de até 2% conta como ritmo mantido, e o GPS pode errar parte disso.</p>`;
+}
+
+function comparacaoComPrevisto(seg, previstoSeg) {
+  const diferenca = Math.round(seg - previstoSeg);
+  if (Math.abs(diferenca) < 30) return `Dentro da previsão de ${formatarTempo(previstoSeg)}.`;
+  return `${formatarTempo(Math.abs(diferenca))} ${diferenca < 0 ? 'mais rápido' : 'mais lento'} que a previsão de ${formatarTempo(previstoSeg)}.`;
+}
+
+function blocoResultadoDaProva(sessao, atividade) {
+  const registrada = estado.provas.find((p) => p.data === sessao.data && p.resultado)?.resultado;
+  const previstoSeg = registrada?.previstoSeg ?? preverTempoSeg(estado.plano.vdot, sessao.distanciaKm);
+  const nivel = String(registrada?.vdot ?? '').replace('.', ',');
+  return `
+    <section class="cartao destaque">
+      <p class="sobretitulo">Resultado da prova</p>
+      <p class="meta-numero"><b>${formatarTempo(atividade.seg)}</b></p>
+      <p>${esc(comparacaoComPrevisto(atividade.seg, previstoSeg))}</p>
+      <p class="suave">Pace médio de ${formatarRitmo(atividade.seg / atividade.km)}/km em ${km(Math.round(atividade.km * 10) / 10)} no GPS.</p>
+      ${nivel ? `<p class="suave">Nível nesta prova: VDOT ${nivel}. Sua planilha usa ${String(estado.plano.vdot).replace('.', ',')}. Para atualizar os ritmos, use Revisão › Atualizar análise.</p>` : ''}
+    </section>`;
+}
+
+function blocoProvasRealizadas() {
+  const lista = provasRealizadas(estado.provas, estado.atividades);
+  if (!lista.length) return '';
+  const nome = (p) => `${String(Math.round(p.distanciaKm * 10) / 10).replace('.', ',')} km`;
+  const grafico = linhaDeEvolucao(
+    [...lista].reverse().map((p) => ({ data: p.data, valor: p.vdot })),
+    { nome: 'VDOT nas provas', formatar: (v) => v.toFixed(1).replace('.', ','), passoMinimo: 0.5 },
+  );
+  return `
+    <section class="cartao">
+      <h2>Minhas provas realizadas</h2>
+      ${lista.map((p) => `
+        <div class="avulsa-linha">
+          <span class="sessao-corpo">
+            <strong>${esc(p.nome)}</strong>
+            <span class="suave">${dataCurta(p.data)}, ${nome(p)}, ${formatarRitmo(p.seg / p.km)}/km, VDOT ${String(p.vdot).replace('.', ',')}</span>
+            ${p.previstoSeg ? `<span class="suave">${esc(comparacaoComPrevisto(p.seg, p.previstoSeg))}</span>` : ''}
+          </span>
+          <span class="status">${formatarTempo(p.seg)}</span>
+        </div>`).join('')}
+      <h3>Melhor tempo por distância</h3>
+      <table class="ritmos"><tbody>${melhoresPorDistancia(lista).map((p) => `<tr><td>${nome(p)}</td><td>${formatarTempo(p.seg)}</td></tr>`).join('')}</tbody></table>
+      ${grafico ? `<h3>Nível estimado nas provas (VDOT)</h3>${grafico}` : ''}
+      <p class="suave" style="margin-top:10px">O nível usa a distância oficial e o tempo do relógio. Percurso, relevo e calor mudam o resultado, então compare provas parecidas.</p>
+    </section>`;
+}
+
 function blocoAnalise(atividade, sessao, previsto) {
   const atributo = `data-analise="${esc(atividade.id)}"`;
   const analise = estado.analises[atividade.id];
@@ -813,7 +1094,7 @@ function blocoAnalise(atividade, sessao, previsto) {
 
   return `
     <section class="cartao" ${atributo}>
-      <p class="sobretitulo">Análise do treino</p>
+      <p class="sobretitulo">${sessao.tipo === 'prova' ? 'Análise da prova' : 'Análise do treino'}</p>
       ${comparacao ? `
         <h2>${esc(veredito.titulo)}</h2>
         <p class="meta-numero"><b>${pct(comparacao.dentro)}</b> do tempo na meta</p>
@@ -825,6 +1106,7 @@ function blocoAnalise(atividade, sessao, previsto) {
         </div>
         ${veredito.tendencia ? `<p class="suave">${esc(veredito.tendencia)}</p>` : ''}
         ${sessao.tipo === 'prova' ? '' : `<p class="suave">Distância: ${km(Math.round(atividade.km * 10) / 10)} de ${km(previsto.distanciaKm)} previstos (${pct(atividade.km / previsto.distanciaKm)}).</p>`}` : '<h2>Como você correu</h2>'}
+      ${sessao.tipo === 'prova' && atual.metades ? blocoDasMetades(atual.metades) : ''}
       <h3>Tempo em cada ritmo</h3>
       ${ORDEM_DAS_ZONAS.filter((z) => atual.seg[z] > 0).map((z) => barraDeZona(NOMES_DAS_ZONAS[z], atual.seg[z], atual.seg[z] / atual.total, z)).join('')}
       <h3>Aeróbico e anaeróbico (estimativa)</h3>
@@ -969,7 +1251,7 @@ function telaEvolucao() {
         <h2>Ainda não há corridas</h2>
         <p>${estado.chaveApi ? 'Quando o Garmin sincronizar com o intervals.icu, suas corridas aparecem aqui.' : 'Conecte o intervals.icu nos Ajustes para trazer suas corridas do Garmin.'}</p>
       </section>
-      ${blocoOutrasNaEvolucao(dia)}${atualizacao}${blocoPrevisoes}`;
+      ${blocoProvasRealizadas()}${blocoOutrasNaEvolucao(dia)}${atualizacao}${blocoPrevisoes}`;
   }
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
@@ -1037,6 +1319,7 @@ function telaEvolucao() {
       <h2>Recordes em 12 meses</h2>
       <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
     </section>
+    ${blocoProvasRealizadas()}
     ${blocoOutrasNaEvolucao(dia)}
     ${blocoPrevisoes}
     <section class="cartao">
@@ -1114,6 +1397,7 @@ function telaDetalhe(sessao) {
       <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : `Estimativa pelo meio das faixas de ritmo, com o seu nível atual. Nessas faixas, o treino leva ${faixaDoTreino(sessao).tempo}.`}</p>
     </section>
     ${blocoMudarDia(sessao, dia)}
+    ${sessao.tipo === 'prova' && realizadas.length ? blocoResultadoDaProva(sessao, realizadas.find((a) => a.prova) ?? realizadas[0]) : ''}
     ${estado.chaveApi ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}
     ${realizadas.map((a) => blocoRealizado(a, d)).join('')}
     <section class="cartao">
@@ -1170,6 +1454,7 @@ function telaPlano() {
     </header>
     ${avisoPlanilhaAntiga()}
     ${blocoDoObjetivo(dia)}
+    ${blocoProvas(dia)}
     ${plano.prudencia?.prudente ? `<section class="cartao alerta"><strong>Progressão mais cuidadosa:</strong> ${esc(plano.prudencia.motivos.join(', '))}.</section>` : ''}
     ${(plano.avisos ?? []).map((a) => `<section class="cartao alerta">${esc(a)}</section>`).join('')}
     ${lista}
@@ -1201,6 +1486,7 @@ const TITULOS_ACAO = {
   semDados: 'Ainda é cedo para revisar',
   analise: 'Análise atualizada com suas corridas',
   dias: 'Dias de treino alterados',
+  provas: 'Calendário de provas alterado',
 };
 
 function blocoAtualizarAnalise() {
@@ -1440,8 +1726,8 @@ function render() {
   if (!estado.plano && !estado.avisoCiente) return telaBoasVindas();
   if (!estado.plano) return telaCadastro(cadastroAnterior);
   renderAbas();
-  if (avulsaAberta) {
-    app.innerHTML = telaAvulsa();
+  if (avulsaAberta || provaAberta) {
+    app.innerHTML = avulsaAberta ? telaAvulsa() : telaProva();
     window.scrollTo(0, 0);
     return;
   }
@@ -1458,12 +1744,16 @@ abas.addEventListener('click', (e) => {
   aba = botao.dataset.aba;
   sessaoAberta = null;
   avulsaAberta = null;
+  provaAberta = null;
+  provasPendentes = null;
   render();
 });
 
 function voltarDoTreino() {
   sessaoAberta = null;
   avulsaAberta = null;
+  provaAberta = null;
+  provasPendentes = null;
   render();
   window.scrollTo(0, rolagemAnterior);
 }
@@ -1471,9 +1761,9 @@ function voltarDoTreino() {
 // Dentro de um treino, só voltar. Nas abas, trocar para a vizinha.
 ligarGestos(app, {
   podeIniciar: () => Boolean(estado.plano) && !ocupado,
-  temDestino: (direcao) => (sessaoAberta || avulsaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
+  temDestino: (direcao) => (sessaoAberta || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
   aoDeslizar: (direcao) => {
-    if (sessaoAberta || avulsaAberta) {
+    if (sessaoAberta || avulsaAberta || provaAberta) {
       voltarDoTreino();
       return;
     }
@@ -1483,7 +1773,7 @@ ligarGestos(app, {
 });
 
 ligarPuxada(app, document.getElementById('puxada'), {
-  podeIniciar: () => Boolean(estado.plano) && !ocupado && !avulsaAberta,
+  podeIniciar: () => Boolean(estado.plano) && !ocupado && !avulsaAberta && !provaAberta,
   aoAtualizar: atualizarPorGesto,
 });
 
@@ -1521,6 +1811,32 @@ const acoes = {
     render();
     if (!analisePendente) mostrarAviso('Esta planilha já terminou. Comece um novo ciclo nos Ajustes.');
   }),
+
+  'excluir-prova': () => {
+    const erro = document.getElementById('erro-prova');
+    try {
+      prepararProvas(estado.provas.filter((p) => p.id !== provaAberta), null);
+    } catch (falha) {
+      erro.textContent = falha.message;
+    }
+  },
+
+  'cancelar-provas': () => {
+    provasPendentes = null;
+    voltarDoTreino();
+  },
+
+  'aplicar-provas': () => {
+    const { novas, objetivo, resultado } = provasPendentes;
+    estado.provas = novas;
+    estado.objetivo = objetivo;
+    estado.plano = resultado.plano;
+    estado.revisoes.push({ data: hoje(), acao: 'provas', motivos: [] });
+    guardar();
+    voltarDoTreino();
+    mostrarAviso(estado.chaveApi && !estado.envioAutomatico ? 'Planilha atualizada. Envie os treinos de novo.' : 'Planilha atualizada com as provas.');
+    setTimeout(enviarAutomaticamente);
+  },
 
   'excluir-avulsa': () => {
     if (!window.confirm('Excluir esta atividade?')) return;
@@ -1596,7 +1912,7 @@ const acoes = {
 
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
-    const { avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       idade: perfil.idade,
       peso: perfil.pesoKg,
@@ -1609,7 +1925,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -1621,6 +1937,14 @@ app.addEventListener('click', (e) => {
   if (abrir) {
     rolagemAnterior = window.scrollY;
     sessaoAberta = abrir.dataset.abrir;
+    render();
+    return;
+  }
+  const botaoDaProva = e.target.closest('[data-prova]');
+  if (botaoDaProva) {
+    rolagemAnterior = window.scrollY;
+    provaAberta = botaoDaProva.dataset.prova;
+    provasPendentes = null;
     render();
     return;
   }
@@ -1693,6 +2017,7 @@ app.addEventListener('submit', (e) => {
 
   if (e.target.id === 'form-dias') return verNovaGrade(e.target);
   if (e.target.id === 'form-avulsa') return salvarAvulsa(e.target);
+  if (e.target.id === 'form-prova') return salvarProva(e.target);
 
   if (e.target.id === 'form-chave') {
     const chave = String(new FormData(e.target).get('chave') ?? '').trim();
@@ -1743,5 +2068,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') aoAbrir();
 });
 
+garantirProvaDoObjetivo();
 render();
 aoAbrir();

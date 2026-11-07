@@ -7,6 +7,7 @@ export const estadoInicial = () => ({
   chaveApi: '',
   perfil: null,
   objetivo: null,
+  provas: [],
   tempoInformado: null,
   plano: null,
   atividades: [],

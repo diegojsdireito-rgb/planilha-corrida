@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compararComPrevisto, limitesDasZonas, temposPorZona, vereditoDoTreino } from '../src/analise.js';
+import { compararComPrevisto, limitesDasZonas, ritmoDaProva, temposPorZona, vereditoDoTreino } from '../src/analise.js';
 
 const ritmos = { leve: { de: 353, ate: 388 }, maratona: 314, meia: 302, limiar: 294, intervalado: 265 };
 const velocidadeDe = (segPorKm) => 1000 / segPorKm;
@@ -31,6 +31,19 @@ test('anaeróbico estimado é o tempo no pace de intervalado ou mais rápido', (
   assert.equal(r.anaerobico, 10);
   assert.equal(r.seg.intervalado, 20);
   assert.ok(limitesDasZonas(ritmos).anaerobico === 265);
+});
+
+test('divide a corrida em duas metades de distância, sem contar parada', () => {
+  const r = temposPorZona({ velocidade: [...repetir(300, 600), 0, 0, ...repetir(360, 720)], ritmos });
+  perto(r.metades.primeira, 300);
+  perto(r.metades.segunda, 360);
+  assert.equal(r.parado, 2);
+});
+
+test('classifica a prova por 2% de diferença entre as metades', () => {
+  assert.equal(ritmoDaProva({ primeira: 300, segunda: 320 }), 'perdeu');
+  assert.equal(ritmoDaProva({ primeira: 320, segunda: 300 }), 'ganhou');
+  assert.equal(ritmoDaProva({ primeira: 300, segunda: 303 }), 'manteve');
 });
 
 test('corrida leve toda no ritmo fica 100% na meta', () => {

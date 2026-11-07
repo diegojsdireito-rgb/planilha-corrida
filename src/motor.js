@@ -152,13 +152,23 @@ export function avaliarPrudencia({ idade, pesoKg, alturaCm, lesaoRecente }) {
 // Pico semanal e maior corrida dos planos de Hal Higdon, conferidos nas tabelas originais:
 // Novice para completar, Intermediate para buscar tempo. São referência de treinador: nenhum
 // estudo define volume obrigatório. Sem prova, usar o 5 km Intermediate é decisão do app.
+// quatroSemanas é a soma, feita pelo app, das 4 semanas seguidas de maior volume antes do polimento;
+// entrada é o volume da semana 1 ou o declarado pelo plano. Partes em minutos não entram nas somas.
 const REFERENCIA_POR_META = {
-  terminar: { 5: { pico: 13, longo: 5 }, 10: { pico: 17, longo: 9 }, 21.1: { pico: 37, longo: 16 }, 42.2: { pico: 64, longo: 32 } },
-  tempo: { 5: { pico: 29, longo: 11 }, 10: { pico: 34, longo: 13 }, 21.1: { pico: 55, longo: 19 }, 42.2: { pico: 71, longo: 32 } },
+  terminar: {
+    5: { pico: 13, longo: 5, quatroSemanas: 46, semanas: 8, entrada: 0 },
+    10: { pico: 17, longo: 9, quatroSemanas: 63, semanas: 8, entrada: 0 },
+    21.1: { pico: 37, longo: 16, quatroSemanas: 126, semanas: 12, entrada: 14 },
+    42.2: { pico: 64, longo: 32, quatroSemanas: 222, semanas: 18, entrada: 24 },
+  },
+  tempo: {
+    5: { pico: 29, longo: 11, quatroSemanas: 93, semanas: 8, entrada: 24 },
+    10: { pico: 34, longo: 13, quatroSemanas: 111, semanas: 8, entrada: 24 },
+    21.1: { pico: 55, longo: 19, quatroSemanas: 180, semanas: 12, entrada: 27 },
+    42.2: { pico: 71, longo: 32, quatroSemanas: 264, semanas: 18, entrada: 39 },
+  },
 };
-const REFERENCIA_SEM_PROVA = { pico: 29, longo: 11 };
-// Volume de entrada dos planos para buscar tempo, em km por semana.
-const ENTRADA_PARA_TEMPO_KM = { 5: 24, 10: 24, 21.1: 27, 42.2: 24 };
+const REFERENCIA_SEM_PROVA = { pico: 29, longo: 11, quatroSemanas: 93, semanas: 12, entrada: 0 };
 const POLIMENTO = { 5: [0.6], 10: [0.6], 21.1: [0.75, 0.5], 42.2: [0.8, 0.65, 0.45] };
 const SEMANAS_SEM_PROVA = 12;
 const MAXIMO_SEMANAS = 52;
@@ -175,8 +185,13 @@ const meioKm = (km) => Math.max(0.5, Math.round(km * 2) / 2);
 
 export function referenciaDaMeta({ distanciaKm, meta }) {
   if (!distanciaKm) return REFERENCIA_SEM_PROVA;
-  return REFERENCIA_POR_META[meta === 'tempo' ? 'tempo' : 'terminar'][distanciaKm] ?? REFERENCIA_SEM_PROVA;
+  const tabela = REFERENCIA_POR_META[meta === 'tempo' ? 'tempo' : 'terminar'];
+  // Distância sem plano localizado usa a próxima maior: decisão do app.
+  const chave = Object.keys(tabela).map(Number).sort((a, b) => a - b).find((d) => d >= distanciaKm) ?? 42.2;
+  return tabela[chave];
 }
+
+export const distanciaTemReferencia = (distanciaKm) => Object.keys(REFERENCIA_POR_META.tempo).map(Number).includes(distanciaKm);
 
 // Nenhuma corrida planejada passa de 10% acima da maior dos últimos 30 dias: associação de
 // Frandsen 2025, sem prova de causa. O acréscimo mínimo de 1 km e a base de 5 km são decisão
@@ -353,7 +368,8 @@ function montarSemana({ segunda, fase, km, recuperacao, parametros, ritmos, limi
       id: `pc-${prova}`,
       data: prova,
       tipo: 'prova',
-      nome: `Prova de ${distancia} km`,
+      nome: objetivo.nome ?? `Prova de ${String(distancia).replace('.', ',')} km`,
+      prioridade: 'A',
       distanciaKm: distancia,
       porque: 'Dia de colher o treino. Comece controlado e solte no final.',
       blocos: [],
@@ -470,7 +486,60 @@ export function gerarPlano(parametros) {
     primeira = false;
   }
 
-  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes, avisos: avisosDoPlano({ objetivo, base, ritmos, referencia }) };
+  const dentroDoCiclo = (parametros.provas ?? []).filter((p) => p.data < somarDias(inicio, total * 7));
+  const comProvas = encaixarProvas(sessoes, dentroDoCiclo, { inicio, desde: segundaDaSemana(aPartirDe), ritmos });
+  return { versaoRegras: VERSAO_REGRAS, inicio, totalSemanas: total, vdot, ritmos, prudencia, sessoes: comProvas, avisos: avisosDoPlano({ objetivo, base, ritmos, referencia }) };
+}
+
+const TIPOS_FORTES = ['limiar', 'intervalado', 'ritmo'];
+const KM_MINIMO_ANTES_DA_PROVA = 3;
+const REDUCAO_ANTES_DA_PROVA = 0.5;
+// Dias sem treino forte depois de uma prova longa: recomendação de treinadores (Higdon, Pfitzinger).
+const diasSemForteDepoisDaProva = (distanciaKm) => (distanciaKm >= 42 ? 21 : distanciaKm >= 21 ? 14 : 0);
+
+// A/B/C é consenso de treinadores, sem estudo em recreativos. A prova secundária é o esforço
+// forte da semana. B reduz 2 dias antes; C só alivia a véspera; o dia seguinte é descanso (decisão do app).
+export function encaixarProvas(sessoes, provas, { inicio, desde, ritmos }) {
+  let lista = [...sessoes];
+  for (const prova of [...provas].sort((a, b) => a.data.localeCompare(b.data))) {
+    if (prova.data < desde) continue;
+    const segunda = segundaDaSemana(prova.data);
+    const fim = somarDias(segunda, 7);
+    const daSemana = (s) => s.data >= segunda && s.data < fim;
+    const referencia = lista.find(daSemana);
+    const reduzirDias = prova.prioridade === 'B' ? [1, 2] : [1];
+    const seguinte = somarDias(prova.data, 1);
+    const antes = reduzirDias.map((d) => somarDias(prova.data, -d));
+    const limiteSemForte = somarDias(prova.data, diasSemForteDepoisDaProva(prova.distanciaKm));
+
+    lista = lista
+      .filter((s) => s.tipo === 'prova' || (s.data !== prova.data && s.data !== seguinte))
+      .filter((s) => s.tipo === 'prova' || !(daSemana(s) && TIPOS_FORTES.includes(s.tipo)))
+      .filter((s) => !(daSemana(s) && s.tipo === 'longo' && s.distanciaKm <= prova.distanciaKm))
+      .map((s) => {
+        if (s.tipo === 'prova') return s;
+        const veio = (km, nome, porque) => ({ ...sessaoLeve(s.data, km, ritmos, nome, porque), semana: s.semana, fase: s.fase, recuperacao: s.recuperacao });
+        const reduzir = antes.includes(s.data) && (prova.prioridade === 'B' || s.tipo === 'longo');
+        if (reduzir) return veio(meioKm(Math.max(KM_MINIMO_ANTES_DA_PROVA, s.distanciaKm * REDUCAO_ANTES_DA_PROVA)), 'Corrida leve antes da prova', 'Treino reduzido para chegar descansado à prova.');
+        if (s.data > prova.data && s.data < limiteSemForte && TIPOS_FORTES.includes(s.tipo)) return veio(s.distanciaKm, 'Corrida leve de recuperação', 'Sem treino forte depois de uma prova longa.');
+        return s;
+      });
+
+    lista.push({
+      id: `pc-${prova.data}`,
+      data: prova.data,
+      tipo: 'prova',
+      prioridade: prova.prioridade,
+      nome: prova.nome,
+      distanciaKm: prova.distanciaKm,
+      porque: { A: 'Dia de colher o treino. Comece controlado e solte no final.', B: 'Prova secundária: chegue descansado, com poucos dias de redução.' }[prova.prioridade] ?? 'Prova de preparação: faz o papel do treino forte da semana.',
+      blocos: [],
+      semana: referencia?.semana ?? Math.floor(diasEntre(inicio, segunda) / 7) + 1,
+      fase: referencia?.fase ?? 'base',
+      recuperacao: referencia?.recuperacao ?? false,
+    });
+  }
+  return lista.sort((a, b) => a.data.localeCompare(b.data));
 }
 
 // Mostra o limite em vez de cortar em silêncio. Nada aqui bloqueia a planilha.
@@ -480,9 +549,8 @@ function avisosDoPlano({ objetivo, base, ritmos, referencia }) {
   if (longoPeloTempo < referencia.longo) {
     avisos.push(`O limite de 3 horas, regra de prudência do app, deixa seu longão em até ${String(longoPeloTempo).replace('.', ',')} km. Os planos de referência para esta prova chegam a ${referencia.longo} km.`);
   }
-  const entrada = ENTRADA_PARA_TEMPO_KM[objetivo.distanciaKm];
-  if (objetivo.meta === 'tempo' && entrada && base.kmSemana < entrada) {
-    avisos.push(`Os planos de referência para buscar tempo começam com cerca de ${entrada} km por semana, e sua base é de ${String(Math.round(base.kmSemana * 10) / 10).replace('.', ',')} km. Isso não impede a planilha, mas o prazo pode ficar curto.`);
+  if (objetivo.distanciaKm && objetivo.meta === 'tempo' && base.kmSemana < referencia.entrada) {
+    avisos.push(`Os planos de referência para buscar tempo começam com cerca de ${referencia.entrada} km por semana, e sua base é de ${String(Math.round(base.kmSemana * 10) / 10).replace('.', ',')} km. Isso não impede a planilha, mas o prazo pode ficar curto.`);
   }
   return avisos;
 }
@@ -543,7 +611,8 @@ export function diasParaMudar({ plano, sessao, atividades, hoje }) {
 
   const outras = plano.sessoes.filter((s) => s.id !== sessao.id);
   const segunda = segundaDaSemana(sessao.data);
-  const prova = plano.sessoes.find((s) => s.tipo === 'prova')?.data;
+  // A última prova encerra a planilha: as secundárias no meio dela não travam as semanas seguintes.
+  const prova = plano.sessoes.filter((s) => s.tipo === 'prova').at(-1)?.data;
   const opcoes = [];
   for (let i = 0; i < 7; i++) {
     const data = somarDias(segunda, i);
@@ -685,19 +754,51 @@ const diasDaGrade = (sessoes, segunda) => {
 
 // Troca só a distribuição na semana. A carga vem da própria planilha, não das corridas:
 // sem isso, quem não tem o Garmin conectado voltaria ao volume inicial.
-export function refazerComNovosDias({ plano, parametros, diasSemana, diaLongo, semQualidadeNaPrimeira = false, hoje }) {
-  const aPartirDe = hoje < plano.inicio ? plano.inicio : proximaSegunda(hoje);
+function baseDaPlanilha(plano, aPartirDe) {
   const restantes = plano.sessoes.filter((s) => s.data >= aPartirDe);
   if (!restantes.length) return null;
-
   const semanaAlvo = restantes[0].semana;
-  const comCargaCheia = plano.sessoes.filter((s) => s.semana <= semanaAlvo && !s.recuperacao && s.fase !== 'polimento');
+  const comCargaCheia = plano.sessoes.filter((s) => s.semana <= semanaAlvo && !s.recuperacao && s.fase !== 'polimento' && s.tipo !== 'prova');
   const semanaBase = comCargaCheia.length ? comCargaCheia[comCargaCheia.length - 1].semana : semanaAlvo;
-  const daBase = plano.sessoes.filter((s) => s.semana === semanaBase);
-  const base = {
+  const daBase = plano.sessoes.filter((s) => s.semana === semanaBase && s.tipo !== 'prova');
+  return {
     kmSemana: daBase.reduce((t, s) => t + s.distanciaKm, 0),
-    longoKm: Math.max(...daBase.map((s) => s.distanciaKm)),
+    longoKm: Math.max(0, ...daBase.map((s) => s.distanciaKm)),
   };
+}
+
+// Refaz da próxima segunda em diante com a prova principal e as secundárias do calendário.
+// Prova nesta semana entra no que ainda não passou, sem refazer a semana inteira.
+export function refazerComProvas({ plano, parametros, provas, hoje }) {
+  const aPartirDe = hoje < plano.inicio ? plano.inicio : proximaSegunda(hoje);
+  const base = baseDaPlanilha(plano, aPartirDe);
+  if (!base) return null;
+
+  const novo = gerarPlano({
+    ...parametros,
+    provas: provas.filter((p) => p.data >= aPartirDe),
+    vdot: plano.vdot,
+    inicio: plano.inicio,
+    aPartirDe,
+    base,
+  });
+  const anteriores = plano.sessoes.filter((s) => s.data < aPartirDe);
+  const emAberto = anteriores.filter((s) => s.data >= hoje && s.tipo !== 'prova');
+  const destaSemana = encaixarProvas(emAberto, provas.filter((p) => p.data < aPartirDe), { inicio: plano.inicio, desde: hoje, ritmos: plano.ritmos });
+  const sessoes = [...anteriores.filter((s) => s.data < hoje), ...destaSemana, ...novo.sessoes];
+
+  return {
+    plano: { ...novo, sessoes },
+    aPartirDe,
+    antes: { vdot: plano.vdot, ...resumoDaSemana(plano.sessoes, aPartirDe) },
+    depois: { vdot: plano.vdot, ...resumoDaSemana(sessoes, aPartirDe) },
+  };
+}
+
+export function refazerComNovosDias({ plano, parametros, diasSemana, diaLongo, semQualidadeNaPrimeira = false, hoje }) {
+  const aPartirDe = hoje < plano.inicio ? plano.inicio : proximaSegunda(hoje);
+  const base = baseDaPlanilha(plano, aPartirDe);
+  if (!base) return null;
 
   const perfil = { ...parametros.perfil, diasSemana, diaLongo };
   const novo = gerarPlano({

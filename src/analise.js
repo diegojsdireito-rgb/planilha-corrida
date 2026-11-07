@@ -38,6 +38,7 @@ function zonaDoRitmo(ritmo, limites) {
 export function temposPorZona({ tempo, velocidade, ritmos }) {
   const limites = limitesDasZonas(ritmos);
   const seg = Object.fromEntries(ORDEM_DAS_ZONAS.map((z) => [z, 0]));
+  const trechos = [];
   let parado = 0;
   let anaerobico = 0;
 
@@ -52,10 +53,38 @@ export function temposPorZona({ tempo, velocidade, ritmos }) {
     const ritmo = 1000 / v;
     seg[zonaDoRitmo(ritmo, limites)] += dt;
     if (ritmo <= limites.anaerobico) anaerobico += dt;
+    trechos.push({ metros: v * dt, dt });
   });
 
   const total = ORDEM_DAS_ZONAS.reduce((t, z) => t + seg[z], 0);
-  return { seg, total, parado, anaerobico };
+  return { seg, total, parado, anaerobico, metades: ritmoDasMetades(trechos) };
+}
+
+// Pace da primeira e da segunda metade da distância, em segundos por km, sem contar paradas.
+function ritmoDasMetades(trechos) {
+  const metros = trechos.reduce((t, p) => t + p.metros, 0);
+  if (!metros) return null;
+  const meio = metros / 2;
+  let percorrido = 0;
+  let primeira = 0;
+  let segunda = 0;
+  for (const { metros: m, dt } of trechos) {
+    const antes = Math.min(Math.max(meio - percorrido, 0), m);
+    primeira += m ? dt * (antes / m) : 0;
+    segunda += m ? dt * ((m - antes) / m) : 0;
+    percorrido += m;
+  }
+  return { primeira: primeira / (meio / 1000), segunda: segunda / (meio / 1000) };
+}
+
+// A tolerância evita chamar de diferença o que é só oscilação do GPS: valor escolhido pelo app.
+const TOLERANCIA_ENTRE_METADES = 0.02;
+
+export function ritmoDaProva({ primeira, segunda }) {
+  const variacao = (segunda - primeira) / primeira;
+  if (variacao > TOLERANCIA_ENTRE_METADES) return 'perdeu';
+  if (variacao < -TOLERANCIA_ENTRE_METADES) return 'ganhou';
+  return 'manteve';
 }
 
 // O trote de recuperação é prescrito no ritmo leve, então conta na mesma zona.

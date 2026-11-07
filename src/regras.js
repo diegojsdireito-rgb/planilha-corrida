@@ -27,6 +27,12 @@ export const REGRAS = [
     fontes: [['Higdon', 'https://www.trainingpeaks.com/blog/is-speedwork-necessary-for-your-first-marathon/']],
   },
   {
+    nome: 'Várias provas',
+    origem: 'treinador',
+    texto: 'Principal, importante ou de preparação segue a divisão A, B e C usada por treinadores, sem estudo em corredores recreativos. Descanso no dia seguinte e aviso de prazo são decisão do app. Só correr leve 48 h depois da maratona tem ensaio.',
+    fontes: [['Higdon, várias maratonas', 'https://www.halhigdon.com/training-programs/more-training/multiple-marathons/'], ['Martínez-Navarro 2020', 'https://repositori.uji.es/xmlui/handle/10234/192075']],
+  },
+  {
     nome: 'Polimento antes da prova',
     origem: 'estudo',
     texto: 'Redução de volume antes da prova. A melhor evidência vem de atletas competitivos, então vale como extrapolação.',
