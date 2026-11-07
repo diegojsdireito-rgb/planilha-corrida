@@ -110,7 +110,8 @@ export function estimarVdot({ atividades = [], tempoInformado = null, hoje }) {
     });
   }
   for (const a of atividades) {
-    if (a.data < limite || a.km < 3 || !a.seg) continue;
+    // Corrida digitada à mão não vem do relógio: conta no volume, não define o nível.
+    if (a.manual || a.data < limite || a.km < 3 || !a.seg) continue;
     candidatos.push({
       vdot: calcularVdot(a.km, a.seg),
       origem: `${a.prova ? 'prova' : 'melhor corrida recente'} de ${a.data.slice(8, 10)}/${a.data.slice(5, 7)} (${a.km.toFixed(1).replace('.', ',')} km em ${formatarTempo(a.seg)})`,
@@ -645,17 +646,19 @@ const LIMITE_DIF_VDOT = 3;
 const SUBIDA_MAX_VDOT_TREINO = 1.5;
 const decimal = (n) => n.toFixed(1).replace('.', ',');
 
-export function analisarRevisao({ plano, atividades, avaliacoes = {}, hoje }) {
+export function analisarRevisao({ plano, atividades, avaliacoes = {}, dispensados = [], hoje }) {
   const de = somarDias(hoje, -JANELA_REVISAO_DIAS);
   const naJanela = (data) => data >= de && data < hoje;
 
-  const previstas = plano.sessoes.filter((s) => naJanela(s.data));
+  const daJanela = plano.sessoes.filter((s) => naJanela(s.data));
+  // Treino não feito por doença ou dor não é cobrado como falta.
+  const previstas = daJanela.filter((s) => !dispensados.includes(s.id));
   const realizadas = atividades.filter((a) => naJanela(a.data));
   const kmPrevistos = previstas.reduce((soma, s) => soma + s.distanciaKm, 0);
   const kmRealizados = realizadas.reduce((soma, a) => soma + a.km, 0);
   const adesao = kmPrevistos ? kmRealizados / kmPrevistos : null;
 
-  const notas = previstas.map((s) => avaliacoes[s.id]).filter(Boolean);
+  const notas = daJanela.map((s) => avaliacoes[s.id]).filter(Boolean);
   const esforcos = [
     ...notas.map((n) => n.esforco),
     ...realizadas.map((a) => a.rpe),
@@ -693,7 +696,7 @@ export function analisarRevisao({ plano, atividades, avaliacoes = {}, hoje }) {
 
   // Ritmos: prova vale pelo que mostrou; treino só sobe, e aos poucos.
   let novoVdot = plano.vdot;
-  const provas = realizadas.filter((a) => a.prova && a.km >= 3 && a.seg);
+  const provas = realizadas.filter((a) => !a.manual && a.prova && a.km >= 3 && a.seg);
   const fortes = realizadas.filter((a) => !a.prova && a.km >= 3 && a.seg && a.rpe >= 8);
   const valor = (a) => calcularVdot(a.km, a.seg);
 

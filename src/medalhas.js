@@ -43,7 +43,8 @@ export function juntarCorridas(arquivo, atividades, inicioDaJanela) {
   return [...(arquivo ?? []).filter((a) => a.data < inicioDaJanela && !atuais.has(String(a.id))), ...atividades];
 }
 
-export const arquivarCorridas = (arquivo, atividades, inicioDaJanela) => juntarCorridas(arquivo, atividades, inicioDaJanela).map(resumoDaCorrida);
+// Corrida manual já fica guardada à parte, sem prazo.
+export const arquivarCorridas = (arquivo, atividades, inicioDaJanela) => juntarCorridas(arquivo, atividades, inicioDaJanela).filter((a) => a.id).map(resumoDaCorrida);
 
 // Só semanas já terminadas. O app não sabe por que um treino faltou, mas sabe quando houve dor.
 export function situacaoDasSemanas({ sessoes = [], corridas = [], avaliacoes = {}, hoje }) {
@@ -264,7 +265,8 @@ export function calcularMedalhas({ corridas = [], semanas = {}, provasDoCalendar
   const validas = corridas.filter(corridaValida).sort((a, b) => a.data.localeCompare(b.data));
   const realizadas = provasRealizadas(provasDoCalendario, validas);
   return [
-    ...recordes(validas),
+    // Recorde precisa do dado do relógio: corrida digitada à mão vale nos marcos, não aqui.
+    ...recordes(validas.filter((a) => !a.manual)),
     ...marcos(validas),
     ...datas(validas, nascimento),
     ...sequencias(semanas),

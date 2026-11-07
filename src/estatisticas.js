@@ -18,7 +18,7 @@ export function resumoSemanal({ atividades, plano, hoje, semanas = 12 }) {
     const previstas = (plano?.sessoes ?? []).filter((s) => s.data >= segunda && s.data < fim);
 
     // Prova e corrida curta distorcem a tendência de ritmo.
-    const paraRitmo = naSemana.filter((a) => !a.prova && a.km >= KM_MINIMO_PARA_RITMO && a.seg > 0);
+    const paraRitmo = naSemana.filter((a) => !a.prova && !a.manual && a.km >= KM_MINIMO_PARA_RITMO && a.seg > 0);
     const kmRitmo = somar(paraRitmo, (a) => a.km);
     const comFc = paraRitmo.filter((a) => a.fcMedia > 0);
     const batimentos = somar(comFc, (a) => (a.fcMedia * a.seg) / 60);

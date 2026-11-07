@@ -2,6 +2,20 @@ import { compararComPrevisto, ORDEM_DAS_ZONAS, ritmoDaProva, temposPorZona, vere
 import { carregar, salvar, exportar, importar, estadoInicial } from './armazenamento.js';
 import { ehAniversario, erroDoNascimento, idadeEm } from './aniversario.js';
 import { CATEGORIAS, duracaoCurta, erroDaAvulsa, juntarAvulsas, nomeDaCategoria, velocidadeDaAtividade } from './avulsas.js';
+import {
+  avaliacoesDaRevisao,
+  avaliacoesDasSemanas,
+  chaveDaCorrida,
+  corridasDoTreino,
+  corridasParaLigar,
+  erroDaCorridaManual,
+  MOTIVOS,
+  motivoDispensa,
+  nomeDoMotivo,
+  sessaoDaCorrida,
+  sessoesDispensadas,
+  situacaoDoTreino,
+} from './cumprimento.js';
 import { feitoForaDosTreinos, gradeDoMes, mesDe, resumoDaAtividade, somarMeses } from './calendario.js';
 import { calcularEnvioAutomatico, DIAS_DE_ANTECEDENCIA, proximoEnvio } from './envio.js';
 import {
@@ -94,11 +108,12 @@ let atividadeAberta = null;
 let medalhasAbertas = false;
 let editandoUsuario = false;
 let editandoChave = false;
+let corridaManualAberta = null;
 let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.1';
+const VERSAO_APP = '3.2';
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -199,7 +214,7 @@ async function comOcupado(botao, tarefa) {
 }
 
 // Redesenhar apagaria o que está sendo preenchido.
-const podeRedesenhar = () => !avulsaAberta && !provaAberta && !document.activeElement?.matches('input, select, textarea');
+const podeRedesenhar = () => !avulsaAberta && !provaAberta && !corridaManualAberta &&!document.activeElement?.matches('input, select, textarea');
 
 const todasAvulsas = () => juntarAvulsas(estado.avulsas, estado.outrasDoRelogio);
 
@@ -212,7 +227,7 @@ function semanasDoHistorico() {
   const corridas = juntarCorridas(estado.arquivoDeCorridas, estado.atividades, inicioDaJanela());
   return {
     ...estado.arquivoDeSemanas,
-    ...situacaoDasSemanas({ sessoes: estado.plano?.sessoes ?? [], corridas, avaliacoes: estado.avaliacoes, hoje: hoje() }),
+    ...situacaoDasSemanas({ sessoes: estado.plano?.sessoes ?? [], corridas, avaliacoes: avaliacoesDasSemanas(estado.avaliacoes, estado.naoFeitos), hoje: hoje() }),
   };
 }
 
@@ -229,11 +244,27 @@ const medalhasAtuais = () => calcularMedalhas({
   nascimento: estado.nascimento,
 });
 
+// A lista baixada substitui a anterior: as corridas digitadas à mão entram de novo a cada vez.
+function reunirCorridas(doRelogio) {
+  const todas = [...doRelogio, ...estado.corridasManuais];
+  estado.atividades = marcarCorridasDeProva(todas, estado.provas);
+  if (estado.plano) estado.provas = registrarResultados(estado.provas, todas, estado.plano.vdot);
+}
+
+const dadosDaRevisao = (dia) => ({
+  plano: estado.plano,
+  atividades: estado.atividades,
+  avaliacoes: avaliacoesDaRevisao(estado.avaliacoes, estado.naoFeitos),
+  dispensados: sessoesDispensadas(estado.naoFeitos),
+  hoje: dia,
+});
+
+const situacaoDaSessao = (sessao, dia = hoje()) => situacaoDoTreino({ sessao, corridas: estado.atividades, ligacoes: estado.ligacoes, naoFeitos: estado.naoFeitos, hoje: dia });
+
 async function sincronizar(chave = estado.chaveApi) {
   const dia = hoje();
   const { atividades, semDados, corridasSemDados, outras } = await criarCliente({ chave }).atividades(somarDias(dia, -DIAS_DE_HISTORICO), dia);
-  estado.atividades = marcarCorridasDeProva(atividades, estado.provas);
-  if (estado.plano) estado.provas = registrarResultados(estado.provas, atividades, estado.plano.vdot);
+  reunirCorridas(atividades);
   estado.outrasDoRelogio = outras;
   estado.semDados = semDados;
   estado.corridasSemDados = corridasSemDados;
@@ -622,13 +653,14 @@ function blocoDaSemana(dia) {
   const previsto = sessoes.reduce((t, s) => t + s.distanciaKm, 0);
   const atividades = estado.atividades.filter((a) => a.data >= segunda && a.data < fim);
   const feito = atividades.reduce((t, a) => t + a.km, 0);
-  const dias = diasDaSemana({ segunda, sessoes, atividades, hoje: dia });
+  const dias = diasDaSemana({ segunda, sessoes, atividades, hoje: dia }).map((d) => (d.sessao ? { ...d, situacao: situacaoDaSessao(d.sessao, dia).situacao } : d));
   const feitos = dias.filter((d) => d.sessao && d.situacao === 'feito').length;
+  const parciais = dias.filter((d) => d.sessao && d.situacao === 'parcial').length;
   const comOutra = new Set(todasAvulsas().map((a) => a.data));
 
   const celulas = dias.map((d) => {
     const nome = DIAS[(new Date(`${d.data}T12:00:00Z`).getUTCDay() + 6) % 7].curto;
-    const marca = { feito: '✓', perdido: '–', descanso: '·' }[d.situacao] ?? numeroKm(d.sessao.distanciaKm);
+    const marca = { feito: '✓', parcial: '½', 'nao-feito': '×', perdido: '–', descanso: '·' }[d.situacao] ?? numeroKm(d.sessao.distanciaKm);
     const classes = `dia ${d.situacao} ${d.ehHoje ? 'hoje' : ''} ${d.sessao ? classeTipo(d.sessao.tipo) : ''}`;
     const temOutra = comOutra.has(d.data);
     const conteudo = `<span class="dia-nome">${nome}</span><span class="dia-marca">${marca}</span>${temOutra ? '<i class="dia-outra"></i>' : ''}`;
@@ -644,7 +676,7 @@ function blocoDaSemana(dia) {
         <div>
           <h2>${antesDoInicio ? 'Sua primeira semana' : 'Sua semana'}</h2>
           <p><span class="cartao-numero">${numeroKm(Math.round(feito * 10) / 10)}</span> <span class="suave">de ${km(Math.round(previsto * 10) / 10)}</span></p>
-          <p class="suave">${feitos} de ${sessoes.length} treinos</p>
+          <p class="suave">${feitos} de ${sessoes.length} treinos${parciais ? `, ${parciais === 1 ? '1 parcial' : `${parciais} parciais`}` : ''}</p>
         </div>
       </div>
       <div class="dias-semana">${celulas}</div>
@@ -689,6 +721,8 @@ const dadosDaAtividade = () => ({
   corridas: estado.atividades,
   semDados: estado.corridasSemDados,
   outras: todasAvulsas(),
+  ligacoes: estado.ligacoes,
+  naoFeitos: estado.naoFeitos,
 });
 
 function blocoOutrasNaEvolucao(dia) {
@@ -992,7 +1026,7 @@ function telaHoje() {
 
   let principal;
   if (deHoje) {
-    principal = heroiDoTreino(deHoje, 'Treino de hoje', atividadeDoDia(dia));
+    principal = heroiDoTreino(deHoje, 'Treino de hoje', corridasDoTreino(deHoje, estado.atividades, estado.ligacoes));
   } else if (proxima) {
     const antesDoInicio = dia < inicio;
     principal = `
@@ -1036,17 +1070,21 @@ function telaHoje() {
     ${blocoDaSemana(dia)}
     ${blocoOutrasDaSemana(dia)}
     ${blocoDoObjetivo(dia, { comAtalho: true })}
-    ${avaliar && avaliar.tipo !== 'prova' ? formularioAvaliacao(avaliar) : ''}`;
+    ${avaliar && avaliar.tipo !== 'prova' && !estado.naoFeitos[avaliar.id] ? formularioAvaliacao(avaliar) : ''}`;
 }
 
 // ---------- Plano ----------
 
 function linhaSessao(sessao, dia) {
-  const feitas = atividadeDoDia(sessao.data);
-  let status = '';
-  if (feitas.length) status = `<span class="status feito">${km(feitas.reduce((t, a) => t + a.km, 0))} feitos</span>`;
-  else if (sessao.data < dia) status = '<span class="status falta">Sem registro</span>';
-  else status = `<span class="status">${km(sessao.distanciaKm)}</span>`;
+  const r = situacaoDaSessao(sessao, dia);
+  const feito = km(Math.round(r.km * 10) / 10);
+  const status = {
+    feito: `<span class="status feito">${feito} feitos</span>`,
+    parcial: `<span class="status parcial">${feito} de ${km(sessao.distanciaKm)}</span>`,
+    'nao-feito': '<span class="status falta">Não feito</span>',
+    perdido: '<span class="status falta">Sem registro</span>',
+    planejado: `<span class="status">${km(sessao.distanciaKm)}</span>`,
+  }[r.situacao];
   const quando = new Date(`${sessao.data}T12:00:00Z`);
   return `
     <button class="sessao ${classeTipo(sessao.tipo)}" data-abrir="${esc(sessao.id)}" aria-label="Abrir ${esc(sessao.nome)}, ${dataCurta(sessao.data)}">
@@ -1140,10 +1178,13 @@ function corpoCorridaFeita(a, naPlanilha) {
   ].filter(Boolean).join(', ');
   return `
     <span class="sessao-corpo"><strong>${esc(a.nome ?? 'Corrida')}</strong><span class="suave">${esc(dados)}</span></span>
-    <span class="selo">${naPlanilha ? 'Da planilha' : 'Fora da planilha'}</span>`;
+    <span class="selo">${naPlanilha ? 'Da planilha' : a.manual ? 'Manual' : 'Fora da planilha'}</span>`;
 }
 
-const linhaCorridaFora = (a) => `<button class="avulsa-linha" data-atividade="${esc(a.id)}" aria-label="Ver dados: ${esc(a.nome ?? 'Corrida')}, ${dataCurta(a.data)}">${corpoCorridaFeita(a, false)}${icone('seta')}</button>`;
+// A corrida do relógio abre os dados; a digitada à mão abre a edição.
+const abrirCorrida = (a) => (a.manual ? `data-corrida-manual="${esc(a.idManual)}"` : `data-atividade="${esc(a.id)}"`);
+
+const linhaCorridaFora = (a) => `<button class="avulsa-linha" ${abrirCorrida(a)} aria-label="${a.manual ? 'Editar' : 'Ver dados'}: ${esc(a.nome ?? 'Corrida')}, ${dataCurta(a.data)}">${corpoCorridaFeita(a, false)}${icone('seta')}</button>`;
 
 const linhaSemDados = (a) => `
   <button class="avulsa-linha" data-atividade="${esc(a.id)}" aria-label="Ver dados: ${esc(a.nome ?? 'Corrida')}, ${dataCurta(a.data)}">
@@ -1313,7 +1354,7 @@ async function carregarPercurso(a) {
 
 function telaAtividade(a) {
   const ehCorrida = a.tipoDaAtividade === 'corrida';
-  const naPlanilha = estado.plano.sessoes.some((s) => s.data === a.data);
+  const naPlanilha = Boolean(sessaoDaCorrida(a, estado.plano.sessoes, estado.ligacoes));
   const nome = a.tipoDaAtividade === 'outra' && (a.categoria !== 'outro' || !a.nome) ? nomeDaCategoria(a.categoria) : a.nome ?? 'Corrida';
   const selo = { corrida: naPlanilha ? 'Da planilha' : 'Fora da planilha', semDados: 'Sem dados', outra: 'Do relógio' }[a.tipoDaAtividade];
   const velocidade = velocidadeDaAtividade(a);
@@ -1373,9 +1414,13 @@ function celulaDoCalendario(d, selecionado) {
   const totalKm = d.corridas.reduce((t, a) => t + a.km, 0);
   const kmOutras = d.outras.reduce((t, a) => t + (a.km ?? 0), 0);
   const minutosOutras = d.outras.reduce((t, a) => t + a.minutos, 0);
+  const kmNoDia = d.sessao ? d.kmDoTreino : totalKm;
   const marca = {
     outra: kmOutras ? numeroKm(kmOutras) : `${minutosOutras}'`,
-    feito: numeroKm(totalKm),
+    // Treino cumprido com corrida de outro dia: os km ficam só no dia em que ela aconteceu.
+    feito: d.sessao && !d.corridas.length ? '✓' : numeroKm(kmNoDia),
+    parcial: d.sessao && !d.corridas.length ? '½' : numeroKm(kmNoDia),
+    'nao-feito': '×',
     extra: numeroKm(totalKm),
     'sem-dados': '?',
     perdido: '–',
@@ -1385,7 +1430,7 @@ function celulaDoCalendario(d, selecionado) {
   const descricao = [
     dataLonga(d.data),
     d.aniversario ? `seu aniversário de ${d.aniversario} anos` : null,
-    { feito: `corrida da planilha, ${km(totalKm)}`, extra: `corrida fora da planilha, ${km(totalKm)}`, 'sem-dados': 'corrida sem distância', perdido: 'treino sem registro', planejado: `treino previsto, ${d.sessao ? km(d.sessao.distanciaKm) : ''}`, outra: null, livre: null }[d.situacao],
+    { feito: `corrida da planilha, ${km(kmNoDia)}`, parcial: `treino feito em parte, ${km(kmNoDia)}`, 'nao-feito': `treino não feito, ${nomeDoMotivo(d.motivo).toLowerCase()}`, extra: `corrida fora da planilha, ${km(totalKm)}`, 'sem-dados': 'corrida sem distância', perdido: 'treino sem registro', planejado: `treino previsto, ${d.sessao ? km(d.sessao.distanciaKm) : ''}`, outra: null, livre: null }[d.situacao],
     d.outras.length ? d.outras.map((a) => `${nomeDaCategoria(a.categoria)}, ${duracaoCurta(a.minutos)}`).join(', ') : null,
   ].filter(Boolean).join(', ');
   const classes = ['dia', d.situacao, d.ehHoje ? 'hoje' : '', d.doMes ? '' : 'fora-do-mes', selecionado ? 'selecionado' : '', d.sessao ? classeTipo(d.sessao.tipo) : ''].filter(Boolean).join(' ');
@@ -1398,7 +1443,10 @@ function detalheDoDia(d, dia) {
   const conteudo = [
     d.aniversario ? `<p class="cal-aniversario"><span aria-hidden="true">🎂</span> Seu aniversário: ${d.aniversario} anos</p>` : '',
     d.sessao && !d.corridas.length ? linhaSessao(d.sessao, dia) : '',
-    d.corridas.map((a) => (d.sessao ? `<button class="avulsa-linha" data-abrir="${esc(d.sessao.id)}">${corpoCorridaFeita(a, true)}</button>` : linhaCorridaFora(a))).join(''),
+    d.corridas.map((a) => {
+      const treino = sessaoDaCorrida(a, estado.plano.sessoes, estado.ligacoes);
+      return treino ? `<button class="avulsa-linha" data-abrir="${esc(treino.id)}">${corpoCorridaFeita(a, true)}${icone('seta')}</button>` : linhaCorridaFora(a);
+    }).join(''),
     d.semDados.map(linhaSemDados).join(''),
     d.outras.map(linhaAvulsa).join(''),
   ].join('');
@@ -1406,6 +1454,7 @@ function detalheDoDia(d, dia) {
     <div class="cal-detalhe">
       <h3>${esc(dataLonga(d.data))}</h3>
       ${conteudo || '<p class="suave">Nada previsto nem registrado neste dia.</p>'}
+      ${d.data <= dia ? `<button style="margin-top:8px" data-corrida-manual="nova" data-data="${d.data}">Registrar corrida sem relógio</button>` : ''}
     </div>`;
 }
 
@@ -1434,7 +1483,9 @@ function blocoCalendario(dia) {
       <div class="cal-grade">${grade.map((d) => celulaDoCalendario(d, d.data === escolhido)).join('')}</div>
       <p class="cal-legenda suave">
         <span><i class="cal-ponto planejado"></i>Previsto</span>
-        <span><i class="cal-ponto feito"></i>Da planilha</span>
+        <span><i class="cal-ponto feito"></i>Cumprido</span>
+        ${grade.some((d) => d.situacao === 'parcial') ? '<span><i class="cal-ponto parcial"></i>Parcial</span>' : ''}
+        ${grade.some((d) => d.situacao === 'nao-feito') ? '<span>×&nbsp;Não feito</span>' : ''}
         <span><i class="cal-ponto extra"></i>Fora da planilha</span>
         <span><i class="cal-ponto outra"></i>Outra atividade</span>
         ${grade.some((d) => d.aniversario) ? '<span><span aria-hidden="true">🎂</span>Aniversário</span>' : ''}
@@ -1461,7 +1512,7 @@ function linhaFeitaNaSemana({ tipo, data, item }) {
       <span class="sessao-corpo"><strong>${esc(item.nome ?? 'Corrida')}</strong><span class="suave">Chegou sem distância</span></span>
       <span class="sessao-fim"><span class="status">?</span>${icone('seta')}</span></button>`;
   }
-  return `<button class="sessao t-extra" data-atividade="${esc(item.id)}" aria-label="Ver dados: ${esc(item.nome ?? 'Corrida')}, ${dataCurta(data)}">${dataDaLinha}
+  return `<button class="sessao t-extra" ${abrirCorrida(item)} aria-label="${item.manual ? 'Editar' : 'Ver dados'}: ${esc(item.nome ?? 'Corrida')}, ${dataCurta(data)}">${dataDaLinha}
     <span class="sessao-corpo"><strong>${esc(item.nome ?? 'Corrida')}</strong><span class="suave">Fora da planilha${item.seg ? `, ${formatarRitmo(item.seg / item.km)}/km` : ''}</span></span>
     <span class="sessao-fim"><span class="status feito">${km(Math.round(item.km * 10) / 10)} feitos</span>${icone('seta')}</span></button>`;
 }
@@ -1742,7 +1793,7 @@ async function carregarAnalise(atividade) {
   }
   // Troca só este cartão, para a tela não voltar ao topo enquanto a pessoa lê.
   const id = CSS.escape(String(atividade.id));
-  const sessao = estado.plano.sessoes.find((s) => s.data === atividade.data);
+  const sessao = sessaoDaCorrida(atividade, estado.plano.sessoes, estado.ligacoes);
   const cartao = document.querySelector(`[data-analise="${id}"]`);
   if (cartao) cartao.outerHTML = sessao ? blocoAnalise(atividade, sessao, detalharSessao(sessao, estado.plano.vdot)) : blocoAnalise(atividade, null, null);
   const feito = document.querySelector(`[data-feito="${id}"]`);
@@ -1753,7 +1804,7 @@ const analisePronta = (atividade) => estado.analises[atividade.id]?.vdot === est
 
 function pedirAnalises(sessao) {
   if (!estado.chaveApi) return;
-  for (const atividade of atividadeDoDia(sessao.data)) {
+  for (const atividade of corridasDoTreino(sessao, estado.atividades, estado.ligacoes)) {
     if (atividade.id && !analisePronta(atividade) && !errosDeAnalise.has(atividade.id)) carregarAnalise(atividade);
   }
 }
@@ -1860,8 +1911,9 @@ function telaEvolucao() {
 
   const semanas = resumoSemanal({ atividades, plano, hoje: dia });
   const { atual, anterior } = compararPeriodos(atividades, dia);
-  const adesao = adesaoDoPeriodo({ atividades, plano, hoje: dia });
-  const recordes = calcularRecordes(atividades);
+  const dispensados = sessoesDispensadas(estado.naoFeitos);
+  const adesao = adesaoDoPeriodo({ atividades, plano: { ...plano, sessoes: plano.sessoes.filter((s) => !dispensados.includes(s.id)) }, hoje: dia });
+  const recordes = calcularRecordes(atividades.filter((a) => !a.manual));
   const zonas = zonasDoPeriodo(atividades, dia);
   const grafRitmo = linhaDeEvolucao(
     semanas.map((s) => ({ data: s.segunda, valor: s.ritmo })),
@@ -1875,7 +1927,7 @@ function telaEvolucao() {
     estado.historicoNivel.map((p) => ({ data: p.data, valor: p.vdot })),
     { nome: 'VDOT', formatar: (v) => v.toFixed(1).replace('.', ','), passoMinimo: 0.5 },
   );
-  const linhasRecordes = [
+  const linhasRecordes = !recordes ? [] : [
     ['Maior corrida', `${km(recordes.maiorCorrida.km)}, ${dataCurta(recordes.maiorCorrida.data)}`],
     ['Melhor pace (5 km ou mais)', recordes.melhorPace ? `${formatarRitmo(recordes.melhorPace.ritmo)}/km, ${dataCurta(recordes.melhorPace.data)}` : 'Ainda sem corrida de 5 km'],
     ['Maior semana', `${km(recordes.maiorSemana.km)}, a partir de ${dataCurta(recordes.maiorSemana.segunda)}`],
@@ -1923,10 +1975,11 @@ function telaEvolucao() {
         ${zonas.map((z) => barraDeZona(`Z${z.zona}`, z.seg, z.fracao)).join('')}
         <p class="suave">Zonas calculadas pelo intervals.icu.</p>
       </section>` : ''}
-    <section class="cartao">
-      <h2>Recordes em 12 meses</h2>
-      <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
-    </section>
+    ${recordes ? `
+      <section class="cartao">
+        <h2>Recordes em 12 meses</h2>
+        <table class="ritmos"><tbody>${linhasRecordes.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td></tr>`).join('')}</tbody></table>
+      </section>` : ''}
     ${blocoProvasRealizadas()}
     ${blocoPrevisoes}
     <section class="cartao">
@@ -1938,7 +1991,7 @@ function telaEvolucao() {
 }
 
 function blocoMudarDia(sessao, dia) {
-  const pode = sessao.tipo !== 'prova' && sessao.data >= dia && !atividadeDoDia(sessao.data).length;
+  const pode = sessao.tipo !== 'prova' && sessao.data >= dia && !corridasDoTreino(sessao, estado.atividades, estado.ligacoes).length && !estado.naoFeitos[sessao.id];
   if (!pode) return '';
   const opcoes = diasParaMudar({ plano: estado.plano, sessao, atividades: estado.atividades, hoje: dia });
   return `
@@ -1973,10 +2026,124 @@ function mudarDia(novaData) {
   setTimeout(enviarAutomaticamente);
 }
 
+// ---------- Situação do treino ----------
+
+function blocoDoRegistro(sessao, dia) {
+  const r = situacaoDaSessao(sessao, dia);
+  if (r.situacao === 'planejado' && sessao.data > dia) return '';
+  const ligadas = r.corridas.filter((a) => estado.ligacoes[chaveDaCorrida(a)]);
+  const manuais = r.corridas.filter((a) => a.manual);
+  const pct = Math.round((r.km / sessao.distanciaKm) * 100);
+
+  if (r.situacao === 'feito' || r.situacao === 'parcial') {
+    return `
+      <section class="cartao">
+        <h2>${r.situacao === 'feito' ? 'Treino cumprido' : 'Treino feito em parte'}</h2>
+        <p>${km(Math.round(r.km * 10) / 10)} de ${km(sessao.distanciaKm)} previstos (${pct}%).</p>
+        <p class="suave">Cumprido a partir de 80% da distância, um corte definido pelo app.</p>
+        ${ligadas.map((a) => `
+          <div class="avulsa-linha">
+            <span class="sessao-corpo"><strong>Feito em ${dataCurta(a.data)}</strong><span class="suave">${km(Math.round(a.km * 10) / 10)}</span></span>
+            <button data-desligar="${esc(chaveDaCorrida(a))}">Desfazer</button>
+          </div>`).join('')}
+        ${manuais.map((a) => `<button class="avulsa-linha" data-corrida-manual="${esc(a.idManual)}"><span class="sessao-corpo"><strong>Corrida registrada à mão</strong><span class="suave">${km(Math.round(a.km * 10) / 10)}, ${formatarTempo(a.seg)}</span></span><span class="sessao-fim"><span class="selo">Editar</span>${icone('seta')}</span></button>`).join('')}
+      </section>`;
+  }
+
+  if (r.situacao === 'nao-feito') {
+    return `
+      <section class="cartao">
+        <h2>Treino não feito</h2>
+        <p>Motivo: ${esc(nomeDoMotivo(r.motivo).toLowerCase())}.</p>
+        <p class="suave">${motivoDispensa(r.motivo) ? 'Não conta como falta na Revisão e não quebra a sequência de semanas.' : 'Conta como falta na Revisão e na sequência de semanas.'}</p>
+        ${r.motivo === 'dor' ? '<p class="suave">A Revisão vai sugerir reduzir a carga. Se a dor persistir, procure um profissional.</p>' : ''}
+        <button data-desfazer-nao-feito="${esc(sessao.id)}">Desfazer</button>
+      </section>`;
+  }
+
+  const candidatas = corridasParaLigar({ sessao, sessoes: estado.plano.sessoes, corridas: estado.atividades, ligacoes: estado.ligacoes });
+  return `
+    <section class="cartao ${r.situacao === 'perdido' ? 'alerta' : ''}">
+      <h2>${r.situacao === 'perdido' ? 'Nenhuma corrida neste treino' : 'Registro do treino'}</h2>
+      ${candidatas.length ? `
+        <h3>Fiz em outro dia</h3>
+        <p class="suave">${candidatas.length === 1 ? 'Encontrei esta corrida na mesma semana. É este treino?' : 'Encontrei estas corridas na mesma semana. Alguma é este treino?'}</p>
+        ${candidatas.map((a) => `
+          <div class="avulsa-linha">
+            <span class="sessao-corpo"><strong>${esc(dataCurta(a.data))}</strong><span class="suave">${esc(a.nome ?? 'Corrida')}, ${km(Math.round(a.km * 10) / 10)}</span></span>
+            <button data-ligar="${esc(chaveDaCorrida(a))}" data-sessao="${esc(sessao.id)}">É este</button>
+          </div>`).join('')}` : ''}
+      <button style="margin-top:10px" data-corrida-manual="nova" data-data="${esc(sessao.data)}">Registrar corrida sem relógio</button>
+      <form id="form-nao-feito" data-sessao="${esc(sessao.id)}" style="margin-top:14px">
+        <label>Motivo
+          <select name="motivo">${MOTIVOS.map((m) => `<option value="${m.chave}">${esc(m.nome)}</option>`).join('')}</select>
+        </label>
+        <button type="submit" style="margin-top:10px">Não fiz este treino</button>
+        <p class="suave" style="margin:10px 0 0">Doença e dor não contam como falta. Se a corrida chegar depois, ela vale.</p>
+      </form>
+    </section>`;
+}
+
+// ---------- Corrida sem relógio ----------
+
+function telaCorridaManual() {
+  const dia = hoje();
+  const item = estado.corridasManuais.find((a) => a.idManual === corridaManualAberta.id);
+  const seg = item?.seg ?? 0;
+  const valor = (v) => (item ? v : '');
+  return `
+    <button class="voltar" data-acao="voltar">‹ Voltar</button>
+    <header class="topo">
+      <h1>${item ? 'Editar corrida' : 'Corrida sem relógio'}</h1>
+      <p class="suave">O que o relógio grava chega sozinho. Registre aqui só o que ficou de fora, para não contar duas vezes. Conta no volume e nos marcos, mas não no nível nem nos recordes.</p>
+    </header>
+    <form class="cartao" id="form-corrida">
+      <label>Data<input name="data" type="date" max="${dia}" value="${esc(item?.data ?? corridaManualAberta.data ?? dia)}" required></label>
+      <label>Distância em km<input name="km" inputmode="decimal" placeholder="Ex.: 5,2" value="${item ? String(item.km).replace('.', ',') : ''}" required></label>
+      <div class="linha3">
+        <label>Horas<input name="horas" type="number" inputmode="numeric" min="0" max="23" value="${valor(Math.floor(seg / 3600))}"></label>
+        <label>Minutos<input name="minutos" type="number" inputmode="numeric" min="0" max="59" value="${valor(Math.floor((seg % 3600) / 60))}"></label>
+        <label>Segundos<input name="segundos" type="number" inputmode="numeric" min="0" max="59" value="${valor(seg % 60)}"></label>
+      </div>
+      <label>Nome (opcional)<input name="nome" maxlength="60" placeholder="Ex.: Esteira da academia" value="${esc(item?.nome ?? '')}"></label>
+      <p class="erro" id="erro-corrida" role="alert"></p>
+      <div class="botoes">
+        <button class="principal" type="submit">Salvar corrida</button>
+        ${item ? '<button type="button" data-acao="excluir-corrida-manual">Apagar</button>' : ''}
+      </div>
+    </form>`;
+}
+
+function salvarCorridaManual(formulario) {
+  const form = new FormData(formulario);
+  const partes = ['horas', 'minutos', 'segundos'].map((n) => Number(form.get(n) || 0));
+  const dados = {
+    data: String(form.get('data') ?? ''),
+    km: numero(form, 'km'),
+    seg: partes[1] < 60 && partes[2] < 60 ? partes[0] * 3600 + partes[1] * 60 + partes[2] : 0,
+  };
+  const erro = erroDaCorridaManual(dados, hoje());
+  if (erro) {
+    document.getElementById('erro-corrida').textContent = erro;
+    return;
+  }
+  const editando = estado.corridasManuais.some((a) => a.idManual === corridaManualAberta.id);
+  const idManual = editando ? corridaManualAberta.id : `cm-${Date.now()}`;
+  const nome = String(form.get('nome') ?? '').trim() || 'Corrida sem relógio';
+  const registro = { ...dados, id: null, idManual, nome, manual: true, prova: false, rpe: null, fcMedia: null, fcMaxima: null, subida: null, tempoPorZonaFc: [], origem: 'manual' };
+  estado.corridasManuais = editando ? estado.corridasManuais.map((a) => (a.idManual === idManual ? registro : a)) : [...estado.corridasManuais, registro];
+  reunirCorridas(estado.atividades.filter((a) => !a.manual));
+  guardar();
+  corridaManualAberta = null;
+  render();
+  window.scrollTo(0, rolagemAnterior);
+  mostrarAviso('Corrida salva.');
+}
+
 function telaDetalhe(sessao) {
   const dia = hoje();
   const d = detalharSessao(sessao, estado.plano.vdot);
-  const realizadas = atividadeDoDia(sessao.data);
+  const realizadas = corridasDoTreino(sessao, estado.atividades, estado.ligacoes);
   const numeros = [
     ['Distância', km(Math.round(d.distanciaKm * 10) / 10)],
     [sessao.tipo === 'prova' ? 'Tempo previsto' : 'Tempo estimado', formatarTempo(d.tempoSeg)],
@@ -2003,6 +2170,7 @@ function telaDetalhe(sessao) {
       <div class="numeros">${numeros.map(([n, v]) => `<div><b>${esc(v)}</b><span>${n}</span></div>`).join('')}</div>
       <p style="margin:14px 0 0;font-size:.85rem">${sessao.tipo === 'prova' ? 'Previsão pelo seu nível atual.' : `Estimativa pelo meio das faixas de ritmo, com o seu nível atual. Nessas faixas, o treino leva ${faixaDoTreino(sessao).tempo}.`}</p>
     </section>
+    ${blocoDoRegistro(sessao, dia)}
     ${blocoMudarDia(sessao, dia)}
     ${sessao.tipo === 'prova' && realizadas.length ? blocoResultadoDaProva(sessao, realizadas.find((a) => a.prova) ?? realizadas[0]) : ''}
     ${estado.chaveApi ? realizadas.filter((a) => a.id).map((a) => blocoAnalise(a, sessao, d)).join('') : ''}
@@ -2019,8 +2187,7 @@ function telaDetalhe(sessao) {
         ${d.zonas.map((z) => `${barraDeZona(`${z.codigo} ${z.nome}`, z.tempoSeg, z.fracao, z.chave)}<p class="suave">${esc(z.sensacao)}</p>`).join('')}
         <p class="suave">Zonas de ritmo calculadas pelo app. São diferentes das zonas de frequência cardíaca do relógio.</p>
       </section>` : ''}
-    ${!realizadas.length && sessao.data < dia ? '<section class="cartao alerta">Nenhuma corrida registrada neste dia.</section>' : ''}
-    ${sessao.data <= dia && sessao.tipo !== 'prova' ? formularioAvaliacao(sessao) : ''}`;
+    ${sessao.data <= dia && sessao.tipo !== 'prova' && !estado.naoFeitos[sessao.id] ? formularioAvaliacao(sessao) : ''}`;
 }
 
 function telaPlano() {
@@ -2140,7 +2307,7 @@ function blocoAtualizarAnalise() {
 
 function telaRevisao() {
   const dia = hoje();
-  const analise = analisarRevisao({ plano: estado.plano, atividades: estado.atividades, avaliacoes: estado.avaliacoes, hoje: dia });
+  const analise = analisarRevisao(dadosDaRevisao(dia));
   const mudaRitmo = analise.novoVdot !== estado.plano.vdot;
   const revisadaHoje = estado.revisoes.some((r) => r.data === dia && r.acao !== 'analise');
   const podeAplicar = (analise.acao !== 'semDados' || mudaRitmo) && !revisadaHoje;
@@ -2405,6 +2572,11 @@ function render() {
     window.scrollTo(0, 0);
     return;
   }
+  if (corridaManualAberta) {
+    app.innerHTML = telaCorridaManual();
+    window.scrollTo(0, 0);
+    return;
+  }
   if (medalhasAbertas) {
     app.innerHTML = telaMedalhas();
     window.scrollTo(0, 0);
@@ -2424,7 +2596,7 @@ function render() {
   window.scrollTo(0, 0);
   if (aberta) {
     pedirAnalises(aberta);
-    atividadeDoDia(aberta.data).forEach(carregarPercurso);
+    corridasDoTreino(aberta, estado.atividades, estado.ligacoes).forEach(carregarPercurso);
   }
 }
 
@@ -2437,6 +2609,7 @@ abas.addEventListener('click', (e) => {
   medalhasAbertas = false;
   editandoUsuario = false;
   editandoChave = false;
+  corridaManualAberta = null;
   avulsaAberta = null;
   provaAberta = null;
   provasPendentes = null;
@@ -2444,6 +2617,13 @@ abas.addEventListener('click', (e) => {
 });
 
 function voltarDoTreino() {
+  if (corridaManualAberta) {
+    // Do formulário volta para onde ele foi aberto, como um treino.
+    corridaManualAberta = null;
+    render();
+    window.scrollTo(0, rolagemAnterior);
+    return;
+  }
   sessaoAberta = null;
   atividadeAberta = null;
   medalhasAbertas = false;
@@ -2457,9 +2637,9 @@ function voltarDoTreino() {
 // Dentro de um treino, só voltar. Nas abas, trocar para a vizinha.
 ligarGestos(app, {
   podeIniciar: () => Boolean(estado.plano) && !ocupado,
-  temDestino: (direcao) => (sessaoAberta || atividadeAberta || medalhasAbertas || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
+  temDestino: (direcao) => (corridaManualAberta || sessaoAberta || atividadeAberta || medalhasAbertas || avulsaAberta || provaAberta ? direcao === 'direita' : Boolean(abaDoGesto(ORDEM_ABAS, aba, direcao))),
   aoDeslizar: (direcao) => {
-    if (sessaoAberta || atividadeAberta || medalhasAbertas || avulsaAberta || provaAberta) {
+    if (corridaManualAberta || sessaoAberta || atividadeAberta || medalhasAbertas || avulsaAberta || provaAberta) {
       voltarDoTreino();
       return;
     }
@@ -2469,7 +2649,7 @@ ligarGestos(app, {
 });
 
 ligarPuxada(app, document.getElementById('puxada'), {
-  podeIniciar: () => Boolean(estado.plano) && !ocupado && !avulsaAberta && !provaAberta,
+  podeIniciar: () => Boolean(estado.plano) && !ocupado && !avulsaAberta && !provaAberta && !corridaManualAberta,
   aoAtualizar: atualizarPorGesto,
 });
 
@@ -2577,6 +2757,19 @@ const acoes = {
     setTimeout(enviarAutomaticamente);
   },
 
+  'excluir-corrida-manual': () => {
+    if (!window.confirm('Apagar esta corrida? Não dá para desfazer.')) return;
+    const { id } = corridaManualAberta;
+    estado.corridasManuais = estado.corridasManuais.filter((a) => a.idManual !== id);
+    const { [id]: _removida, ...ligacoes } = estado.ligacoes;
+    estado.ligacoes = ligacoes;
+    reunirCorridas(estado.atividades.filter((a) => !a.manual));
+    guardar();
+    corridaManualAberta = null;
+    render();
+    window.scrollTo(0, rolagemAnterior);
+    mostrarAviso('Corrida apagada.');
+  },
   'editar-usuario': () => {
     editandoUsuario = true;
     renderMantendoRolagem();
@@ -2621,7 +2814,7 @@ const acoes = {
 
   'aplicar-revisao': (botao) => comOcupado(botao, async () => {
     const dia = hoje();
-    const analise = analisarRevisao({ plano: estado.plano, atividades: estado.atividades, avaliacoes: estado.avaliacoes, hoje: dia });
+    const analise = analisarRevisao(dadosDaRevisao(dia));
     estado.plano = aplicarRevisao({ plano: estado.plano, parametros: parametrosAtuais(), analise, hoje: dia });
     estado.revisoes.push({ data: dia, acao: analise.acao, motivos: analise.motivos });
     estado.historicoNivel = registrarNivel(estado.historicoNivel, dia, estado.plano.vdot);
@@ -2655,7 +2848,7 @@ const acoes = {
   recomecar: () => {
     if (!window.confirm('Isso apaga a planilha atual deste aparelho. Os treinos já enviados continuam no intervals.icu até você enviar os novos. Continuar?')) return;
     arquivarHistorico();
-    const { historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
+    const { corridasManuais, historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, perfil, objetivo, historicoNivel, ultimaSincronizacao } = estado;
     cadastroAnterior = {
       peso: perfil.pesoKg,
       altura: perfil.alturaCm,
@@ -2667,7 +2860,7 @@ const acoes = {
       meta: objetivo.meta,
     };
     sessaoAberta = null;
-    estado = { ...estadoInicial(), avisoCiente: true, historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
+    estado = { ...estadoInicial(), avisoCiente: true, corridasManuais, historicoPeso, arquivoDeCorridas, arquivoDeSemanas, medalhasVistas, analises, nome, nascimento, provas, avulsas, outrasDoRelogio, chaveApi, atividades, enviados, assinaturas, envioAutomatico, semDados, corridasSemDados, historicoNivel, ultimaSincronizacao };
     guardar();
     aba = 'hoje';
     render();
@@ -2692,6 +2885,39 @@ app.addEventListener('click', (e) => {
   if (diaDoCalendario) {
     diaVisto = diaDoCalendario.dataset.diaCalendario;
     mesVisto = mesDe(diaVisto);
+    renderMantendoRolagem();
+    return;
+  }
+  const corridaManual = e.target.closest('[data-corrida-manual]');
+  if (corridaManual) {
+    rolagemAnterior = window.scrollY;
+    corridaManualAberta = { id: corridaManual.dataset.corridaManual, data: corridaManual.dataset.data ?? null };
+    render();
+    return;
+  }
+  const ligar = e.target.closest('[data-ligar]');
+  if (ligar) {
+    estado.ligacoes = { ...estado.ligacoes, [ligar.dataset.ligar]: ligar.dataset.sessao };
+    const { [ligar.dataset.sessao]: _resolvido, ...naoFeitos } = estado.naoFeitos;
+    estado.naoFeitos = naoFeitos;
+    guardar();
+    renderMantendoRolagem();
+    mostrarAviso('Corrida ligada a este treino.');
+    return;
+  }
+  const desligar = e.target.closest('[data-desligar]');
+  if (desligar) {
+    const { [desligar.dataset.desligar]: _removida, ...ligacoes } = estado.ligacoes;
+    estado.ligacoes = ligacoes;
+    guardar();
+    renderMantendoRolagem();
+    return;
+  }
+  const desfazerNaoFeito = e.target.closest('[data-desfazer-nao-feito]');
+  if (desfazerNaoFeito) {
+    const { [desfazerNaoFeito.dataset.desfazerNaoFeito]: _removido, ...naoFeitos } = estado.naoFeitos;
+    estado.naoFeitos = naoFeitos;
+    guardar();
     renderMantendoRolagem();
     return;
   }
@@ -2818,6 +3044,15 @@ app.addEventListener('submit', (e) => {
     document.activeElement?.blur();
     render();
     return mostrarAviso('Cadastro salvo.');
+  }
+  if (e.target.id === 'form-corrida') return salvarCorridaManual(e.target);
+  if (e.target.id === 'form-nao-feito') {
+    const motivo = String(new FormData(e.target).get('motivo') ?? 'outro');
+    estado.naoFeitos = { ...estado.naoFeitos, [e.target.dataset.sessao]: { motivo } };
+    guardar();
+    document.activeElement?.blur();
+    renderMantendoRolagem();
+    return mostrarAviso('Registrado como não feito.');
   }
   if (e.target.id === 'form-peso') {
     const dados = new FormData(e.target);

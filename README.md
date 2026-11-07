@@ -35,6 +35,7 @@ O app precisa estar publicado em um endereço HTTPS. No Safari, abra o endereço
 | `src/analise.js` | Análise da corrida feita: tempo em cada ritmo, porcentagem na meta e estimativa anaeróbica. |
 | `src/avulsas.js` | Caminhadas e outros exercícios, do relógio ou lançados à mão. |
 | `src/aniversario.js` | Idade calculada pela data de nascimento e dia do aniversário. |
+| `src/cumprimento.js` | Situação de cada treino: cumprido, parcial, não feito ou sem registro, e corrida ligada a treino de outro dia. |
 | `src/calendario.js` | Calendário do mês e totais de tudo o que foi feito, dentro ou fora da planilha. |
 | `src/medalhas.js` | Conquistas: recordes, marcos, datas especiais, constância semanal e provas, além do resumo que guarda as corridas com mais de 12 meses. |
 | `src/peso.js` | Histórico de peso e IMC, com as faixas da OMS. |
@@ -62,6 +63,8 @@ Regras principais:
 - **Treino forte** só entra para quem busca tempo. A origem de cada regra aparece em Ajustes e fica em `src/regras.js`.
 - **Detalhes do treino** mostram tempo e pace estimados pelo meio das faixas de ritmo, e zonas Z1 a Z5 de ritmo calculadas pelo app. Depois da corrida, trazem os dados reais e as zonas de frequência cardíaca do intervals.icu.
 - **Análise do treino** compara o tempo real em cada zona de ritmo com o previsto e mostra quanto ficou na meta, acima e abaixo (80% ou mais é "dentro da meta", 60% ou mais é "parcialmente": corte do app, não de estudo). A parte anaeróbica é aproximada pelo pace, porque o Training Effect do Garmin não vem pela API.
+- **Treino cumprido**: a corrida do dia, ou uma corrida da mesma semana ligada por você, conta como cumprido a partir de 80% da distância e como parcial abaixo disso (corte do app). Na virada do dia, o treino sem corrida fica sem registro. O botão Não fiz este treino guarda o motivo: doença ou dor não contam como falta na Revisão nem quebram a sequência de semanas.
+- **Corrida manual**, para treino sem relógio, conta no volume e nos marcos, mas não no nível nem nos recordes.
 - **Conquistas**, na Evolução, não mudam treino nem nível. Só corrida conta. A constância é medida por semana, nunca por dias seguidos, e uma semana com dor registrada não quebra a sequência: premiar dias seguidos contrariaria o descanso da planilha.
 - **Calendário**, na Planilha e na Evolução, mostra por mês o previsto, as corridas da planilha, as corridas fora dela e as outras atividades, inclusive antes de a planilha começar.
 - **Corrida fora da planilha** conta no volume e no nível, porque é carga real de corrida.

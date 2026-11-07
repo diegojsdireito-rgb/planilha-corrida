@@ -21,6 +21,12 @@ export const REGRAS = [
     fontes: [['Planos de Higdon', 'https://www.halhigdon.com/training-programs/']],
   },
   {
+    nome: 'Treino cumprido',
+    origem: 'app',
+    texto: 'Conta como cumprido a partir de 80% da distância prevista, e como parcial abaixo disso. Sem corrida, o treino fica sem registro na virada do dia. Não feito por doença ou dor não conta como falta. Sem estudo que defina esses cortes.',
+    fontes: [],
+  },
+  {
     nome: 'Treinos fortes',
     origem: 'treinador',
     texto: 'Só para quem busca tempo, porque os planos iniciantes não usam tiros. Não há estudo que defina quando um iniciante deve começar.',

@@ -169,6 +169,11 @@ p { margin: 0 0 8px; }
 .voltas tr.volta-melhor td { background: var(--marca-suave); font-weight: 700; }
 .voltas tr.volta-recuperacao td { color: var(--suave); }
 #form-peso { padding-bottom: 8px; }
+.status.parcial { color: var(--alerta); }
+.dia.parcial .dia-marca { background: color-mix(in srgb, var(--ok) 28%, transparent); border: 2px solid var(--ok); }
+.dia.nao-feito .dia-marca { border: 2px solid var(--borda); color: var(--suave); }
+.cal-ponto.parcial { border: 2px solid var(--ok); background: color-mix(in srgb, var(--ok) 28%, transparent); }
+.avulsa-linha > button { flex: none; min-height: 40px; padding: 0 12px; }
 .cal-detalhe { margin-top: 12px; }
 .cal-detalhe h3 { margin: 0 0 6px; text-transform: none; }
 .cal-detalhe .sessao { padding-left: 0; padding-right: 0; }
