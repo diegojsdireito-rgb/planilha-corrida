@@ -93,11 +93,12 @@ let provasPendentes = null;
 let atividadeAberta = null;
 let medalhasAbertas = false;
 let editandoUsuario = false;
+let editandoChave = false;
 let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '2.9';
+const VERSAO_APP = '3.0';
 
 const avisoPlanilhaAntiga = () => (estado.plano.versaoRegras === VERSAO_REGRAS ? '' : `
   <section class="cartao alerta">
@@ -2282,6 +2283,39 @@ function blocoUsuario() {
     </form>`;
 }
 
+// Como os dados do usuário: depois de salva, a chave só muda ou sai por Editar.
+function blocoChave() {
+  const passos = (aberto) => `
+    <details class="passos-chave" ${aberto ? 'open' : ''}>
+      <summary>Como conseguir a chave de API</summary>
+      ${PASSOS_DA_CHAVE}
+    </details>`;
+  if (estado.chaveApi && !editandoChave) {
+    return `
+      <section class="cartao">
+        <h2>Intervals.icu</h2>
+        ${passos(false)}
+        <table class="ritmos"><tbody>
+          <tr><td>Situação</td><td>Chave salva</td></tr>
+          <tr><td>Chave de API</td><td>••••••••</td></tr>
+        </tbody></table>
+        <button style="margin-top:10px" data-acao="editar-chave">Editar</button>
+      </section>`;
+  }
+  return `
+    <form class="cartao" id="form-chave">
+      <h2>${estado.chaveApi ? 'Editar chave' : 'Intervals.icu'}</h2>
+      ${passos(!estado.chaveApi)}
+      <label>Chave de API<input name="chave" type="password" autocomplete="off" value="${esc(estado.chaveApi)}"></label>
+      <div class="botoes">
+        <button class="principal" type="submit">Salvar e testar</button>
+        ${estado.chaveApi ? `
+          <button type="button" data-acao="cancelar-chave">Cancelar</button>
+          <button type="button" data-acao="remover-chave">Remover</button>` : ''}
+      </div>
+    </form>`;
+}
+
 function telaAjustes() {
   const { plano, perfil } = estado;
   const r = plano.ritmos;
@@ -2314,18 +2348,7 @@ function telaAjustes() {
       <p>${perfil.idade} anos, ${numeroPeso(perfil.pesoKg)} kg, ${esc(perfil.alturaCm)} cm, IMC ${numeroPeso(imcDe(perfil.pesoKg, perfil.alturaCm))}</p>
       <p class="suave">O peso se registra em Evolução, em Peso e IMC. Para mudar altura ou objetivo, comece um novo ciclo.</p>
     </section>
-    <form class="cartao" id="form-chave">
-      <h2>Intervals.icu</h2>
-      <details class="passos-chave" ${estado.chaveApi ? '' : 'open'}>
-        <summary>Como conseguir a chave de API</summary>
-        ${PASSOS_DA_CHAVE}
-      </details>
-      <label>Chave de API<input name="chave" type="password" autocomplete="off" value="${esc(estado.chaveApi)}"></label>
-      <div class="botoes">
-        <button class="principal" type="submit">Salvar e testar</button>
-        ${estado.chaveApi ? '<button type="button" data-acao="remover-chave">Remover</button>' : ''}
-      </div>
-    </form>
+    ${blocoChave()}
     <section class="cartao">
       <h2>Envio automático</h2>
       <label class="marcar"><input type="checkbox" id="envio-automatico" ${estado.envioAutomatico ? 'checked' : ''}> Enviar os treinos de cada semana</label>
@@ -2413,6 +2436,7 @@ abas.addEventListener('click', (e) => {
   atividadeAberta = null;
   medalhasAbertas = false;
   editandoUsuario = false;
+  editandoChave = false;
   avulsaAberta = null;
   provaAberta = null;
   provasPendentes = null;
@@ -2611,7 +2635,17 @@ const acoes = {
 
   'baixar-csv': () => salvarArquivo(csvDasCorridas(estado.atividades), `corridas-${hoje()}.csv`, 'text/csv'),
 
+  'editar-chave': () => {
+    editandoChave = true;
+    renderMantendoRolagem();
+  },
+  'cancelar-chave': () => {
+    editandoChave = false;
+    renderMantendoRolagem();
+  },
   'remover-chave': () => {
+    if (!window.confirm('Remover a chave deste aparelho? O app para de receber suas atividades até você colar a chave de novo.')) return;
+    editandoChave = false;
     estado.chaveApi = '';
     guardar();
     render();
@@ -2807,6 +2841,7 @@ app.addEventListener('submit', (e) => {
     comOcupado(botao, async () => {
       await sincronizar(chave);
       estado.chaveApi = chave;
+      editandoChave = false;
       guardar();
       render();
       mostrarAviso(`Conectado. ${estado.atividades.length} corridas encontradas.`);
