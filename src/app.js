@@ -123,7 +123,7 @@ let mesVisto = null;
 let diaVisto = null;
 
 // Mesmo número da VERSAO em sw.js. Fica visível para conferir qual versão o aparelho abriu.
-const VERSAO_APP = '3.7';
+const VERSAO_APP = '3.8';
 
 const barraDeSecoes = (aba_, opcoes) => `
   <div class="secoes" role="group" aria-label="Seções">
@@ -1741,9 +1741,36 @@ function blocoCalendario(dia) {
 }
 
 // Corrida extra, corrida sem distância ou outro exercício, na mesma lista dos treinos da semana.
-function linhaFeitaNaSemana({ tipo, data, item }) {
+function dataDaLinhaFeita(data) {
   const quando = new Date(`${data}T12:00:00Z`);
-  const dataDaLinha = `<span class="sessao-data"><small>${DIAS[(quando.getUTCDay() + 6) % 7].curto}</small><b>${quando.getUTCDate()}</b></span><span class="sessao-faixa"></span>`;
+  return `<span class="sessao-data"><small>${DIAS[(quando.getUTCDay() + 6) % 7].curto}</small><b>${quando.getUTCDate()}</b></span><span class="sessao-faixa"></span>`;
+}
+
+const nomeDoFeito = ({ tipo, item }) => (tipo === 'outra'
+  ? (item.categoria === 'outro' && item.nome ? item.nome : nomeDaCategoria(item.categoria))
+  : (item.nome ?? 'Corrida'));
+
+// Mais de uma atividade no mesmo dia vira uma linha só, com a soma; o toque abre o dia no calendário.
+function linhaDoDiaAgrupado(data, lista) {
+  const nomes = [...new Set(lista.map(nomeDoFeito))];
+  const titulo = nomes.length === 1 ? nomes[0] : 'Atividades';
+  const kmTotal = lista.reduce((t, f) => t + (f.item.km ?? 0), 0);
+  const minutos = lista.reduce((t, f) => t + (f.tipo === 'outra' ? f.item.minutos ?? 0 : Math.round((f.item.seg ?? 0) / 60)), 0);
+  const detalhe = [`${lista.length} atividades no dia`, minutos ? duracaoCurta(minutos) : null].filter(Boolean).join(', ');
+  const corrida = lista.some((f) => f.tipo !== 'outra');
+  return `<button class="sessao ${corrida ? 't-extra' : 't-outra'}" data-acao="ver-dia" data-data="${data}" aria-label="${esc(titulo)}, ${lista.length} atividades, ${dataCurta(data)}. Abre o dia no calendário">${dataDaLinhaFeita(data)}
+    <span class="sessao-corpo"><strong>${esc(titulo)}</strong><span class="suave">${esc(detalhe)}</span></span>
+    <span class="sessao-fim"><span class="status">${kmTotal ? km(Math.round(kmTotal * 10) / 10) : ''}</span>${icone('seta')}</span></button>`;
+}
+
+function linhasFeitasPorDia(feito) {
+  const porDia = new Map();
+  for (const f of feito) porDia.set(f.data, [...(porDia.get(f.data) ?? []), f]);
+  return [...porDia].map(([data, lista]) => ({ data, html: lista.length === 1 ? linhaFeitaNaSemana(lista[0]) : linhaDoDiaAgrupado(data, lista) }));
+}
+
+function linhaFeitaNaSemana({ tipo, data, item }) {
+  const dataDaLinha = dataDaLinhaFeita(data);
   if (tipo === 'outra') {
     const nome = item.categoria === 'outro' && item.nome ? item.nome : nomeDaCategoria(item.categoria);
     const corpo = `${dataDaLinha}
@@ -1787,7 +1814,7 @@ function semanaAntesDoInicio(dia) {
           <span class="suave">${dia < plano.inicio ? 'Antes do início da planilha. ' : ''}${esc(contagemDoFeito(feito))}</span>
         </span>
       </summary>
-      ${feito.map(linhaFeitaNaSemana).join('')}
+      ${linhasFeitasPorDia(feito).map((l) => l.html).join('')}
     </details>`;
 }
 
@@ -2718,7 +2745,7 @@ function telaPlano() {
     const feito = feitoForaDosTreinos({ segunda: segundaDaSemana(primeira.data), ...dadosDaAtividade() });
     const linhas = [
       ...sessoes.map((s) => ({ data: s.data, html: linhaSessao(s, dia) })),
-      ...feito.map((f) => ({ data: f.data, html: linhaFeitaNaSemana(f) })),
+      ...linhasFeitasPorDia(feito),
     ].sort((a, b) => a.data.localeCompare(b.data));
     return `
       <details class="semana ${atual ? 'atual' : ''}" ${aberta ? 'open' : ''}>
@@ -3335,6 +3362,15 @@ const acoes = {
     mesVisto = null;
     diaVisto = null;
     render();
+  },
+  'ver-dia': (botao) => {
+    aba = 'plano';
+    secoes.plano = 'calendario';
+    sessaoAberta = null;
+    diaVisto = botao.dataset.data;
+    mesVisto = mesDe(diaVisto);
+    render();
+    document.getElementById('calendario')?.querySelector('.cal-detalhe')?.scrollIntoView({ block: 'start' });
   },
   'ver-provas': () => {
     aba = 'plano';
