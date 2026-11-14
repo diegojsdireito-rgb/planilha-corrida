@@ -1,5 +1,5 @@
 import * as xadrez from '../xadrez.js';
-import { el, pausa } from '../comum.js';
+import { el, pausa, deslizar } from '../comum.js';
 
 const GLIFO = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 const NOME = { k: 'rei', q: 'dama', r: 'torre', b: 'bispo', n: 'cavalo', p: 'peão' };
@@ -56,6 +56,7 @@ export function montar(area, ctl) {
       const p = s.t[i];
       const coords = [...b.querySelectorAll('.coord')].map((c) => c.outerHTML).join('');
       b.innerHTML = (p ? peca(p) : '') + coords;
+      b.classList.remove('origem');
       b.classList.toggle('selecionada', i === selecionada);
       b.classList.toggle('alvo', destinos.includes(i));
       b.classList.toggle('come', destinos.includes(i) && Boolean(p));
@@ -112,10 +113,25 @@ export function montar(area, ctl) {
     const ativa = ctl.ativa();
     const [m] = await Promise.all([pensar(s, ctl.nivel(), chaves), pausa(350)]);
     if (!ativa()) return;
-    pensando = false;
+    // acende a peça que vai sair, para dar tempo de ver de onde ela parte
+    ultimo = [m.de];
+    desenhar();
+    qs[m.de].classList.add('origem');
+    ctl.status(`Robô vai mover ${NOME[s.t[m.de].toLowerCase()]} de ${xadrez.nomeCasa(m.de)}…`, 'robo');
+    if (!await ctl.esperar(600)) return;
     executar(m, 'b');
     desenhar();
-    if (!verificarFim()) ctl.status(xadrez.emXeque(s) ? 'Xeque! Proteja o rei' : 'Sua vez', 'voce');
+    animarLance(m, 700);
+    if (!await ctl.esperar(720)) return;
+    pensando = false;
+    desenhar();
+    if (!verificarFim()) ctl.status(`Robô: ${historico[historico.length - 1]}. ${xadrez.emXeque(s) ? 'Xeque! Proteja o rei' : 'Sua vez'}`, 'voce');
+  }
+
+  function animarLance(m, ms) {
+    deslizar(qs, [m.de, m.para], ms);
+    if (m.roque === 'curto') deslizar(qs, [m.de + 3, m.de + 1], ms);
+    if (m.roque === 'longo') deslizar(qs, [m.de - 4, m.de - 1], ms);
   }
 
   function escolherPromocao(opcoes) {
@@ -140,7 +156,11 @@ export function montar(area, ctl) {
       const m = opcoes.length > 1 ? await escolherPromocao(opcoes) : opcoes[0];
       executar(m, 'w');
       selecionada = null;
+      pensando = true; // trava o tabuleiro enquanto a peça desliza
       desenhar();
+      animarLance(m, 320);
+      if (!await ctl.esperar(340)) return;
+      pensando = false;
       if (!verificarFim()) robo();
       return;
     }
