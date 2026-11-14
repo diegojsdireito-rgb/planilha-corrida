@@ -88,6 +88,7 @@ Esses limites são prudência, não garantia contra lesões. A planilha não sub
 App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 robôs), Xadrez, Damas (regras brasileiras), Reversi, Quatro em Linha e Jogo da Velha, e dois desafios solo com dicas do robô: Paciência e Sudoku. O robô tem três níveis (fácil, médio e difícil).
 
 - **Salvamento automático:** cada partida em andamento fica guardada no aparelho e volta do ponto em que parou, inclusive depois de fechar o navegador.
+- **Cópia de segurança:** no fim da tela inicial, "Salvar cópia" gera um arquivo com placar, histórico e partidas em andamento, e "Restaurar cópia" junta o arquivo ao que já está no aparelho, sem repetir partidas. No iPhone, apagar o ícone da tela de início apaga os dados, por isso o app avisa quando a última cópia tem mais de 14 dias.
 - **Sons:** gerados na hora pelo navegador (Web Audio), sem arquivos; dá para desligar no botão de alto-falante.
 - **Painel:** na tela inicial, aproveitamento contra o robô, sequências de vitórias, partidas dos últimos 14 dias, aproveitamento por jogo, recordes dos desafios solo e últimas partidas.
 
@@ -104,7 +105,8 @@ Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai 
 | `jogos/src/velha.js` | Jogo da velha; no difícil, o robô joga perfeito. |
 | `jogos/src/paciencia.js` | Paciência (Klondike), movimento automático e dica do robô. |
 | `jogos/src/sudoku.js` | Gera grades com solução única em três níveis. |
-| `jogos/src/dados.js` | Histórico, placar, recordes e partidas salvas, tudo no aparelho. |
+| `jogos/src/dados.js` | Histórico, placar, recordes, partidas salvas e cópia de segurança, tudo no aparelho. |
+| `jogos/src/copia.js` | Cartão "Seus dados": salvar e restaurar a cópia. |
 | `jogos/src/som.js` | Efeitos sonoros sintetizados. |
 | `jogos/src/painel.js` | Números e gráficos da tela inicial. |
 | `jogos/src/app.js` e `jogos/src/telas/` | Telas, tabuleiros e animações. |

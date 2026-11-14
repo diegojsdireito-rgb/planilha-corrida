@@ -1,5 +1,6 @@
 import { el } from './comum.js';
-import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo } from './dados.js';
+import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo, pedirPersistencia } from './dados.js';
+import { montarCopiaCartao } from './copia.js';
 import { tocar, destravar } from './som.js';
 import { montarPainel } from './painel.js';
 import { formatarTempo } from './comum.js';
@@ -173,7 +174,10 @@ function inicio() {
 
   app.append(el('p', 'rotulo', 'Seu painel'));
   montarPainel(app, JOGOS, abrir);
+  montarCopiaCartao(app, JOGOS, inicio);
 }
+
+pedirPersistencia();
 
 // ---------- Tela de jogo ----------
 
