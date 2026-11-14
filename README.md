@@ -91,7 +91,7 @@ App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 
 - **Sons:** gerados na hora pelo navegador (Web Audio), sem arquivos; dá para desligar no botão de alto-falante.
 - **Painel:** na tela inicial, aproveitamento contra o robô, sequências de vitórias, partidas dos últimos 14 dias, aproveitamento por jogo, recordes dos desafios solo e últimas partidas.
 
-Com `npm run dev`, abre em http://localhost:4180/jogos/index.html.
+Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai de `jogos/icones/icone.svg`; depois de mudar o desenho, gere os PNGs com `node scripts/gerar-icones-jogos.mjs` (usa o Playwright).
 
 | Arquivo | Função |
 |---|---|
