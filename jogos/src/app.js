@@ -1,6 +1,7 @@
 import { el } from './comum.js';
 import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo, pedirPersistencia } from './dados.js';
 import { montarCopiaCartao } from './copia.js';
+import { ligarPuxada } from '../../src/gestos.js';
 import { tocar, destravar } from './som.js';
 import { montarPainel } from './painel.js';
 import { formatarTempo } from './comum.js';
@@ -136,6 +137,7 @@ function resumoDoJogo(jogo) {
 function inicio() {
   sairDaTela?.();
   sairDaTela = null;
+  naTelaInicial = true;
   app.replaceChildren();
   document.title = 'Mesa de Jogos';
 
@@ -179,9 +181,26 @@ function inicio() {
 
 pedirPersistencia();
 
+// Puxar para atualizar: só no app aberto pelo ícone, que não tem o recarregar do Safari,
+// e só na tela inicial, para não confundir com arrastar peças nos tabuleiros.
+const instalado = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let naTelaInicial = false;
+if (instalado) {
+  ligarPuxada(app, document.getElementById('puxada'), {
+    podeIniciar: () => naTelaInicial,
+    async aoAtualizar() {
+      // Busca a versão nova antes de recarregar; as partidas já estão salvas no aparelho.
+      try { await fetch(location.pathname, { cache: 'reload' }); } catch { /* sem internet: recarrega o que houver */ }
+      location.reload();
+      await new Promise(() => {});
+    },
+  });
+}
+
 // ---------- Tela de jogo ----------
 
 function abrir(jogo) {
+  naTelaInicial = false;
   tocar('clique');
   sairDaTela?.();
   app.replaceChildren();

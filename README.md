@@ -89,6 +89,7 @@ App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 
 
 - **Salvamento automático:** cada partida em andamento fica guardada no aparelho e volta do ponto em que parou, inclusive depois de fechar o navegador.
 - **Cópia de segurança:** no fim da tela inicial, "Salvar cópia" gera um arquivo com placar, histórico e partidas em andamento, e "Restaurar cópia" junta o arquivo ao que já está no aparelho, sem repetir partidas. No iPhone, apagar o ícone da tela de início apaga os dados, por isso o app avisa quando a última cópia tem mais de 14 dias.
+- **Puxar para atualizar:** no app aberto pelo ícone da tela de início, puxar a tela inicial para baixo busca a versão nova (o Safari já faz isso sozinho; nos tabuleiros o gesto fica desligado para não atrapalhar as jogadas). Usa o mesmo `src/gestos.js` do app de corrida.
 - **Sons:** gerados na hora pelo navegador (Web Audio), sem arquivos; dá para desligar no botão de alto-falante.
 - **Painel:** na tela inicial, aproveitamento contra o robô, sequências de vitórias, partidas dos últimos 14 dias, aproveitamento por jogo, recordes dos desafios solo e últimas partidas.
 

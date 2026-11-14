@@ -402,3 +402,17 @@ h2 { font-size: 20px; }
 .dados-cartao .acoes-solo { justify-content: flex-start; }
 .dados-cartao label.botao { display: inline-flex; align-items: center; cursor: pointer; }
 .aviso-copia { margin: 10px 0 0; font-size: 13px; color: var(--suave); min-height: 1em; }
+
+/* Puxar para atualizar (app instalado) */
+#puxada {
+  position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 0; right: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--suave); font-size: 14px; font-weight: 600; pointer-events: none;
+}
+#puxada[hidden] { display: none; }
+#puxada.atualizando::before {
+  content: ""; width: 14px; height: 14px; border: 2px solid var(--borda); border-top-color: var(--marca);
+  border-radius: 50%; animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #puxada.atualizando::before { animation: none; } }
