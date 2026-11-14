@@ -1,5 +1,5 @@
 import * as damas from '../damas.js';
-import { el, COROA } from '../comum.js';
+import { el, COROA, deslizar } from '../comum.js';
 
 export function montar(area, ctl) {
   const grade = el('div', 'oito damas');
@@ -22,6 +22,7 @@ export function montar(area, ctl) {
       const v = t[i];
       b.innerHTML = v ? `<span class="pedra p${Math.sign(v)}">${Math.abs(v) === 2 ? COROA : ''}</span>` : '';
       b.classList.toggle('pode', origens.has(i) && selecionada === null);
+      b.classList.remove('origem');
       b.classList.toggle('selecionada', i === selecionada);
       b.classList.toggle('alvo', destinos.has(i));
       b.classList.toggle('captura', destinos.has(i) && destinos.get(i).capturadas.length > 0);
@@ -72,21 +73,39 @@ export function montar(area, ctl) {
     ctl.status('Robô pensando…', 'robo');
     if (!await ctl.esperar(400)) return;
     const m = damas.jogadaRobo(t, -1, ctl.nivel());
+    // acende a origem e o caminho antes de mover
     ultimo = [m.de, ...m.caminho];
     desenhar(m.capturadas);
-    if (!await ctl.esperar(m.capturadas.length ? 650 : 300)) return;
-    registrar(m, -1);
-    desenhar();
+    qs[m.de].classList.add('origem');
+    ctl.status(m.capturadas.length ? `Robô vai capturar ${m.capturadas.length} peça${m.capturadas.length > 1 ? 's' : ''}…` : 'Robô vai mover…', 'robo');
+    if (!await ctl.esperar(650)) return;
+    if (!await animar(m, -1, 520)) return;
     if (!verificarFim()) avisoVez();
   }
 
-  function clicar(i) {
+  // Aplica o lance e faz a pedra percorrer o caminho; as capturadas somem ao fim.
+  async function animar(m, j, msPorPasso) {
+    const pecasCapturadas = m.capturadas.map((i) => t[i]);
+    registrar(m, j);
+    desenhar();
+    m.capturadas.forEach((i, k) => {
+      const fantasma = el('span', `pedra p${Math.sign(pecasCapturadas[k])} fantasma`, Math.abs(pecasCapturadas[k]) === 2 ? COROA : '');
+      fantasma.style.animationDuration = `${msPorPasso * m.caminho.length}ms`;
+      qs[i].append(fantasma);
+    });
+    const total = msPorPasso * m.caminho.length;
+    deslizar(qs, [m.de, ...m.caminho], total);
+    const continua = await ctl.esperar(total + 30);
+    if (continua) desenhar();
+    return continua;
+  }
+
+  async function clicar(i) {
     if (acabou || vez !== 1) return;
     const m = ops.find((o) => o.de === selecionada && damas.destino(o) === i);
     if (m) {
-      registrar(m, 1);
       selecionada = null;
-      desenhar();
+      if (!await animar(m, 1, 300)) return;
       if (!verificarFim()) robo();
       return;
     }

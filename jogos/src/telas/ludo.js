@@ -245,7 +245,7 @@ export function montar(area, ctl) {
       g.style.transform = `translate(${x}px, ${y}px) scale(1.1)`;
       svg.append(g);
       ctl.som('passo');
-      if (!await ctl.esperar(150)) return false;
+      if (!await ctl.esperar(j.cor === 0 ? 160 : 260)) return false;
     }
     return true;
   }

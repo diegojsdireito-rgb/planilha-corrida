@@ -53,7 +53,12 @@ export function montar(area, ctl) {
       ctl.status('Robô pensando…', 'robo');
       if (!await ctl.esperar(550)) return;
       const i = reversi.jogadaRobo(t, 2, ctl.nivel());
-      if (i !== null) { t = reversi.jogar(t, i, 2); ultimo = i; ctl.som('robo'); }
+      if (i !== null) {
+        qs[i].classList.add('origem');
+        if (!await ctl.esperar(550)) return;
+        qs[i].classList.remove('origem');
+        t = reversi.jogar(t, i, 2); ultimo = i; ctl.som('robo');
+      }
       if (verificarFim()) return;
       if (reversi.jogadas(t, 1).size) break;
       salvar();
