@@ -82,3 +82,18 @@ Regras principais:
 - **Revisão** compara os últimos 14 dias com o previsto e só altera da próxima segunda em diante. Dor sempre reduz a carga.
 
 Esses limites são prudência, não garantia contra lesões. A planilha não substitui avaliação médica ou de um treinador.
+
+## Mesa de Jogos
+
+App separado, na pasta `jogos/`, com jogos de tabuleiro contra o robô: Ludo (você e até 3 robôs), Damas (regras brasileiras), Reversi, Quatro em Linha e Jogo da Velha. O robô tem três níveis (fácil, médio e difícil) e o placar fica guardado no aparelho.
+
+Com `npm run dev`, abre em http://localhost:4180/jogos/index.html.
+
+| Arquivo | Função |
+|---|---|
+| `jogos/src/ludo.js` | Percurso, capturas, casas seguras e escolha da jogada do robô por pontuação. |
+| `jogos/src/damas.js` | Captura obrigatória pela maioria, dama que voa e robô por minimax com poda alfa-beta. |
+| `jogos/src/reversi.js` | Jogadas válidas, viradas e robô por minimax com pesos por casa. |
+| `jogos/src/lig4.js` | Quatro em linha com robô por minimax. |
+| `jogos/src/velha.js` | Jogo da velha; no difícil, o robô joga perfeito. |
+| `jogos/src/app.js` | Telas, tabuleiros e animações. |
