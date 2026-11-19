@@ -14,6 +14,7 @@ export function recorde() {
 
 export function montar(area, ctl) {
   const palco = el('div', 'corrida');
+  const tela3d = el('canvas', 'tela-3d');
   const tela = el('canvas');
   tela.setAttribute('role', 'img');
   tela.setAttribute('aria-label', 'Corrida: deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar');
@@ -25,7 +26,7 @@ export function montar(area, ctl) {
   skateEl.setAttribute('aria-label', 'Subir no skate');
   const turboEl = el('button', 'acao-corrida acao-turbo', '<i></i><span>⚡</span>');
   turboEl.setAttribute('aria-label', 'Ativar a supercarga');
-  palco.append(tela, hud, pausaEl, skateEl, turboEl, camada);
+  palco.append(tela3d, tela, hud, pausaEl, skateEl, turboEl, camada);
   const controles = el('div', 'corrida-controles', `
     <button data-acao="esquerda" aria-label="Esquerda">◀</button>
     <button data-acao="pular" aria-label="Pular">▲</button>
@@ -37,6 +38,27 @@ export function montar(area, ctl) {
   let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
 
+  // 3D quando o aparelho permite; senão, o desenho em 2D continua valendo.
+  let mundo = null;
+  const parado = cor.nova('medio');
+  parado.ultimaLinha = 1e9;
+  import('../mundo3d.js')
+    .then((m) => {
+      if (!palco.isConnected) return;
+      mundo = m.criarMundo(tela3d);
+      if (mundo) { palco.classList.add('em-3d'); medir(); }
+    })
+    .catch(() => { /* fica no 2D */ });
+
+  // Ao sair da tela, libera a memória do 3D.
+  const vigia = setInterval(() => {
+    if (palco.isConnected) return;
+    clearInterval(vigia);
+    observador?.disconnect();
+    mundo?.destruir();
+    mundo = null;
+  }, 2000);
+
   function medir() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const r = palco.getBoundingClientRect();
@@ -44,6 +66,7 @@ export function montar(area, ctl) {
     tela.width = Math.round(W * dpr);
     tela.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    mundo?.redimensionar(W, H, dpr);
     if (!rodando) desenhar(0);
   }
   const observador = new ResizeObserver(medir);
@@ -257,6 +280,12 @@ export function montar(area, ctl) {
 
   function desenhar(t) {
     if (!W) return;
+    if (mundo) {
+      mundo.desenhar(s ?? parado, t, prefs.personagem);
+      ctx.clearRect(0, 0, W, H);
+      if (s?.supercarga > 0) linhasDeVelocidade(t);
+      return;
+    }
     const dist = s?.dist ?? 0;
     ctx.clearRect(0, 0, W, H);
     const alvoCamera = Math.max(0, (s?.y ?? 0) - 1.1) * U(0) * 0.8;
@@ -605,7 +634,7 @@ export function montar(area, ctl) {
     if (b) agir(b.dataset.acao);
   });
   const teclas = (e) => {
-    if (!palco.isConnected) { document.removeEventListener('keydown', teclas); observador.disconnect(); return; }
+    if (!palco.isConnected) { document.removeEventListener('keydown', teclas); observador.disconnect(); mundo?.destruir(); mundo = null; return; }
     const mapa = { ArrowLeft: 'esquerda', a: 'esquerda', ArrowRight: 'direita', d: 'direita', ArrowUp: 'pular', w: 'pular', ' ': 'pular', ArrowDown: 'deslizar', s: 'deslizar', k: 'skate', e: 'supercarga' };
     const acao = mapa[e.key];
     if (acao && rodando) { e.preventDefault(); agir(acao); }

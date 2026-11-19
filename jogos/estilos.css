@@ -550,3 +550,7 @@ h2 { font-size: 20px; }
 .acao-turbo span { position: relative; }
 .acao-turbo.pronto { animation: pronto .7s ease-in-out infinite alternate; }
 @keyframes pronto { to { box-shadow: 0 0 0 6px rgba(255, 200, 40, .45), 0 4px 12px rgba(0, 0, 0, .3); transform: scale(1.06); } }
+
+/* Corrida em 3D: o canvas 3D fica embaixo; o 2D, por cima, só para efeitos */
+.corrida .tela-3d { display: none; }
+.corrida.em-3d .tela-3d { display: block; }

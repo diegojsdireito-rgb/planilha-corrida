@@ -107,6 +107,8 @@ Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai 
 | `jogos/src/docinhos.js` | Docinhos: trincas, doces especiais (listrado, bomba, arco-íris), cascatas, fases e jogada para a dica. |
 | `jogos/src/corrida.js` | Corrida dos Cachinhos: física, obstáculos sempre com passagem, colisões, moedas, poderes, skate e supercarga. |
 | `jogos/src/loja.js` | Carteira, loja, missões, presente do dia e junção de carteiras na cópia de segurança. |
+| `jogos/src/mundo3d.js` | A corrida em 3D: rua, prédios, árvores, obstáculos, moedas e a menina articulada, com câmera atrás dela. Se o aparelho não tiver 3D, a corrida usa o desenho em 2D. |
+| `jogos/vendor/three.module.min.js` | Biblioteca three.js 0.170 (licença MIT, em `jogos/vendor/three.LICENSE`), guardada no app para funcionar sem internet. |
 | `jogos/src/personagem.js` | A menina: retrato de frente (SVG) e desenho de costas correndo (canvas), com luz e sombra. |
 | `jogos/src/paciencia.js` | Paciência (Klondike), movimento automático e dica do robô. |
 | `jogos/src/sudoku.js` | Gera grades com solução única em três níveis. |
