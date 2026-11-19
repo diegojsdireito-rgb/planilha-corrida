@@ -225,8 +225,8 @@ export function montar(area, ctl) {
     ctx.restore();
   }
 
-  const ICONE = { ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹' };
-  const COR_BOLHA = { ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc' };
+  const ICONE = { capa: '🦸‍♀️', nave: '🛸', ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹' };
+  const COR_BOLHA = { capa: '#e8344a', nave: '#2fcf9a', ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc' };
   function bolha(x, y, r, tipo, t) {
     const yy = y + Math.sin(t * 4) * r * 0.12;
     const g = ctx.createRadialGradient(x - r * 0.35, yy - r * 0.4, r * 0.1, x, yy, r);
@@ -356,7 +356,14 @@ export function montar(area, ctl) {
       ...prefs.personagem,
       piscando: (s?.invencivel ?? 0) > 0 && Math.floor(t * 12) % 2 === 0,
     });
-    if ((s?.voo ?? 0) > 0) desenharMaleta(x, y - altura * u, u, t);
+    if ((s?.voo ?? 0) > 0) {
+      if (s.vooTipo === 'mochila') desenharMaleta(x, y - altura * u, u, t);
+      else {
+        // sem 3D: a capa ou a nave aparecem como figurinhas grandes junto dela
+        ctx.font = `${Math.round(u * (s.vooTipo === 'nave' ? 1.1 : 0.6))}px sans-serif`; ctx.textAlign = 'center';
+        ctx.fillText(s.vooTipo === 'nave' ? '🛸' : '🦸‍♀️', x, y - altura * u - (s.vooTipo === 'nave' ? u * 0.2 : u * 1.4));
+      }
+    }
     for (const o of perto) (o.enfeite ? desenharEnfeite(o) : desenharObjeto(o, t));
     const dp = s?.perseguidor?.dist ?? 99;
     if (dp < 1.9) {
@@ -457,7 +464,7 @@ export function montar(area, ctl) {
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
     hud.innerHTML = `<span class="pts">${cor.pontos(s).toLocaleString('pt-BR')}</span><span class="est">🪙 ${s.moedas}</span>${
       s.dobro > 0 ? `<span class="poder dobro">✖2 ${Math.ceil(s.dobro)}s</span>` : ''}${
-      tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
+      tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, { mochila: '🎒', capa: '🦸‍♀️', nave: '🛸' }[s.vooTipo] ?? '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
     const podeDecolar = emCorrida && s.arrancadas > 0 && s.t <= cor.JANELA_ARRANCADA && s.voo <= 0;
     decolarEl.hidden = !podeDecolar;
     if (podeDecolar) decolarEl.innerHTML = `🎒 Decolar! <small>${s.arrancadas}</small><i style="width:${Math.round((1 - s.t / cor.JANELA_ARRANCADA) * 100)}%"></i>`;
@@ -466,7 +473,7 @@ export function montar(area, ctl) {
 
   const SOM = {
     pulo: 'passo', superpulo: 'superpulo', troca: 'clique', moeda: 'moeda', raio: 'acerto', 'carga-cheia': 'premio', poder: 'item',
-    escudo: 'captura', desliza: 'carta', batida: 'erro', decolar: 'decolar', 'pouso-jato': 'pouso-jato', supercarga: 'turbo', skate: 'skate',
+    escudo: 'captura', desliza: 'carta', batida: 'erro', decolar: 'decolar', 'pouso-jato': 'pouso-jato', heroi: 'heroi', 'pouso-heroi': 'pouso-heroi', teletransporte: 'teletransporte', supercarga: 'turbo', skate: 'skate',
     'skate-quebrou': 'quebra', quebra: 'quebra', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
   };
 
@@ -506,7 +513,9 @@ export function montar(area, ctl) {
 
   function sonsContinuos() {
     if (!prefs.som || !s || pausado || !rodando) { desligarLacos(); ambiente = null; return; }
-    if (s.voo > 0) ligarLaco('jato'); else desligarLaco('jato');
+    for (const [tipo, som] of [['mochila', 'jato'], ['capa', 'capa'], ['nave', 'nave']]) {
+      if (s.voo > 0 && s.vooTipo === tipo) ligarLaco(som); else desligarLaco(som);
+    }
     const tema = cenarioDaCorrida(prefs.cenario ?? 'passeio', s.dist);
     if (tema !== ambiente) { if (ambiente) desligarLaco(ambiente); ligarLaco(tema); ambiente = tema; }
   }

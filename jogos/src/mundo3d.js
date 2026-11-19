@@ -1,7 +1,7 @@
 // Corrida dos Cachinhos em 3D: liga a menina, o cenário escolhido e os objetos da pista.
 // Usa as mesmas coordenadas da lógica (corrida.js): faixa 0..2, z = distância à frente dela, y = altura.
 import { THREE, xDe, COMP_CENA, INICIO, textura, descartar } from './3d/base.js';
-import { criarMenina, criarMochilaJato } from './3d/menina.js';
+import { criarMenina, criarMochilaJato, criarNave } from './3d/menina.js';
 import { texBrilho } from './3d/base.js';
 import { montarCenario, criarObstaculo } from './3d/cenarios.js';
 import { criarPerseguidor, quemPersegue } from './3d/perseguidores.js';
@@ -36,7 +36,7 @@ function prepararComuns() {
   });
   TEX_PODER = {
     ima: bolha('🧲', '#ff5a5a'), pulo: bolha('👟', '#35c46a'), escudo: bolha('🛡️', '#3e8bff'), raio: bolha('⚡', '#ffb800'),
-    dobro: bolha('×2', '#ff4f81', true), bau: bolha('💰', '#e0a000'), turbo: bolha('🚀', '#ff7a1f'), prancha: bolha('🛹', '#29b7dc'),
+    dobro: bolha('×2', '#ff4f81', true), bau: bolha('💰', '#e0a000'), turbo: bolha('🚀', '#ff7a1f'), prancha: bolha('🛹', '#29b7dc'), capa: bolha('🦸‍♀️', '#e8344a'),
   };
 }
 
@@ -60,6 +60,19 @@ function criarObjeto(o, tema) {
     g.add(grupo);
     const brilho = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0x7fb2ff, transparent: true, depthWrite: false, opacity: 0.8 }));
     brilho.scale.set(0.9, 0.9, 1); g.add(brilho);
+    g.userData.flutua = true;
+    g.userData.gira = true;
+    return g;
+  }
+  if (o.tipo === 'nave') {
+    // um disco voador pequeno pairando na pista, com as luzes acesas
+    const g = new THREE.Group();
+    const { grupo, feixe } = criarNave();
+    feixe.visible = false;
+    grupo.scale.setScalar(0.45); grupo.rotation.x = 0.25;
+    g.add(grupo);
+    const brilho = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0x7dffb5, transparent: true, depthWrite: false, opacity: 0.8 }));
+    brilho.scale.set(1.0, 1.0, 1); g.add(brilho);
     g.userData.flutua = true;
     g.userData.gira = true;
     return g;
@@ -121,7 +134,7 @@ export function criarMundo(canvas) {
   let cenario = null; let temaAtual = null;
   let perseguidor = null; let perseguidorId = null; let perX = 0;
   const objetos = new Map();
-  let camX = 0; let camY = 2.4; let ultimoT = 0;
+  let camX = 0; let camY = 2.4; let ultimoT = 0; let afastar = 0;
 
   function limparObjetos() {
     const manter = COMUNS();
@@ -212,9 +225,11 @@ export function criarMundo(canvas) {
       camera.position.set(px - 0.62, 1.05, -2.75);
       camera.lookAt(px - 0.62, 0.84, 0);
     } else {
+      // na nave a câmera se afasta um pouco, para caber o disco voador inteiro
+      afastar += ((s.voo > 0 && s.vooTipo === 'nave' ? 1 : 0) - afastar) * 0.06;
       camX += (px * 0.75 - camX) * 0.12;
-      camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 - camY) * 0.1;
-      camera.position.set(camX, camY, -2.9);
+      camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 + afastar * 0.9 - camY) * 0.1;
+      camera.position.set(camX, camY, -2.9 - afastar * 1.8);
       camera.lookAt(px * 0.85, 0.95 + s.y * 0.6, 6);
     }
     sol.position.set(px - 4, 9, -2);

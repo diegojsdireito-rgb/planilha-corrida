@@ -275,6 +275,43 @@ export function criarMochilaJato() {
   return { grupo, chamas };
 }
 
+// Disco voador: casco metálico, luzes coloridas na borda, cúpula de vidro, painel e raio trator.
+// A menina vai sentada lá dentro; o mesmo modelo, pequeno, aparece na pista como item.
+export function criarNave() {
+  const grupo = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, metalness: 0.75, roughness: 0.28 });
+  const escuro = new THREE.MeshStandardMaterial({ color: 0x55627a, metalness: 0.6, roughness: 0.35 });
+  const casco = sombrear(new THREE.Mesh(torneada([[0, -0.2], [0.4, -0.22], [1.0, -0.06], [1.2, 0], [1.02, 0.07], [0.62, 0.13], [0, 0.14]], 40), metal));
+  grupo.add(casco);
+  const faixa = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.035, 8, 48), escuro); faixa.rotation.x = Math.PI / 2; grupo.add(faixa);
+  const CORES = [0xff4f81, 0x3be8ff, 0xffd23b, 0x6dff7a];
+  const luzes = Array.from({ length: 12 }, (_, k) => {
+    const a = (k / 12) * Math.PI * 2;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), new THREE.MeshStandardMaterial({ color: CORES[k % 4], emissive: CORES[k % 4], emissiveIntensity: 1.2 }));
+    m.position.set(Math.cos(a) * 1.14, 0.0, Math.sin(a) * 1.14); grupo.add(m);
+    return m;
+  });
+  const fundo = new THREE.Mesh(new THREE.CircleGeometry(0.36, 28), new THREE.MeshBasicMaterial({ color: 0x7dffb5 }));
+  fundo.rotation.x = Math.PI / 2; fundo.position.y = -0.215; grupo.add(fundo);
+  // painel de controle na frente dela, com botões acesos
+  const painel = sombrear(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.14), escuro)); painel.position.set(0, 0.24, 0.5); painel.rotation.x = -0.5; grupo.add(painel);
+  for (let k = 0; k < 4; k++) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: CORES[k] }));
+    b.position.set(-0.15 + k * 0.1, 0.3, 0.46); grupo.add(b);
+  }
+  const cupula = new THREE.Mesh(new THREE.SphereGeometry(0.82, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xaeeeff, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide }));
+  cupula.position.y = 0.12; grupo.add(cupula);
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.03, 8, 40), metal); aro.rotation.x = Math.PI / 2; aro.position.y = 0.12; grupo.add(aro);
+  const antena = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 6), metal); antena.position.y = 1.02; grupo.add(antena);
+  const bolinha = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff4f81 })); bolinha.position.y = 1.14; grupo.add(bolinha);
+  // raio trator: um cone de luz verde que desce até o chão e puxa as moedas
+  const feixe = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1, 28, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x7dffb5, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  grupo.add(feixe);
+  return { grupo, luzes, feixe };
+}
+
 export function criarMenina() {
   const tex = criarTexturas();
   const raiz = new THREE.Group();
@@ -511,6 +548,26 @@ export function criarMenina() {
     return { sp, vida: 0 };
   });
   let proximaFumaca = 0; let ultimoT = 0;
+  // capa de super-heroína: presa nos ombros, mais larga embaixo, tremulando ao vento
+  const matCapa = new THREE.MeshStandardMaterial({ color: 0xe0283f, roughness: 0.55, side: THREE.DoubleSide });
+  const geoCapa = new THREE.PlaneGeometry(0.34, 0.8, 6, 16); geoCapa.translate(0, -0.4, 0);
+  const basePosCapa = geoCapa.attributes.position.array.slice();
+  for (let i = 0; i < basePosCapa.length; i += 3) basePosCapa[i] *= 0.8 + 0.8 * (-basePosCapa[i + 1] / 0.8);
+  const capa = sombrear(new THREE.Mesh(geoCapa, matCapa)); capa.position.set(0, 0.43, -0.105); tronco.add(capa);
+  const presilhas = [-1, 1].map((l) => { const b = peca(new THREE.SphereGeometry(0.022, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.6, roughness: 0.3 })); b.position.set(l * 0.11, 0.425, 0.02); tronco.add(b); return b; });
+  // estrela dourada no peito
+  const formaEstrela = new THREE.Shape();
+  for (let k = 0; k < 10; k++) { const a = Math.PI / 2 + (k * Math.PI) / 5; const r = k % 2 ? 0.022 : 0.052; formaEstrela[k ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
+  const estrela = new THREE.Mesh(new THREE.ShapeGeometry(formaEstrela), new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.5, roughness: 0.35, emissive: 0x553300 }));
+  estrela.position.set(0, 0.3, 0.118); tronco.add(estrela);
+  const partesCapa = [capa, ...presilhas, estrela];
+  // nave alienígena (fica na raiz: não acompanha a pose do corpo) e o feixe do teletransporte
+  const { grupo: nave, luzes: luzesNave, feixe: raioTrator } = criarNave();
+  nave.position.y = 0.2; raiz.add(nave);
+  const teleFeixe = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1, 24, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x8ffcff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  teleFeixe.visible = false; raiz.add(teleFeixe);
+  let naNaveAntes = false; let teletransporte = 0;
   const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), transparent: true, depthWrite: false, opacity: 0.55 }));
   aura.scale.set(1.6, 2.2, 1); aura.position.y = 0.75; raiz.add(aura);
 
@@ -587,7 +644,7 @@ export function criarMenina() {
   // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
   const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'cabecaZ', 'vento', 'balanco',
     'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1', 'm0', 'm1', 'olhar', 'palpebra'];
-  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0 };
+  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0 };
   // ombro: primeiro torce o braço no próprio eixo (y), depois leva à frente (x) e abre para o lado (z).
   // A torção é o que permite pôr a mão na cintura com o cotovelo para fora.
   for (const b of bracos) b.ombro.rotation.order = 'ZXY';
@@ -666,6 +723,25 @@ export function criarMenina() {
       ox0: -0.5 + 0.1 * Math.sin(t * 2), oz0: -(1.1 + 0.1 * Math.sin(t * 3)), c0: -0.25,
       ox1: -0.5 + 0.1 * Math.sin(t * 2 + 1), oz1: 1.1 + 0.1 * Math.sin(t * 3 + 1), c1: -0.25,
     }),
+    heroi: (s, t) => {
+      // voando de super-heroína: deitada no ar, um braço esticado à frente, o outro junto do corpo,
+      // pernas juntas e esticadas, cabeça erguida olhando o caminho, cabelo e capa ao vento
+      const b = Math.sin(t * 2.2);
+      return {
+        rotX: 1.32 + 0.04 * b, rotY: -0.42, posY: 0.2 + 0.06 * b, posZ: -0.75, troncoX: -0.12, cabecaX: -0.95, troncoZ: 0.05 * Math.sin(t * 1.3),
+        vento: 1.1, balanco: 0.14,
+        ox1: -2.95, oy1: 0, oz1: 0.12, c1: -0.08, m1: 0.1,
+        ox0: 0.15, oz0: -0.22, c0: -0.35, m0: -0.2,
+        cx0: 0.04, j0: 0.12 + 0.05 * b, p0: 0.75, cz0: -0.02,
+        cx1: 0.2, j1: 0.55 + 0.08 * b, p1: 0.75, cz1: 0.03,
+      };
+    },
+    nave: (s, t) => ({
+      // sentada na nave, mãos no painel, olhando em volta maravilhada
+      posY: -0.28, troncoX: 0.06, cabecaX: -0.1 + 0.06 * Math.sin(t * 0.9), cabecaY: 0.45 * Math.sin(t * 0.7), vento: 0.05, balanco: 0.02,
+      cx0: -1.5, cz0: -0.1, j0: 1.45, p0: 0.15, cx1: -1.5, cz1: 0.1, j1: 1.45, p1: 0.15,
+      ox0: -0.95, oz0: -0.15, c0: -0.65, ox1: -0.95, oz1: 0.15, c1: -0.65, olhar: 0.8 * Math.sin(t * 0.7 + 0.4),
+    }),
     skate: (s, t) => {
       // de lado na prancha, como quem anda de skate de verdade: o corpo vira 90°, os pés
       // ficam afastados ao longo da prancha (um na frente, outro na rabeta), joelhos dobrados
@@ -743,7 +819,7 @@ export function criarMenina() {
     if (poseForcada) estado = poseForcada;
     else if (!s.vivo) estado = 'batida';
     else if (parado) estado = 'parado';
-    else if (s.voo > 0) estado = 'voo';
+    else if (s.voo > 0) estado = { capa: 'heroi', nave: 'nave' }[s.vooTipo] ?? 'voo';
     else if (s.deslizando > 0 && s.y < 0.2) estado = 'desliza';
     else if (s.y > 0.05) estado = 'ar';
     else if (pouso > 0) estado = 'pouso';
@@ -801,7 +877,9 @@ export function criarMenina() {
       m.piv.rotation.x = a.vento * 0.5 + Math.sin(fase * 2 + m.fase) * a.balanco;
       m.piv.rotation.z = Math.sin(fase + m.fase * 0.7) * a.balanco * 0.6;
     }
-    skate.visible = naPrancha;
+    const naNave = s.voo > 0 && s.vooTipo === 'nave';
+    const deCapa = s.voo > 0 && s.vooTipo === 'capa';
+    skate.visible = naPrancha && !naNave;
     if (naPrancha) {
       matDeck.color.setHex(SKATE_COR[s.skateTipo] ?? SKATE_COR.classico);
       rodas.visible = s.skateTipo === 'classico';
@@ -809,11 +887,43 @@ export function criarMenina() {
       chamasSkate.forEach((f) => { f.visible = s.skateTipo === 'supersonico'; f.scale.setScalar(0.8 + Math.random() * 0.4); });
       skate.position.y = -0.1 + (s.skateTipo === 'voador' ? 0.05 + Math.sin(t * 5) * 0.025 : 0);
     }
-    maleta.visible = s.voo > 0;
+    maleta.visible = s.voo > 0 && !naNave && !deCapa;
+    // capa tremulando: quanto mais longe do ombro, mais ela balança e se solta das costas
+    for (const parte of partesCapa) parte.visible = deCapa;
+    if (deCapa) {
+      const pos = geoCapa.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x0 = basePosCapa[i * 3]; const y0 = basePosCapa[i * 3 + 1]; const d = -y0 / 0.8;
+        const onda = Math.sin(t * 15 - d * 7 + x0 * 6) * 0.05 * d;
+        pos.setXYZ(i, x0 * (1 + 0.08 * Math.sin(t * 9 + d * 4)), y0 * (1 - 0.06 * d), -0.035 * d - 0.07 * d * d + onda);
+      }
+      pos.needsUpdate = true; geoCapa.computeVertexNormals();
+    }
+    // nave: luzes piscando em volta e o raio trator até o chão
+    nave.visible = naNave;
+    if (naNave) {
+      nave.rotation.y = Math.sin(t * 0.8) * 0.08; nave.rotation.z = Math.sin(t * 1.3) * 0.05;
+      nave.position.y = 0.2 + Math.sin(t * 2.4) * 0.05;
+      luzesNave.forEach((l, k) => { l.material.emissiveIntensity = (Math.floor(t * 8) + k) % 3 === 0 ? 2.5 : 0.4; });
+      const alturaFeixe = Math.max(0.5, s.y + 0.0);
+      raioTrator.scale.set(1, alturaFeixe, 1); raioTrator.position.y = -0.22 - alturaFeixe / 2;
+      raioTrator.material.opacity = 0.1 + 0.05 * Math.sin(t * 6);
+    }
+    // teletransporte: coluna de luz ao entrar e ao sair da nave
+    if (naNave !== naNaveAntes) teletransporte = 0.9;
+    naNaveAntes = naNave;
+    teletransporte = Math.max(0, teletransporte - dtp);
+    teleFeixe.visible = teletransporte > 0;
+    if (teletransporte > 0) {
+      const alto = 4.6 + s.y;
+      teleFeixe.scale.set(1 + 0.15 * Math.sin(t * 30), alto, 1 + 0.15 * Math.sin(t * 30));
+      teleFeixe.position.y = -s.y + alto / 2;
+      teleFeixe.material.opacity = 0.55 * Math.sin((teletransporte / 0.9) * Math.PI);
+    }
     chamasMaleta.forEach((f) => f.scale.set(1, 0.7 + Math.random() * 0.6, 1));
     // fumaça: nuvenzinhas que saem dos bocais e ficam para trás
     const dt = Math.min(0.05, Math.max(0, t - ultimoT)); ultimoT = t;
-    if (s.voo > 0 && t >= proximaFumaca) {
+    if (s.voo > 0 && !naNave && !deCapa && t >= proximaFumaca) {
       proximaFumaca = t + 0.04;
       const livre = fumaca.find((f) => f.vida <= 0);
       if (livre) {
@@ -832,12 +942,13 @@ export function criarMenina() {
       f.sp.material.opacity = Math.max(0, f.vida) * 0.7;
     }
     const corAura = s.supercarga > 0 ? 0xffc828 : s.escudo ? 0x50aaff : s.ima > 0 ? 0xff5a5a : null;
-    aura.visible = corAura !== null;
+    aura.visible = corAura !== null && !naNave && !deCapa; // de capa ou na nave o ímã já vem junto: sem brilho em volta
     if (corAura !== null) { aura.material.color.setHex(corAura); aura.material.opacity = 0.45 + Math.sin(t * 8) * 0.1; }
     raiz.visible = !(s.invencivel > 0 && Math.floor(t * 12) % 2 === 0);
     if (poseForcada) {
       // no saguão e na tela de fim: só ela, sem skate, mochila nem auras
       skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true;
+      nave.visible = false; teleFeixe.visible = false; for (const parte of partesCapa) parte.visible = false;
       for (const f of fumaca) f.sp.visible = false;
       raiz.position.y = 0;
     }

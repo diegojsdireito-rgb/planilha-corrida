@@ -3,7 +3,9 @@
 // Obstáculos: cerca (pular), bandeirinhas (deslizar) e carrinho de sorvete (trocar de faixa ou super pulo).
 // Na pista: moedas e itens que valem na hora em que são pegos: ímã, tênis de mola (super pulo),
 // mochila a jato (id 'maleta', para não perder as melhorias já compradas), escudo, pontos em dobro,
-// baú de moedas, foguete (supercarga na hora), skate grátis e raio (enche a barra da supercarga).
+// baú de moedas, foguete (supercarga na hora), skate grátis, raio (enche a barra da supercarga),
+// capa de super-heroína (voa atraindo as moedas) e nave alienígena (um feixe de luz leva a menina
+// para dentro de um disco voador, que percorre um trecho pelo alto e a devolve à pista).
 
 export const LONGE = 70;
 const GRAVIDADE = 30;
@@ -15,6 +17,8 @@ const COMPRIMENTO_CARRINHO = 5;
 const ALTURA_VOO = 3.6;
 export const DURACAO_SKATE = 30;
 export const DURACAO_DOBRO = 10;
+export const DURACAO_CAPA = 9;
+export const DURACAO_NAVE = 11;
 export const MOEDAS_BAU = 50;
 export const JANELA_ARRANCADA = 6;
 // Quem persegue a menina: começa colado nela, fica para trás e volta a chegar perto quando ela tropeça.
@@ -42,13 +46,13 @@ export function nova(nivel = 'medio', cfg = {}) {
     nivel, t: 0, dist: 0, vel: VELOCIDADE[nivel].base,
     faixa: 1, x: 1, y: 0, vy: 0, deslizando: 0,
     moedas: 0, objetos: [], ultimaLinha: 0,
-    ima: 0, superPulo: 0, voo: 0, supercarga: 0, energia: 0, escudo: false, invencivel: 0, dobro: 0, bonus: 0,
+    ima: 0, superPulo: 0, voo: 0, vooTipo: 'mochila', supercarga: 0, energia: 0, escudo: false, invencivel: 0, dobro: 0, bonus: 0,
     arrancadas: cfg.arrancadas ?? 0,
     skate: 0, skateTipo: SKATES[cfg.skate] ? cfg.skate : 'classico', cargas: cfg.cargas ?? 0,
     poderes,
     vivo: true, eventos: ['perseguidor'],
     perseguidor: { dist: PERSEGUIDOR.perto, perto: PERSEGUIDOR.largada },
-    contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0 },
+    contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0, capas: 0, naves: 0 },
   };
 }
 
@@ -94,8 +98,8 @@ export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false)
 
 // Itens da pista, com a chance de cada um aparecer (somam 1).
 export const ITENS = [
-  ['raio', 0.2], ['ima', 0.13], ['pulo', 0.12], ['escudo', 0.1], ['maleta', 0.11],
-  ['dobro', 0.11], ['bau', 0.1], ['turbo', 0.06], ['prancha', 0.07],
+  ['raio', 0.15], ['ima', 0.12], ['pulo', 0.11], ['escudo', 0.1], ['maleta', 0.1],
+  ['dobro', 0.09], ['bau', 0.09], ['turbo', 0.06], ['prancha', 0.07], ['capa', 0.06], ['nave', 0.05],
 ];
 export function sortearItem(x) {
   let soma = 0;
@@ -157,7 +161,7 @@ export function avancar(s, dt, aleatorio = Math.random) {
   const cfg = VELOCIDADE[s.nivel];
   const sk = skateAtivo(s);
   s.t += dt;
-  const turbo = s.supercarga > 0 ? 1.4 : 1;
+  const turbo = (s.supercarga > 0 ? 1.4 : 1) * (s.voo > 0 && s.vooTipo === 'nave' ? 1.25 : 1);
   s.vel = Math.min(cfg.max, cfg.base + cfg.ganho * s.t) * turbo * (sk?.velocidade ?? 1);
   const dz = s.vel * dt;
   s.dist += dz;
@@ -181,7 +185,13 @@ export function avancar(s, dt, aleatorio = Math.random) {
     s[k] = Math.max(0, s[k] - dt);
     if (antes > 0 && s[k] === 0 && ['ima', 'superPulo', 'supercarga', 'dobro'].includes(k)) s.eventos.push('poder-fim');
   }
-  if (voava && s.voo === 0) { s.vy = 0; s.invencivel = Math.max(s.invencivel, 1.2); s.eventos.push('pouso-jato'); }
+  if (voava && s.voo === 0) {
+    s.vy = 0;
+    s.invencivel = Math.max(s.invencivel, 1.2);
+    if (s.vooTipo === 'nave') { s.y = 0; s.eventos.push('teletransporte'); } // o feixe a devolve direto ao chão
+    else s.eventos.push(s.vooTipo === 'capa' ? 'pouso-heroi' : 'pouso-jato');
+    s.vooTipo = 'mochila';
+  }
   if (s.skate > 0) {
     s.skate = Math.max(0, s.skate - dt);
     if (s.skate === 0) s.eventos.push('skate-fim');
@@ -253,13 +263,21 @@ export function alcancar(s, dt) {
   return s.perseguidor.dist <= 0.36;
 }
 
-function voar(s, segundos) {
+function voar(s, segundos, tipo = 'mochila') {
   s.voo = segundos;
+  s.vooTipo = tipo;
   s.deslizando = 0;
-  s.contagem.maletas++;
+  if (tipo === 'capa') {
+    s.contagem.capas++;
+    s.ima = Math.max(s.ima, segundos); // a super-heroína puxa as moedas para perto
+  } else if (tipo === 'nave') {
+    s.contagem.naves++;
+    s.ima = Math.max(s.ima, segundos); // o raio trator da nave puxa as moedas
+    s.y = ALTURA_VOO; // teletransportada: já aparece lá em cima, dentro da nave
+  } else s.contagem.maletas++;
   // tira da frente os obstáculos que já estavam perto: ela decola por cima deles
   s.objetos = s.objetos.filter((x) => x.z < 2 || !['cerca', 'faixa', 'carrinho'].includes(x.tipo));
-  s.eventos.push('decolar');
+  s.eventos.push({ mochila: 'decolar', capa: 'heroi', nave: 'teletransporte' }[tipo]);
 }
 
 function coletar(s, o) {
@@ -279,6 +297,8 @@ function coletar(s, o) {
     case 'ima': s.ima = d('ima'); s.eventos.push('poder'); break;
     case 'pulo': s.superPulo = d('pulo'); s.eventos.push('poder'); break;
     case 'maleta': voar(s, d('maleta') * 0.75); break;
+    case 'capa': voar(s, DURACAO_CAPA, 'capa'); break;
+    case 'nave': voar(s, DURACAO_NAVE, 'nave'); break;
     case 'dobro': s.dobro = DURACAO_DOBRO + s.poderes.supercarga; s.eventos.push('dobro'); break;
     case 'bau': s.moedas += MOEDAS_BAU; s.energia = Math.min(1, s.energia + 0.1); s.eventos.push('bau'); break;
     case 'turbo':
