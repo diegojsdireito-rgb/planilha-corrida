@@ -57,6 +57,7 @@ export function montar(area, ctl) {
   palco.addEventListener('touchmove', (e) => { if (!e.target.closest('.cartao-corrida')) e.preventDefault(); }, { passive: false });
 
   const ctx = tela.getContext('2d');
+  let vitrinePose = 'vitrine'; let vitrineAnimando = false;
   let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
 
@@ -68,7 +69,7 @@ export function montar(area, ctl) {
     .then((m) => {
       if (!palco.isConnected) return;
       mundo = m.criarMundo(tela3d);
-      if (mundo) { palco.classList.add('em-3d'); medir(); }
+      if (mundo) { palco.classList.add('em-3d'); medir(); animarVitrine(); }
     })
     .catch(() => { /* fica no 2D */ });
 
@@ -313,7 +314,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, prefs.personagem, tema, prefs.perseguidorFloresta);
+      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -537,6 +538,7 @@ export function montar(area, ctl) {
     pausaEl.textContent = sim ? '▶' : 'Ⅱ';
     pausaEl.setAttribute('aria-label', sim ? 'Continuar' : 'Pausar');
     camada.hidden = !sim;
+    camada.className = 'corrida-camada';
     if (sim) calarTudo();
     if (sim) {
       camada.innerHTML = '<div class="cartao-corrida"><strong>Pausado</strong></div>';
@@ -563,33 +565,87 @@ export function montar(area, ctl) {
 
   function salvarCarteira(c) { prefs.carteira = c; guardar(); }
 
-  function telaInicial(aba = 'correr', aviso = '') {
+  // Anima a menina no saguão e na tela de fim (respirando, comemorando) enquanto a corrida não roda.
+  function animarVitrine() {
+    if (vitrineAnimando || !mundo) return;
+    vitrineAnimando = true;
+    const passo = (agora) => {
+      if (rodando || !palco.isConnected || camada.hidden || !mundo) { vitrineAnimando = false; return; }
+      desenhar(agora / 1000);
+      requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  }
+
+  const topoLobby = () => {
+    const c = prefs.carteira;
+    return `<div class="lobby-topo"><span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
+  };
+  // Sem 3D, o retrato desenhado ocupa o lugar da menina.
+  // (o retrato fica escondido pelo CSS quando o 3D carrega, mesmo que carregue depois de a tela abrir)
+  const lugarDaMenina = (sorriso) => `<div class="lobby-menina">${retrato({ ...prefs.personagem, estilo: prefs.carteira.estilo, sorriso })}</div>`;
+
+  function telaInicial(aba = 'saguao', aviso = '') {
     rodando = false;
     calarTudo();
     s = null;
     pausaEl.hidden = true;
     camada.hidden = false;
+    vitrinePose = 'vitrine';
     salvarCarteira(loja.completarMissoes(prefs.carteira));
     const c = prefs.carteira;
-    const abas = [['correr', 'Correr'], ['loja', 'Loja'], ['missoes', 'Prêmios']];
-    let corpo = '';
-    if (aba === 'correr') {
+    if (aba === 'saguao') {
       const r = recorde();
       const presente = loja.presenteDisponivel(c, hoje());
+      camada.className = 'corrida-camada modo-lobby';
+      camada.innerHTML = `<div class="lobby">
+        ${topoLobby()}
+        <div class="lobby-meio">
+          ${lugarDaMenina('feliz')}
+          <div class="lobby-placas">
+            <div class="placa"><span>Recorde</span><b>${r ? fmt(r) : '—'}</b></div>
+            <div class="placa"><span>Moedas</span><b>🪙 ${fmt(c.moedas)}</b></div>
+            <div class="placa missoes"><span>Missões</span>${c.missoes.map((m) => `<small>🎯 ${m.texto} <em>+${fmt(m.premio)}</em></small>`).join('')}</div>
+            ${presente ? '<button class="placa presente" data-presente>🎁 <b>Presente do dia</b><small>Toque para abrir</small></button>' : ''}
+            ${aviso ? `<p class="aviso-loja">${aviso}</p>` : ''}
+          </div>
+        </div>
+        <div class="lobby-base">
+          <button class="botao-lobby" data-ir="visual"><b>🎨</b>Visual</button>
+          <button class="botao-lobby" data-ir="loja"><b>🛒</b>Loja</button>
+          <button class="botao-lobby" data-ir="missoes"><b>🎯</b>Prêmios</button>
+          <button class="botao-jogar" data-correr>JOGAR</button>
+        </div>
+      </div>`;
+      ligarTelaInicial(aba);
+      desenharHud();
+      desenhar(0);
+      animarVitrine();
+      ctl.status('Toque em JOGAR!', 'voce');
+      return;
+    }
+    // painéis: Visual, Loja e Prêmios, por cima do saguão
+    const abas = [['visual', '🎨 Visual'], ['loja', '🛒 Loja'], ['missoes', '🎯 Prêmios']];
+    let corpo = '';
+    if (aba === 'visual') {
       corpo = `
-        <div class="retrato">${retrato(prefs.personagem)}</div>
-        <small>${r ? `Recorde: ${fmt(r)} pontos` : 'Pegue moedas, desvie dos obstáculos e use os poderes!'}</small>
-        ${presente ? '<button class="botao presente" data-presente>🎁 Abrir o presente do dia</button>' : ''}
+        <div class="retrato">${retrato({ ...prefs.personagem, estilo: prefs.carteira.estilo })}</div>
         <div class="escolha"><span>Pele</span>${PELES.map((cor_, k) => `<button class="amostra${prefs.personagem.pele === k ? ' sel' : ''}" data-pele="${k}" style="background:${cor_}" aria-label="Tom de pele ${k + 1}"></button>`).join('')}</div>
         <div class="escolha"><span>Roupa</span>${ROUPAS.map((cor_, k) => `<button class="amostra${prefs.personagem.roupa === k ? ' sel' : ''}" data-roupa="${k}" style="background:${cor_}" aria-label="Cor da roupa ${k + 1}"></button>`).join('')}</div>
+        <small class="equipado">${loja.ESTILOS.find((e) => e.id === c.estilo)?.icone ?? ''} Estilo ${loja.ESTILOS.find((e) => e.id === c.estilo)?.nome ?? ''}: troque na Loja</small>
         <div class="cenarios velocidade"><span>Velocidade</span>${[['facil', 'Fácil', '🐢'], ['medio', 'Médio', '🏃‍♀️'], ['dificil', 'Difícil', '⚡']].map(([id, nome, ic]) => `<button data-velocidade="${id}" aria-pressed="${prefs.nivel === id}"><b>${ic}</b>${nome}</button>`).join('')}</div>
         <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
         ${['floresta', 'passeio'].includes(prefs.cenario ?? 'passeio') ? `<div class="cenarios bichos"><span>Na floresta, quem corre atrás?</span>${OPCOES_FLORESTA.map((o) => `<button data-bicho="${o.id}" aria-pressed="${prefs.perseguidorFloresta === o.id}"><b>${o.icone}</b>${o.nome}</button>`).join('')}</div>` : ''}
-        <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque duas vezes na tela para subir</small>
-        ${c.arrancadas ? `<small class="equipado">🎒 ${c.arrancadas} mochila${c.arrancadas > 1 ? 's' : ''} a jato: toque em "Decolar" no começo</small>` : ''}
-        <button class="botao grande" data-correr>Correr!</button>`;
+        <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque duas vezes na tela para subir</small>`;
     } else if (aba === 'loja') {
       corpo = `
+        <h4>Estilos de roupa</h4>
+        ${loja.ESTILOS.map((it) => {
+          const tem = c.estilos.includes(it.id);
+          const usando = c.estilo === it.id;
+          const botao = usando ? '<span class="usando">Vestindo</span>' : tem ? `<button class="botao secundario" data-vestir="${it.id}">Vestir</button>` : `<button class="botao" data-estilo="${it.id}" ${c.moedas < it.preco ? 'disabled' : ''}>🪙 ${fmt(it.preco)}</button>`;
+          return `<div class="item-loja"><span class="retrato-mini">${retrato({ ...prefs.personagem, estilo: it.id })}</span><div><b>${it.icone} ${it.nome}</b><small>${it.texto}</small></div>${botao}</div>`;
+        }).join('')}
         <h4>Skates</h4>
         ${loja.SKATES_LOJA.map((it) => {
           const tem = c.skates.includes(it.id);
@@ -620,22 +676,26 @@ export function montar(area, ctl) {
         <div class="dias">${loja.PRESENTES.map((v, k) => `<span class="${k < seg && !loja.presenteDisponivel(c, hoje()) ? 'ok' : ''}"><b>Dia ${k + 1}</b>🪙 ${v}${k === loja.PRESENTES.length - 1 ? ' + 🛹' : ''}</span>`).join('')}</div>
         ${loja.presenteDisponivel(c, hoje()) ? '<button class="botao presente" data-presente>🎁 Abrir o presente de hoje</button>' : '<small>Volte amanhã para o próximo presente. Dias seguidos valem mais!</small>'}`;
     }
+    camada.className = 'corrida-camada';
     camada.innerHTML = `<div class="cartao-corrida inicio">
-      <strong>Corrida dos Cachinhos</strong>
+      <div class="painel-topo"><strong>${abas.find((a) => a[0] === aba)?.[1] ?? ''}</strong><button class="botao-icone fechar-painel" data-ir="saguao" aria-label="Voltar">✕</button></div>
       ${carteiraHtml()}
-      <div class="abas-corrida">${abas.map(([id, nome]) => `<button data-aba="${id}" aria-pressed="${id === aba}">${nome}</button>`).join('')}</div>
+      <div class="abas-corrida">${abas.map(([id, nome]) => `<button data-aba="${id}" aria-pressed="${id === aba}">${nome.split(' ')[1]}</button>`).join('')}</div>
       ${aviso ? `<p class="aviso-loja">${aviso}</p>` : ''}
       <div class="corpo-aba">${corpo}</div>
+      <button class="botao-jogar largo" data-correr>JOGAR</button>
     </div>`;
     ligarTelaInicial(aba);
     desenharHud();
     desenhar(0);
-    ctl.status(aba === 'loja' ? 'Troque suas moedas por skates e poderes' : aba === 'missoes' ? 'Cumpra missões para ganhar moedas' : 'Escolha o visual e toque em Correr!', 'voce');
+    animarVitrine();
+    ctl.status(aba === 'loja' ? 'Troque suas moedas por roupas, skates e poderes' : aba === 'missoes' ? 'Cumpra missões para ganhar moedas' : 'Escolha o visual, a velocidade e o cenário', 'voce');
   }
 
   function ligarTelaInicial(aba) {
     const q = (sel) => camada.querySelectorAll(sel);
     q('[data-aba]').forEach((b) => { b.onclick = () => { ctl.som('clique'); telaInicial(b.dataset.aba); }; });
+    q('[data-ir]').forEach((b) => { b.onclick = () => { ctl.som('clique'); telaInicial(b.dataset.ir); }; });
     q('[data-correr]').forEach((b) => { b.onclick = comecar; });
     q('[data-velocidade]').forEach((b) => {
       b.onclick = () => { prefs.nivel = b.dataset.velocidade; guardar(); ctl.som('clique'); telaInicial(aba); };
@@ -665,6 +725,8 @@ export function montar(area, ctl) {
       ctl.som('premio');
       telaInicial(aba, ok);
     };
+    q('[data-estilo]').forEach((b) => { b.onclick = () => resultado(loja.comprarEstilo(prefs.carteira, b.dataset.estilo), `Estilo ${loja.ESTILOS.find((e) => e.id === b.dataset.estilo).nome} é seu!`); });
+    q('[data-vestir]').forEach((b) => { b.onclick = () => resultado(loja.vestirEstilo(prefs.carteira, b.dataset.vestir), `Vestindo o estilo ${loja.ESTILOS.find((e) => e.id === b.dataset.vestir).nome}.`); });
     q('[data-skate]').forEach((b) => { b.onclick = () => resultado(loja.comprarSkate(prefs.carteira, b.dataset.skate), `${cor.SKATES[b.dataset.skate].nome} é seu!`); });
     q('[data-equipar]').forEach((b) => { b.onclick = () => resultado(loja.equipar(prefs.carteira, b.dataset.equipar), `Usando o ${cor.SKATES[b.dataset.equipar].nome}.`); });
     q('[data-cargas]').forEach((b) => { b.onclick = () => resultado(loja.comprarCargas(prefs.carteira, Number(b.dataset.cargas)), `+${b.dataset.cargas} ${b.dataset.cargas === '1' ? 'carga' : 'cargas'} de skate.`); });
@@ -688,24 +750,33 @@ export function montar(area, ctl) {
     ctl.fim('concluida', `Fim da corrida: ${fmt(res.pontos)} pontos`, null, { pontos: res.pontos, moedas: res.moedas, metros: res.metros });
     if (fechado.concluidas.length) setTimeout(() => ctl.som('premio'), 600);
     const novo = res.pontos > antes;
+    vitrinePose = novo ? 'comemora' : 'triste';
+    hud.innerHTML = '';
     pausaEl.hidden = true;
     camada.hidden = false;
-    camada.innerHTML = `<div class="cartao-corrida">
-      <div class="retrato pequeno">${retrato({ ...prefs.personagem, sorriso: 'uau' })}</div>
-      <strong>${novo ? 'Novo recorde! 🎉' : 'Ops, bateu!'}</strong>
-      <small class="alcancou">${EMOJI[perseguidorAgora()]} ${NOMES[perseguidorAgora()].replace(/^./, (l) => l.toUpperCase())} te alcançou!</small>
-      <span class="grande-num">${fmt(res.pontos)}</span>
-      <small>${res.metros} m${novo || !antes ? '' : ` · recorde ${fmt(antes)}`}</small>
-      <div class="ganhos"><span>🪙 +${fmt(res.moedas)} moedas pegas</span>
-        ${fechado.concluidas.map((m) => `<span class="missao-ok">🎯 ${m.texto} <b>+${fmt(m.premio)}</b></span>`).join('')}
+    camada.className = 'corrida-camada modo-lobby';
+    const pct = antes ? Math.min(100, Math.round((res.pontos / antes) * 100)) : 100;
+    const quem = `${EMOJI[perseguidorAgora()]} ${NOMES[perseguidorAgora()].replace(/^./, (l) => l.toUpperCase())} te alcançou`;
+    camada.innerHTML = `<div class="lobby resultado">
+      ${topoLobby()}
+      <div class="lobby-meio">
+        ${lugarDaMenina(novo ? 'uau' : 'feliz')}
+        <div class="lobby-placas">
+          <div class="placa destaque">${novo ? '<i class="fita">Novo recorde! 🎉</i>' : ''}<span>Pontuação</span><b>${fmt(res.pontos)}</b><small>${res.metros} m · ${quem}</small></div>
+          <div class="placa"><span>Moedas</span><b>🪙 +${fmt(res.moedas)}</b></div>
+          ${fechado.concluidas.length ? `<div class="placa missoes"><span>Missões cumpridas</span>${fechado.concluidas.map((m) => `<small>🎯 ${m.texto} <em>+${fmt(m.premio)}</em></small>`).join('')}</div>` : ''}
+          <div class="placa progresso"><span>${novo ? 'Seu novo recorde!' : `Recorde: ${fmt(antes)}`}</span><div class="barra-recorde"><i style="width:${pct}%"></i><em>${fmt(res.pontos)} / ${fmt(Math.max(antes, res.pontos))}</em></div></div>
+        </div>
       </div>
-      ${carteiraHtml()}
+      <div class="lobby-base">
+        <button class="botao-lobby" data-ir="saguao"><b>🏠</b>Início</button>
+        <button class="botao-lobby" data-ir="loja"><b>🛒</b>Loja</button>
+        <button class="botao-jogar" data-correr>JOGAR</button>
+      </div>
     </div>`;
-    const b = el('button', 'botao grande', 'Correr de novo');
-    b.onclick = comecar;
-    const v = el('button', 'botao secundario', 'Loja e prêmios');
-    v.onclick = () => telaInicial('loja');
-    camada.firstChild.append(b, v);
+    ligarTelaInicial('resultado');
+    desenhar(0);
+    animarVitrine();
   }
 
   // ---------- Controles ----------

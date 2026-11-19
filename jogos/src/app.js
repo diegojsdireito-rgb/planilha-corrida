@@ -125,7 +125,8 @@ for (const j of JOGOS) j.icone = ICONES[j.id];
 
 let sairDaTela = null;
 
-document.addEventListener('pointerdown', destravar);
+// O iPhone libera o áudio em gestos diferentes conforme a versão: vale qualquer um deles.
+for (const evento of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(evento, destravar, { capture: true, passive: true });
 
 function botaoSom() {
   const b = el('button', 'botao-icone som');
@@ -134,7 +135,7 @@ function botaoSom() {
     b.setAttribute('aria-label', prefs.som ? 'Desligar sons' : 'Ligar sons');
     b.setAttribute('aria-pressed', String(prefs.som));
   };
-  b.onclick = () => { prefs.som = !prefs.som; guardar(); desenhar(); tocar('clique'); };
+  b.onclick = () => { prefs.som = !prefs.som; guardar(); destravar(); desenhar(); tocar('clique'); };
   desenhar();
   return b;
 }
@@ -305,7 +306,7 @@ function abrir(jogo) {
     salvar(estado) { salvar(jogo.id, estado); },
     salvo: () => lerSalvo(jogo.id),
     sair: () => voltar.onclick(),
-    alternarSom: () => { prefs.som = !prefs.som; guardar(); tocar('clique'); return prefs.som; },
+    alternarSom: () => { prefs.som = !prefs.som; guardar(); destravar(); tocar('clique'); return prefs.som; },
     apagar: () => apagarSalvo(jogo.id),
     // Quem começa alterna a cada partida terminada.
     roboComeca() { const p = placarDe(jogo.id); return (p.v + p.d + p.e) % 2 === 1; },

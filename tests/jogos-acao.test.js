@@ -325,3 +325,25 @@ test('corrida: quem persegue em cada cenário, com leão ou panda na floresta', 
   assert.equal(quemPersegue('floresta', 'panda'), 'panda');
   assert.equal(quemPersegue('floresta', 'outro'), 'leao');
 });
+
+test('loja: estilos de roupa são comprados uma vez e vestidos quando quiser', () => {
+  let c = { ...loja.carteiraNova(), moedas: 1000 };
+  assert.deepEqual(c.estilos, ['moletom', 'esportiva']);
+  assert.equal(c.estilo, 'moletom');
+  assert.ok(loja.comprarEstilo(c, 'jeans').erro); // 1.200: falta dinheiro
+  c = loja.comprarEstilo(c, 'skatista').carteira;
+  assert.equal(c.moedas, 100);
+  assert.equal(c.estilo, 'skatista');
+  assert.ok(loja.comprarEstilo(c, 'skatista').erro);
+  assert.equal(loja.vestirEstilo(c, 'esportiva').carteira.estilo, 'esportiva');
+  assert.ok(loja.vestirEstilo(c, 'tiedye').erro);
+  // carteira antiga, sem estilos, ganha a esportiva; estilos desconhecidos são descartados
+  assert.deepEqual(loja.normalizar({ moedas: 5, estilos: ['xyz'] }).estilos, ['moletom', 'esportiva']);
+  // carteira de antes do moletom: ganha o moletom vestido, sem perder o que tinha comprado
+  const antiga = loja.normalizar({ moedas: 5, estilos: ['esportiva', 'jeans'], estilo: 'jeans' });
+  assert.equal(antiga.estilo, 'moletom');
+  assert.ok(antiga.estilos.includes('jeans'));
+  assert.equal(loja.normalizar(antiga).estilo, 'moletom');
+  assert.equal(loja.normalizar({ ...antiga, estilo: 'jeans' }).estilo, 'jeans'); // depois, a escolha da pessoa vale
+  assert.deepEqual([...loja.mesclarCarteiras(c, { ...loja.carteiraNova(), estilos: ['esportiva', 'street'] }).estilos].sort(), ['esportiva', 'moletom', 'skatista', 'street']);
+});

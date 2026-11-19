@@ -2,18 +2,59 @@
 import { prefs } from './dados.js';
 
 let ctx = null;
+let liberado = false;
+let audioMudo = null;
 
 function contexto() {
   if (!prefs.som) return null;
   try {
     ctx ??= new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+    // no iPhone o áudio fica "suspended" ou "interrupted" (depois de ligação ou de sair do app)
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
   } catch { return null; }
   return ctx;
 }
 
-// Chamado no primeiro toque: o iPhone só libera o áudio depois de um gesto.
-export function destravar() { contexto(); }
+// Um <audio> tocando silêncio põe a página no modo "mídia": no iPhone antigo, é o que faz
+// o som tocar mesmo com a chave lateral no silencioso.
+function silencioEmLaco() {
+  if (audioMudo) return audioMudo;
+  const taxa = 8000; const n = taxa / 2;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const txt = (o, t) => [...t].forEach((ch, k) => v.setUint8(o + k, ch.charCodeAt(0)));
+  txt(0, 'RIFF'); v.setUint32(4, 36 + n, true); txt(8, 'WAVE'); txt(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, taxa, true);
+  v.setUint32(28, taxa, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); txt(36, 'data'); v.setUint32(40, n, true);
+  for (let k = 0; k < n; k++) v.setUint8(44 + k, 128);
+  audioMudo = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+  audioMudo.loop = true;
+  audioMudo.setAttribute('playsinline', '');
+  return audioMudo;
+}
+
+// Chamado a cada toque: o iPhone só libera o áudio dentro de um gesto da pessoa.
+export function destravar() {
+  if (!prefs.som) return;
+  // Safari 16.4 em diante: som do jogo como mídia, que toca mesmo no modo silencioso
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* sem suporte */ }
+  const c = contexto();
+  if (!c) return;
+  if (liberado && c.state === 'running') return;
+  try {
+    // tocar um silêncio curtinho dentro do gesto é o que destrava o áudio no iPhone
+    const b = c.createBuffer(1, 1, 22050);
+    const src = c.createBufferSource();
+    src.buffer = b;
+    src.connect(c.destination);
+    src.start(0);
+  } catch { /* nada */ }
+  if (!navigator.audioSession) silencioEmLaco().play().catch(() => {});
+  liberado = c.state === 'running';
+}
+
+// Para conferir em testes e no aparelho.
+export const estadoDoAudio = () => ({ ligado: prefs.som, contexto: ctx?.state ?? 'nenhum', sessao: navigator.audioSession?.type ?? 'sem suporte' });
 
 function tom(c, freq, inicio, dur, { tipo = 'sine', vol = 0.18, ate = null } = {}) {
   const o = c.createOscillator();
