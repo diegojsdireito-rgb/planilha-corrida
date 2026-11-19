@@ -117,6 +117,8 @@ const MODELOS = [
   { tipo: 'deslizes', alvos: [10, 20, 35], texto: (n) => `Deslize ${n} vezes numa corrida` },
   { tipo: 'pontos', alvos: [1000, 2500, 5000], texto: (n) => `Faça ${n.toLocaleString('pt-BR')} pontos` },
   { tipo: 'maletas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Voe com a mochila a jato' : `Voe ${n} vezes com a mochila a jato`) },
+  { tipo: 'capas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Voe de super-heroína com a capa' : `Vista a capa de super-heroína ${n} vezes`) },
+  { tipo: 'naves', alvos: [1], texto: () => 'Viaje na nave alienígena' },
   { tipo: 'itens', alvos: [3, 6, 10], texto: (n) => `Pegue ${n} itens na pista` },
   { tipo: 'supercargas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Ative a supercarga' : `Ative a supercarga ${n} vezes`) },
   { tipo: 'superPulos', alvos: [5, 12], texto: (n) => `Dê ${n} super pulos` },

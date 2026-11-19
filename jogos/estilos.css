@@ -654,3 +654,39 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .painel-topo strong { font-family: var(--titulos); font-size: 22px; }
 .fechar-painel { position: static; width: 36px; height: 36px; font-size: 16px; }
 .corrida.em-3d .lobby-menina svg { display: none; }
+
+/* ---------- Jogadores (perfis) ---------- */
+.chip-perfil {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 5px 12px 5px 5px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .16); color: #fff; text-align: left; position: relative; z-index: 1;
+}
+.chip-perfil .avatar-perfil { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: rgba(255, 255, 255, .9); }
+.chip-perfil small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.chip-perfil b { display: block; font-size: 15px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-perfil .troca { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(0, 0, 0, .18); margin-left: 2px; }
+.botao.pequeno { padding: 8px 14px; border-radius: 11px; font-size: 14px; }
+.botao.perigo { background: var(--critico, #c8423b); color: #fff; }
+.sub-jogadores { color: var(--suave); font-size: 14px; margin: -4px 0 14px 2px; }
+.grade-jogadores { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.cartao-jogador {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 10px 14px;
+  border: 2px solid var(--borda); background: var(--cartao); border-radius: 20px; box-shadow: var(--sombra); color: var(--texto);
+}
+.cartao-jogador.atual { border-color: var(--marca); }
+.cartao-jogador .avatar-grande { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; font-size: 44px; background: var(--preenchido); margin-bottom: 4px; }
+.cartao-jogador strong { font-size: 17px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cartao-jogador small { color: var(--suave); font-size: 12px; }
+.cartao-jogador .selo, .cartao-jogador .lapis { position: absolute; top: 8px; right: 8px; }
+.cartao-jogador .lapis { right: auto; left: 10px; }
+.cartao-jogador .selo { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: var(--marca); color: var(--marca-texto); padding: 2px 7px; border-radius: 999px; }
+.cartao-jogador .lapis { font-size: 16px; }
+.cartao-jogador.novo { border-style: dashed; background: transparent; box-shadow: none; }
+.cartao-jogador.novo .avatar-grande { font-size: 34px; color: var(--suave); }
+.form-jogador .campo { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; }
+.form-jogador input { font: inherit; font-size: 18px; font-weight: 600; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--borda); background: var(--fundo); color: var(--texto); }
+.form-jogador .rot-avatar { display: block; font-weight: 700; font-size: 14px; margin: 16px 0 8px; }
+.form-jogador .avatares { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.form-jogador .avatares button { aspect-ratio: 1; padding: 0; min-width: 0; font-size: 26px; border-radius: 14px; border: 2px solid transparent; background: var(--preenchido); }
+.form-jogador .avatares button[aria-pressed="true"] { border-color: var(--marca); background: var(--cartao); }
+.apagar-jogador { margin-top: 18px; }
+.pilula.jogador b { max-width: 110px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }

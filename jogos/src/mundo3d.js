@@ -1,7 +1,7 @@
 // Corrida dos Cachinhos em 3D: liga a menina, o cenário escolhido e os objetos da pista.
 // Usa as mesmas coordenadas da lógica (corrida.js): faixa 0..2, z = distância à frente dela, y = altura.
 import { THREE, xDe, COMP_CENA, INICIO, textura, descartar } from './3d/base.js';
-import { criarMenina, criarMochilaJato } from './3d/menina.js';
+import { criarMenina, criarMochilaJato, criarNave } from './3d/menina.js';
 import { texBrilho } from './3d/base.js';
 import { montarCenario, criarObstaculo } from './3d/cenarios.js';
 import { criarPerseguidor, quemPersegue } from './3d/perseguidores.js';
@@ -36,10 +36,11 @@ function prepararComuns() {
   });
   TEX_PODER = {
     ima: bolha('🧲', '#ff5a5a'), pulo: bolha('👟', '#35c46a'), escudo: bolha('🛡️', '#3e8bff'), raio: bolha('⚡', '#ffb800'),
-    dobro: bolha('×2', '#ff4f81', true), bau: bolha('💰', '#e0a000'), turbo: bolha('🚀', '#ff7a1f'), prancha: bolha('🛹', '#29b7dc'),
+    dobro: bolha('×2', '#ff4f81', true), bau: bolha('💰', '#e0a000'), turbo: bolha('🚀', '#ff7a1f'), prancha: bolha('🛹', '#29b7dc'), capa: bolha('🦸‍♀️', '#e8344a'),
   };
 }
 
+const suave = (x) => x * x * (3 - 2 * x);
 const COMUNS = () => new Set([GEO_MOEDA, ...MAT_MOEDA, ...Object.values(TEX_PODER), texBrilho()]);
 
 function criarObjeto(o, tema) {
@@ -60,6 +61,19 @@ function criarObjeto(o, tema) {
     g.add(grupo);
     const brilho = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0x7fb2ff, transparent: true, depthWrite: false, opacity: 0.8 }));
     brilho.scale.set(0.9, 0.9, 1); g.add(brilho);
+    g.userData.flutua = true;
+    g.userData.gira = true;
+    return g;
+  }
+  if (o.tipo === 'nave') {
+    // um disco voador pequeno pairando na pista, com as luzes acesas
+    const g = new THREE.Group();
+    const { grupo, feixe } = criarNave();
+    feixe.visible = false;
+    grupo.scale.setScalar(0.45); grupo.rotation.x = 0.25;
+    g.add(grupo);
+    const brilho = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0x7dffb5, transparent: true, depthWrite: false, opacity: 0.8 }));
+    brilho.scale.set(1.0, 1.0, 1); g.add(brilho);
     g.userData.flutua = true;
     g.userData.gira = true;
     return g;
@@ -121,7 +135,7 @@ export function criarMundo(canvas) {
   let cenario = null; let temaAtual = null;
   let perseguidor = null; let perseguidorId = null; let perX = 0;
   const objetos = new Map();
-  let camX = 0; let camY = 2.4; let ultimoT = 0;
+  let camX = 0; let camY = 2.4; let ultimoT = 0; let afastar = 0;
 
   function limparObjetos() {
     const manter = COMUNS();
@@ -161,21 +175,34 @@ export function criarMundo(canvas) {
 
   // vitrine: no saguão e na tela de fim ela fica de frente para a câmera, à esquerda da tela,
   // com a rua do cenário ao fundo ('vitrine', 'comemora' ou 'triste')
-  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao', vitrine = null) {
+  // captura: segundos desde que quem persegue a alcançou; ela se vira para a tela, triste, e ele a segura
+  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao', vitrine = null, captura = null) {
     trocarCenario(tema);
     trocarPerseguidor(quemPersegue(tema, escolhaFloresta));
     const dt = Math.min(0.05, Math.max(0, t - ultimoT));
     ultimoT = t;
     const dist = s.dist;
     menina.vestir(visual.pele, visual.roupa, visual.estilo);
-    menina.posar(s, t, vitrine);
+    const kc = captura === null ? 0 : suave(Math.min(1, captura / 0.8)); // vira para a tela aos poucos
+    menina.posar(s, t, vitrine ?? (captura !== null ? 'capturada' : null));
     if (vitrine) menina.raiz.rotation.set(0, Math.PI + 0.28 + Math.sin(t * 0.4) * 0.05, 0);
+    else if (captura !== null) menina.raiz.rotation.set(0, Math.PI * kc - 0.12 * kc, 0);
 
     // quem persegue: logo atrás dela, um pouco de lado para não tapar a menina
     const dp = s.perseguidor?.dist ?? 99;
     // mais longe que isso ele já estaria em cima da câmera: some de vista
-    perseguidor.raiz.visible = dp < 1.9 && !vitrine;
-    if (perseguidor.raiz.visible) {
+    perseguidor.raiz.visible = (dp < 1.9 || captura !== null) && !vitrine;
+    if (captura !== null) {
+      // ele dá a volta e fica ao lado dela, de frente para a tela, segurando-a
+      const quadrupede = ['leao', 'panda', 'urso'].includes(perseguidorId);
+      const alvoX = xDe(s.x) + (quadrupede ? 0.45 : 0.5); const alvoZ = quadrupede ? 0.5 : 0.18;
+      const de = { x: perX + 0.18, z: -dp };
+      perseguidor.raiz.position.set(de.x + (alvoX - de.x) * kc, 0, de.z + (alvoZ - de.z) * kc);
+      perseguidor.raiz.rotation.y = Math.PI * kc;
+      perseguidor.raiz.scale.setScalar(0.8);
+      if (kc < 1) perseguidor.animar(t * 9); else perseguidor.segurar(t);
+    } else if (perseguidor.raiz.visible) {
+      perseguidor.raiz.rotation.y = 0;
       perX += (xDe(s.x) - perX) * 0.08;
       const lado = s.faixa === 0 ? -1 : 1; // fica do lado de dentro da pista
       perseguidor.raiz.position.set(perX + lado * (dp > 0.5 ? 0.32 : 0.18), 0, -dp);
@@ -190,6 +217,7 @@ export function criarMundo(canvas) {
     const vistos = new Set();
     for (const o of s.objetos) {
       if (o.pego || o.quebrado || o.z > LONGE + 2) continue;
+      if (captura !== null && kc > 0.5 && o.z < 4) continue; // na cena da captura, nada na frente deles
       let m = objetos.get(o);
       if (!m) { m = criarObjeto(o, tema); objetos.set(o, m); cena.add(m); }
       vistos.add(o);
@@ -206,15 +234,22 @@ export function criarMundo(canvas) {
     }
 
     const px = xDe(s.x);
-    if (vitrine) {
+    if (captura !== null && !vitrine) {
+      // a câmera desce e chega perto, com os dois no meio da tela
+      const cx = px + 0.22; const k2 = kc;
+      camera.position.set(camX + (cx - camX) * k2, camY + (1.2 - camY) * k2, -2.9 + 0.5 * k2);
+      camera.lookAt((px * 0.85) + (cx - px * 0.85) * k2, (0.95 + s.y * 0.6) + (0.82 - 0.95 - s.y * 0.6) * k2, 6 - 6 * k2);
+    } else if (vitrine) {
       // de frente para ela; olhando um pouco para a direita da tela (−x), ela fica à esquerda
       camX = px - 0.62; camY = 2.35;
       camera.position.set(px - 0.62, 1.05, -2.75);
       camera.lookAt(px - 0.62, 0.84, 0);
     } else {
+      // na nave a câmera se afasta um pouco, para caber o disco voador inteiro
+      afastar += ((s.voo > 0 && s.vooTipo === 'nave' ? 1 : 0) - afastar) * 0.06;
       camX += (px * 0.75 - camX) * 0.12;
-      camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 - camY) * 0.1;
-      camera.position.set(camX, camY, -2.9);
+      camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 + afastar * 0.9 - camY) * 0.1;
+      camera.position.set(camX, camY, -2.9 - afastar * 1.8);
       camera.lookAt(px * 0.85, 0.95 + s.y * 0.6, 6);
     }
     sol.position.set(px - 4, 9, -2);

@@ -275,6 +275,43 @@ export function criarMochilaJato() {
   return { grupo, chamas };
 }
 
+// Disco voador: casco metálico, luzes coloridas na borda, cúpula de vidro, painel e raio trator.
+// A menina vai sentada lá dentro; o mesmo modelo, pequeno, aparece na pista como item.
+export function criarNave() {
+  const grupo = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0xb9c6d8, metalness: 0.75, roughness: 0.28 });
+  const escuro = new THREE.MeshStandardMaterial({ color: 0x55627a, metalness: 0.6, roughness: 0.35 });
+  const casco = sombrear(new THREE.Mesh(torneada([[0, -0.2], [0.4, -0.22], [1.0, -0.06], [1.2, 0], [1.02, 0.07], [0.62, 0.13], [0, 0.14]], 40), metal));
+  grupo.add(casco);
+  const faixa = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.035, 8, 48), escuro); faixa.rotation.x = Math.PI / 2; grupo.add(faixa);
+  const CORES = [0xff4f81, 0x3be8ff, 0xffd23b, 0x6dff7a];
+  const luzes = Array.from({ length: 12 }, (_, k) => {
+    const a = (k / 12) * Math.PI * 2;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), new THREE.MeshStandardMaterial({ color: CORES[k % 4], emissive: CORES[k % 4], emissiveIntensity: 1.2 }));
+    m.position.set(Math.cos(a) * 1.14, 0.0, Math.sin(a) * 1.14); grupo.add(m);
+    return m;
+  });
+  const fundo = new THREE.Mesh(new THREE.CircleGeometry(0.36, 28), new THREE.MeshBasicMaterial({ color: 0x7dffb5 }));
+  fundo.rotation.x = Math.PI / 2; fundo.position.y = -0.215; grupo.add(fundo);
+  // painel de controle na frente dela, com botões acesos
+  const painel = sombrear(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.14), escuro)); painel.position.set(0, 0.24, 0.5); painel.rotation.x = -0.5; grupo.add(painel);
+  for (let k = 0; k < 4; k++) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: CORES[k] }));
+    b.position.set(-0.15 + k * 0.1, 0.3, 0.46); grupo.add(b);
+  }
+  const cupula = new THREE.Mesh(new THREE.SphereGeometry(0.82, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xaeeeff, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide }));
+  cupula.position.y = 0.12; grupo.add(cupula);
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.03, 8, 40), metal); aro.rotation.x = Math.PI / 2; aro.position.y = 0.12; grupo.add(aro);
+  const antena = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 6), metal); antena.position.y = 1.02; grupo.add(antena);
+  const bolinha = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff4f81 })); bolinha.position.y = 1.14; grupo.add(bolinha);
+  // raio trator: um cone de luz verde que desce até o chão e puxa as moedas
+  const feixe = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1, 28, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x7dffb5, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  grupo.add(feixe);
+  return { grupo, luzes, feixe };
+}
+
 export function criarMenina() {
   const tex = criarTexturas();
   const raiz = new THREE.Group();
@@ -409,7 +446,7 @@ export function criarMenina() {
   const matEscuro = new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.4 });
   const matBoca = new THREE.MeshStandardMaterial({ color: 0xb0434f, roughness: 0.45 });
   const matBochecha = new THREE.MeshStandardMaterial({ color: 0xff8a8a, roughness: 0.6, transparent: true, opacity: 0.35, depthWrite: false });
-  const olhos = [];
+  const olhos = []; const sobrancelhas = [];
   for (const lado of [-1, 1]) {
     const x = lado * 0.045; const y = -0.005; const z = superficie(x, y);
     // o olho fica num grupo próprio: achatando o grupo ela pisca; a íris e a pupila se mexem juntas (olhar)
@@ -421,7 +458,7 @@ export function criarMenina() {
     const brilho = peca(new THREE.SphereGeometry(0.0038, 8, 6), matOlho); brilho.position.set(0.005, 0.005, 0.0105); olho.add(brilho);
     const cilios = peca(new THREE.TorusGeometry(0.024, 0.0032, 4, 14, Math.PI), matEscuro); cilios.position.set(x, y + 0.001, z - 0.001); cilios.rotation.x = -0.15; rosto.add(cilios);
     const pontinha = peca(new THREE.CapsuleGeometry(0.0025, 0.008, 2, 4), matEscuro); pontinha.position.set(x + lado * 0.027, y + 0.006, z - 0.006); pontinha.rotation.z = lado * 0.9; rosto.add(pontinha);
-    const sobrancelha = peca(new THREE.CapsuleGeometry(0.0042, 0.03, 3, 6), matEscuro); sobrancelha.rotation.z = Math.PI / 2 + lado * 0.15; sobrancelha.position.set(x + lado * 0.002, 0.038, superficie(x, 0.038) + 0.001); rosto.add(sobrancelha);
+    const sobrancelha = peca(new THREE.CapsuleGeometry(0.0042, 0.03, 3, 6), matEscuro); sobrancelha.rotation.z = Math.PI / 2 + lado * 0.15; sobrancelha.position.set(x + lado * 0.002, 0.038, superficie(x, 0.038) + 0.001); rosto.add(sobrancelha); sobrancelhas.push({ sobrancelha, lado, z0: sobrancelha.rotation.z, y0: sobrancelha.position.y });
     const bochecha = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8), matBochecha); bochecha.scale.set(1.3, 0.8, 0.3); bochecha.position.set(lado * 0.072, -0.045, superficie(lado * 0.072, -0.045) - 0.001); rosto.add(bochecha);
     olhos.push({ olho, mira, brilho });
   }
@@ -433,6 +470,14 @@ export function criarMenina() {
   const zBoca = superficie(0, -0.07);
   sorriso.position.set(0, -0.066, zBoca + 0.002); sorriso.rotation.x = -0.45; rosto.add(sorriso);
   const labio = peca(new THREE.TorusGeometry(0.0265, 0.0042, 6, 18, Math.PI), matBoca); labio.rotation.z = Math.PI; labio.scale.set(1, 1.05, 1); labio.position.set(0, -0.066, zBoca + 0.0); labio.rotation.x = -0.45; rosto.add(labio);
+  // rosto triste: boca para baixo, sobrancelhas levantadas no meio e lágrimas escorrendo
+  const bocaTriste = peca(new THREE.TorusGeometry(0.019, 0.0045, 6, 18, Math.PI), matBoca);
+  bocaTriste.position.set(0, -0.082, zBoca - 0.001); bocaTriste.rotation.x = -0.45; bocaTriste.visible = false; rosto.add(bocaTriste);
+  const matLagrima = new THREE.MeshStandardMaterial({ color: 0x8fd3ff, roughness: 0.05, transparent: true, opacity: 0.85 });
+  const lagrimas = [-1, 1].map((l) => {
+    const g = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 10, 8), matLagrima); g.scale.set(0.8, 1.3, 0.6); g.visible = false; rosto.add(g);
+    return { g, l, x: l * 0.055, z: superficie(l * 0.055, -0.03) + 0.004 };
+  });
   const nuca = peca(new THREE.SphereGeometry(0.148, 28, 18, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.35, Math.PI * 0.35), mat.cabeloLiso);
   nuca.rotation.y = Math.PI; cabeca.add(nuca);
   const mechas = [];
@@ -511,6 +556,26 @@ export function criarMenina() {
     return { sp, vida: 0 };
   });
   let proximaFumaca = 0; let ultimoT = 0;
+  // capa de super-heroína: presa nos ombros, mais larga embaixo, tremulando ao vento
+  const matCapa = new THREE.MeshStandardMaterial({ color: 0xe0283f, roughness: 0.55, side: THREE.DoubleSide });
+  const geoCapa = new THREE.PlaneGeometry(0.34, 0.8, 6, 16); geoCapa.translate(0, -0.4, 0);
+  const basePosCapa = geoCapa.attributes.position.array.slice();
+  for (let i = 0; i < basePosCapa.length; i += 3) basePosCapa[i] *= 0.8 + 0.8 * (-basePosCapa[i + 1] / 0.8);
+  const capa = sombrear(new THREE.Mesh(geoCapa, matCapa)); capa.position.set(0, 0.43, -0.105); tronco.add(capa);
+  const presilhas = [-1, 1].map((l) => { const b = peca(new THREE.SphereGeometry(0.022, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.6, roughness: 0.3 })); b.position.set(l * 0.11, 0.425, 0.02); tronco.add(b); return b; });
+  // estrela dourada no peito
+  const formaEstrela = new THREE.Shape();
+  for (let k = 0; k < 10; k++) { const a = Math.PI / 2 + (k * Math.PI) / 5; const r = k % 2 ? 0.022 : 0.052; formaEstrela[k ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
+  const estrela = new THREE.Mesh(new THREE.ShapeGeometry(formaEstrela), new THREE.MeshStandardMaterial({ color: 0xffc928, metalness: 0.5, roughness: 0.35, emissive: 0x553300 }));
+  estrela.position.set(0, 0.3, 0.118); tronco.add(estrela);
+  const partesCapa = [capa, ...presilhas, estrela];
+  // nave alienígena (fica na raiz: não acompanha a pose do corpo) e o feixe do teletransporte
+  const { grupo: nave, luzes: luzesNave, feixe: raioTrator } = criarNave();
+  nave.position.y = 0.2; raiz.add(nave);
+  const teleFeixe = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1, 24, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x8ffcff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  teleFeixe.visible = false; raiz.add(teleFeixe);
+  let naNaveAntes = false; let teletransporte = 0;
   const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), transparent: true, depthWrite: false, opacity: 0.55 }));
   aura.scale.set(1.6, 2.2, 1); aura.position.y = 0.75; raiz.add(aura);
 
@@ -587,7 +652,7 @@ export function criarMenina() {
   // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
   const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'cabecaZ', 'vento', 'balanco',
     'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1', 'm0', 'm1', 'olhar', 'palpebra'];
-  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0 };
+  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0, capturada: 0 };
   // ombro: primeiro torce o braço no próprio eixo (y), depois leva à frente (x) e abre para o lado (z).
   // A torção é o que permite pôr a mão na cintura com o cotovelo para fora.
   for (const b of bracos) b.ombro.rotation.order = 'ZXY';
@@ -666,6 +731,25 @@ export function criarMenina() {
       ox0: -0.5 + 0.1 * Math.sin(t * 2), oz0: -(1.1 + 0.1 * Math.sin(t * 3)), c0: -0.25,
       ox1: -0.5 + 0.1 * Math.sin(t * 2 + 1), oz1: 1.1 + 0.1 * Math.sin(t * 3 + 1), c1: -0.25,
     }),
+    heroi: (s, t) => {
+      // voando de super-heroína: deitada no ar, um braço esticado à frente, o outro junto do corpo,
+      // pernas juntas e esticadas, cabeça erguida olhando o caminho, cabelo e capa ao vento
+      const b = Math.sin(t * 2.2);
+      return {
+        rotX: 1.32 + 0.04 * b, rotY: -0.42, posY: 0.2 + 0.06 * b, posZ: -0.75, troncoX: -0.12, cabecaX: -0.95, troncoZ: 0.05 * Math.sin(t * 1.3),
+        vento: 1.1, balanco: 0.14,
+        ox1: -2.95, oy1: 0, oz1: 0.12, c1: -0.08, m1: 0.1,
+        ox0: 0.15, oz0: -0.22, c0: -0.35, m0: -0.2,
+        cx0: 0.04, j0: 0.12 + 0.05 * b, p0: 0.75, cz0: -0.02,
+        cx1: 0.2, j1: 0.55 + 0.08 * b, p1: 0.75, cz1: 0.03,
+      };
+    },
+    nave: (s, t) => ({
+      // sentada na nave, mãos no painel, olhando em volta maravilhada
+      posY: -0.28, troncoX: 0.06, cabecaX: -0.1 + 0.06 * Math.sin(t * 0.9), cabecaY: 0.45 * Math.sin(t * 0.7), vento: 0.05, balanco: 0.02,
+      cx0: -1.5, cz0: -0.1, j0: 1.45, p0: 0.15, cx1: -1.5, cz1: 0.1, j1: 1.45, p1: 0.15,
+      ox0: -0.95, oz0: -0.15, c0: -0.65, ox1: -0.95, oz1: 0.15, c1: -0.65, olhar: 0.8 * Math.sin(t * 0.7 + 0.4),
+    }),
     skate: (s, t) => {
       // de lado na prancha, como quem anda de skate de verdade: o corpo vira 90°, os pés
       // ficam afastados ao longo da prancha (um na frente, outro na rabeta), joelhos dobrados
@@ -713,6 +797,16 @@ export function criarMenina() {
         cx0: -0.05, j0: 0.15 + 0.2 * pulo, cx1: -0.3, j1: 0.5 + 0.2 * pulo, p1: 0.3, cz0: -0.06, cz1: 0.08, vento: 0.15, balanco: 0.05,
       };
     },
+    capturada: (s, t) => {
+      // presa por quem a perseguia: de frente para a tela, ombros caídos, mãos juntas na frente,
+      // cabeça um pouco baixa e soluçando de leve
+      const solu = Math.max(0, Math.sin(t * 7)) * (0.5 + 0.5 * Math.sin(t * 1.3));
+      return {
+        posY: -0.01, troncoX: 0.16 + 0.03 * solu, cabecaX: 0.16 + 0.03 * solu, cabecaZ: 0.08, cabecaY: 0.06 * Math.sin(t * 0.8),
+        ox0: -0.42, oy0: 0.25, oz0: 0.02, c0: -1.05, m0: -0.2, ox1: -0.42, oy1: -0.25, oz1: -0.02, c1: -1.05, m1: -0.2,
+        cz0: -0.02, cz1: 0.02, cx1: -0.04, j0: 0.06, j1: 0.14, p1: 0.08, vento: 0.04, balanco: 0.02, palpebra: 0.3, olhar: 0,
+      };
+    },
     triste: (s, t) => ({
       // não foi dessa vez: ombros caídos e cabeça baixa
       troncoX: 0.22, cabecaX: 0.32, cabecaY: 0.1 * Math.sin(t * 0.6), posY: -0.01,
@@ -743,7 +837,7 @@ export function criarMenina() {
     if (poseForcada) estado = poseForcada;
     else if (!s.vivo) estado = 'batida';
     else if (parado) estado = 'parado';
-    else if (s.voo > 0) estado = 'voo';
+    else if (s.voo > 0) estado = { capa: 'heroi', nave: 'nave' }[s.vooTipo] ?? 'voo';
     else if (s.deslizando > 0 && s.y < 0.2) estado = 'desliza';
     else if (s.y > 0.05) estado = 'ar';
     else if (pouso > 0) estado = 'pouso';
@@ -771,6 +865,21 @@ export function criarMenina() {
     if (t >= proximaPiscada) { piscada = 0.14; proximaPiscada = t + (Math.random() < 0.2 ? 0.3 : 2 + Math.random() * 3); }
     piscada = Math.max(0, piscada - dtp);
     const fechado = Math.max(a.palpebra, piscada > 0 ? Math.sin((piscada / 0.14) * Math.PI) : 0);
+    // expressão: triste quando perde (tela de fim e captura); sorrindo no resto do tempo
+    const tristeza = Math.min(1, pesos.triste + pesos.capturada);
+    sorriso.visible = tristeza < 0.5; labio.visible = tristeza < 0.5; bocaTriste.visible = tristeza >= 0.5;
+    for (const b of sobrancelhas) {
+      b.sobrancelha.rotation.z = b.z0 - b.lado * 0.45 * tristeza; // a ponta de dentro sobe
+      b.sobrancelha.position.y = b.y0 + 0.004 * tristeza;
+    }
+    for (const l of lagrimas) {
+      l.g.visible = pesos.capturada > 0.5;
+      if (l.g.visible) {
+        const ciclo = ((t * 0.7 + (l.l > 0 ? 0.45 : 0)) % 1);
+        l.g.position.set(l.x + l.l * 0.004 * ciclo, -0.022 - ciclo * 0.06, l.z - ciclo * 0.004);
+        l.g.scale.setScalar(ciclo > 0.9 ? (1 - ciclo) * 10 : 1); l.g.scale.y *= 1.3;
+      }
+    }
     for (const o of olhos) {
       o.olho.scale.y = 1 - 0.92 * fechado;
       o.brilho.visible = fechado < 0.5;
@@ -801,7 +910,9 @@ export function criarMenina() {
       m.piv.rotation.x = a.vento * 0.5 + Math.sin(fase * 2 + m.fase) * a.balanco;
       m.piv.rotation.z = Math.sin(fase + m.fase * 0.7) * a.balanco * 0.6;
     }
-    skate.visible = naPrancha;
+    const naNave = s.voo > 0 && s.vooTipo === 'nave';
+    const deCapa = s.voo > 0 && s.vooTipo === 'capa';
+    skate.visible = naPrancha && !naNave;
     if (naPrancha) {
       matDeck.color.setHex(SKATE_COR[s.skateTipo] ?? SKATE_COR.classico);
       rodas.visible = s.skateTipo === 'classico';
@@ -809,11 +920,43 @@ export function criarMenina() {
       chamasSkate.forEach((f) => { f.visible = s.skateTipo === 'supersonico'; f.scale.setScalar(0.8 + Math.random() * 0.4); });
       skate.position.y = -0.1 + (s.skateTipo === 'voador' ? 0.05 + Math.sin(t * 5) * 0.025 : 0);
     }
-    maleta.visible = s.voo > 0;
+    maleta.visible = s.voo > 0 && !naNave && !deCapa;
+    // capa tremulando: quanto mais longe do ombro, mais ela balança e se solta das costas
+    for (const parte of partesCapa) parte.visible = deCapa;
+    if (deCapa) {
+      const pos = geoCapa.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x0 = basePosCapa[i * 3]; const y0 = basePosCapa[i * 3 + 1]; const d = -y0 / 0.8;
+        const onda = Math.sin(t * 15 - d * 7 + x0 * 6) * 0.05 * d;
+        pos.setXYZ(i, x0 * (1 + 0.08 * Math.sin(t * 9 + d * 4)), y0 * (1 - 0.06 * d), -0.035 * d - 0.07 * d * d + onda);
+      }
+      pos.needsUpdate = true; geoCapa.computeVertexNormals();
+    }
+    // nave: luzes piscando em volta e o raio trator até o chão
+    nave.visible = naNave;
+    if (naNave) {
+      nave.rotation.y = Math.sin(t * 0.8) * 0.08; nave.rotation.z = Math.sin(t * 1.3) * 0.05;
+      nave.position.y = 0.2 + Math.sin(t * 2.4) * 0.05;
+      luzesNave.forEach((l, k) => { l.material.emissiveIntensity = (Math.floor(t * 8) + k) % 3 === 0 ? 2.5 : 0.4; });
+      const alturaFeixe = Math.max(0.5, s.y + 0.0);
+      raioTrator.scale.set(1, alturaFeixe, 1); raioTrator.position.y = -0.22 - alturaFeixe / 2;
+      raioTrator.material.opacity = 0.1 + 0.05 * Math.sin(t * 6);
+    }
+    // teletransporte: coluna de luz ao entrar e ao sair da nave
+    if (naNave !== naNaveAntes) teletransporte = 0.9;
+    naNaveAntes = naNave;
+    teletransporte = Math.max(0, teletransporte - dtp);
+    teleFeixe.visible = teletransporte > 0;
+    if (teletransporte > 0) {
+      const alto = 4.6 + s.y;
+      teleFeixe.scale.set(1 + 0.15 * Math.sin(t * 30), alto, 1 + 0.15 * Math.sin(t * 30));
+      teleFeixe.position.y = -s.y + alto / 2;
+      teleFeixe.material.opacity = 0.55 * Math.sin((teletransporte / 0.9) * Math.PI);
+    }
     chamasMaleta.forEach((f) => f.scale.set(1, 0.7 + Math.random() * 0.6, 1));
     // fumaça: nuvenzinhas que saem dos bocais e ficam para trás
     const dt = Math.min(0.05, Math.max(0, t - ultimoT)); ultimoT = t;
-    if (s.voo > 0 && t >= proximaFumaca) {
+    if (s.voo > 0 && !naNave && !deCapa && t >= proximaFumaca) {
       proximaFumaca = t + 0.04;
       const livre = fumaca.find((f) => f.vida <= 0);
       if (livre) {
@@ -832,12 +975,13 @@ export function criarMenina() {
       f.sp.material.opacity = Math.max(0, f.vida) * 0.7;
     }
     const corAura = s.supercarga > 0 ? 0xffc828 : s.escudo ? 0x50aaff : s.ima > 0 ? 0xff5a5a : null;
-    aura.visible = corAura !== null;
+    aura.visible = corAura !== null && !naNave && !deCapa; // de capa ou na nave o ímã já vem junto: sem brilho em volta
     if (corAura !== null) { aura.material.color.setHex(corAura); aura.material.opacity = 0.45 + Math.sin(t * 8) * 0.1; }
     raiz.visible = !(s.invencivel > 0 && Math.floor(t * 12) % 2 === 0);
     if (poseForcada) {
       // no saguão e na tela de fim: só ela, sem skate, mochila nem auras
       skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true;
+      nave.visible = false; teleFeixe.visible = false; for (const parte of partesCapa) parte.visible = false;
       for (const f of fumaca) f.sp.visible = false;
       raiz.position.y = 0;
     }

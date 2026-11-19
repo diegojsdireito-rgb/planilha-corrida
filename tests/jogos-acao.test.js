@@ -122,6 +122,40 @@ function cenario(objetos, { antes = () => {}, acao = null, quando = 2.2, quadros
   return s;
 }
 
+test('corrida: capa transforma em super-heroína, voa por cima de tudo e puxa as moedas', () => {
+  const s = cenario([{ tipo: 'capa', faixa: 1, z: 1, h: 0.7 }, { tipo: 'carrinho', faixa: 1, z: 25, comp: 5 }, { tipo: 'moeda', faixa: 0, z: 30, h: 4.2 }], { quadros: 200 });
+  assert.equal(s.vivo, true);
+  assert.equal(s.vooTipo, 'capa');
+  assert.equal(s.contagem.capas, 1);
+  assert.equal(s.contagem.maletas, 0);
+  assert.ok(s.y > 2.5);
+  assert.ok(s.ima > 0);
+  assert.equal(s.moedas, 1); // a moeda da faixa ao lado veio até ela
+  assert.ok(s.eventos.length === 0 || !s.eventos.includes('decolar'));
+});
+
+test('corrida: nave alienígena teletransporta para o alto, anda mais rápido e devolve ao chão', () => {
+  const s = corrida.nova('medio');
+  s.ultimaLinha = 1e9;
+  s.objetos = [{ tipo: 'nave', faixa: 1, z: 0.3, h: 0.9 }];
+  corrida.avancar(s, 1 / 60);
+  assert.equal(s.vooTipo, 'nave');
+  assert.equal(s.voo > 10, true);
+  assert.ok(s.y >= 3.5); // já aparece lá em cima, sem subir aos poucos
+  assert.ok(s.eventos.includes('teletransporte'));
+  assert.equal(s.contagem.naves, 1);
+  corrida.avancar(s, 1 / 60); // a velocidade nova vale a partir do quadro seguinte
+  const velNormal = corrida.nova('medio'); corrida.avancar(velNormal, 1 / 60); corrida.avancar(velNormal, 1 / 60);
+  assert.ok(s.vel > velNormal.vel * 1.2);
+  s.eventos.length = 0;
+  for (let k = 0; k < 60 * 12 && s.voo > 0; k++) corrida.avancar(s, 1 / 60);
+  assert.equal(s.voo, 0);
+  assert.equal(s.y, 0); // volta direto para a pista
+  assert.equal(s.vooTipo, 'mochila');
+  assert.ok(s.eventos.includes('teletransporte'));
+  assert.ok(s.invencivel > 0);
+});
+
 test('corrida: tênis de mola faz o super pulo passar por cima do carrinho', () => {
   const carrinho = () => [{ tipo: 'carrinho', faixa: 1, z: 6, comp: 5 }];
   assert.equal(cenario(carrinho(), { acao: 'pular', quando: 1.6 }).vivo, false);

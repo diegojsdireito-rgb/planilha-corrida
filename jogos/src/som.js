@@ -103,6 +103,19 @@ const SONS = {
   skate: (c) => { ruido(c, 0, 0.2, { vol: 0.2, freq: 1200 }); tom(c, 520, 0, 0.15, { tipo: 'triangle', vol: 0.12, ate: 780 }); },
   quebra: (c) => ruido(c, 0, 0.18, { vol: 0.4, freq: 500 }),
   decolar: (c) => { ruido(c, 0, 0.6, { vol: 0.35, freq: 900 }); tom(c, 120, 0, 0.6, { tipo: 'sawtooth', vol: 0.08, ate: 420 }); tom(c, 660, 0.15, 0.25, { tipo: 'triangle', vol: 0.1, ate: 990 }); },
+  // capa: fanfarra de super-heroína subindo
+  heroi: (c) => {
+    [392, 523, 659, 784].forEach((f, k) => tom(c, f, k * 0.09, 0.22, { tipo: 'square', vol: 0.06 }));
+    tom(c, 1046, 0.36, 0.5, { tipo: 'triangle', vol: 0.14 });
+    ruido(c, 0, 0.5, { vol: 0.18, freq: 1500 });
+  },
+  'pouso-heroi': (c) => { tom(c, 784, 0, 0.12, { tipo: 'triangle', vol: 0.12 }); tom(c, 523, 0.1, 0.25, { tipo: 'triangle', vol: 0.12 }); },
+  // nave: o feixe de teletransporte, um "uííu" de ficção científica
+  teletransporte: (c) => {
+    tom(c, 300, 0, 0.7, { tipo: 'sine', vol: 0.16, ate: 1800 });
+    tom(c, 1800, 0.05, 0.6, { tipo: 'sine', vol: 0.06, ate: 300 });
+    for (let k = 0; k < 8; k++) tom(c, 1400 + k * 180, k * 0.06, 0.06, { tipo: 'triangle', vol: 0.05 });
+  },
   'pouso-jato': (c) => { ruido(c, 0, 0.25, { vol: 0.3, freq: 300 }); tom(c, 180, 0, 0.2, { tipo: 'sine', vol: 0.2, ate: 90 }); },
   dobro: (c) => [523, 784, 1046, 1568].forEach((f, k) => tom(c, f, k * 0.06, 0.16, { tipo: 'square', vol: 0.05 })),
   bau: (c) => { for (let k = 0; k < 9; k++) tom(c, 1200 + (k % 4) * 260, k * 0.045, 0.08, { tipo: 'square', vol: 0.04 }); ruido(c, 0, 0.12, { vol: 0.2, freq: 3000 }); },
@@ -174,6 +187,22 @@ const LACOS = {
     oscilar(c, g.gain, 11, 0.25, partes); // tremor do jato
     const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 72; const go = c.createGain(); go.gain.value = 0.12;
     o.connect(filtro(c, 'lowpass', 300)).connect(go).connect(saida); o.start(); partes.push(o);
+  }),
+  // vento forte enquanto voa de capa
+  capa: (c) => montarLaco(c, 0.16, (saida, partes) => {
+    const r = ruidoEmLaco(c, 3); const f = filtro(c, 'bandpass', 900, 0.5); const g = c.createGain(); g.gain.value = 0.8;
+    r.connect(f).connect(g).connect(saida); r.start(); partes.push(r);
+    oscilar(c, f.frequency, 0.6, 400, partes);
+    oscilar(c, g.gain, 3.2, 0.25, partes); // a capa tremulando
+  }),
+  // zumbido da nave: tom grave com um "uóuóuó" de disco voador
+  nave: (c) => montarLaco(c, 0.12, (saida, partes) => {
+    const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 180; const g = c.createGain(); g.gain.value = 0.7;
+    o.connect(g).connect(saida); o.start(); partes.push(o);
+    oscilar(c, o.frequency, 5, 40, partes);
+    const o2 = c.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 90; const g2 = c.createGain(); g2.gain.value = 0.35;
+    o2.connect(g2).connect(saida); o2.start(); partes.push(o2);
+    oscilar(c, g2.gain, 0.7, 0.2, partes);
   }),
   cidade: (c) => montarLaco(c, 0.06, (saida, partes, timers) => {
     const r = ruidoEmLaco(c); r.connect(filtro(c, 'lowpass', 260)).connect(saida); r.start(); partes.push(r);

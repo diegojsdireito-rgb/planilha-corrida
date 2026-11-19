@@ -1,6 +1,6 @@
 import * as cor from '../corrida.js';
 import { el } from '../comum.js';
-import { prefs, guardar } from '../dados.js';
+import { prefs, guardar, perfilAtual, temVariosPerfis } from '../dados.js';
 import * as loja from '../loja.js';
 import { ligarLaco, desligarLaco, desligarLacos } from '../som.js';
 import { quemPersegue, OPCOES_FLORESTA, NOMES, EMOJI, SOM as SOM_PERSEGUIDOR } from '../perseguidores.js';
@@ -58,6 +58,7 @@ export function montar(area, ctl) {
 
   const ctx = tela.getContext('2d');
   let vitrinePose = 'vitrine'; let vitrineAnimando = false;
+  let capturada = null; // segundos desde que quem persegue a alcançou (cena da captura)
   let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
 
@@ -225,8 +226,8 @@ export function montar(area, ctl) {
     ctx.restore();
   }
 
-  const ICONE = { ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹' };
-  const COR_BOLHA = { ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc' };
+  const ICONE = { capa: '🦸‍♀️', nave: '🛸', ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹' };
+  const COR_BOLHA = { capa: '#e8344a', nave: '#2fcf9a', ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc' };
   function bolha(x, y, r, tipo, t) {
     const yy = y + Math.sin(t * 4) * r * 0.12;
     const g = ctx.createRadialGradient(x - r * 0.35, yy - r * 0.4, r * 0.1, x, yy, r);
@@ -314,7 +315,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose);
+      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose, capturada);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -356,7 +357,14 @@ export function montar(area, ctl) {
       ...prefs.personagem,
       piscando: (s?.invencivel ?? 0) > 0 && Math.floor(t * 12) % 2 === 0,
     });
-    if ((s?.voo ?? 0) > 0) desenharMaleta(x, y - altura * u, u, t);
+    if ((s?.voo ?? 0) > 0) {
+      if (s.vooTipo === 'mochila') desenharMaleta(x, y - altura * u, u, t);
+      else {
+        // sem 3D: a capa ou a nave aparecem como figurinhas grandes junto dela
+        ctx.font = `${Math.round(u * (s.vooTipo === 'nave' ? 1.1 : 0.6))}px sans-serif`; ctx.textAlign = 'center';
+        ctx.fillText(s.vooTipo === 'nave' ? '🛸' : '🦸‍♀️', x, y - altura * u - (s.vooTipo === 'nave' ? u * 0.2 : u * 1.4));
+      }
+    }
     for (const o of perto) (o.enfeite ? desenharEnfeite(o) : desenharObjeto(o, t));
     const dp = s?.perseguidor?.dist ?? 99;
     if (dp < 1.9) {
@@ -454,10 +462,11 @@ export function montar(area, ctl) {
     somEl.hidden = emCorrida;
     pausaEl.hidden = !emCorrida;
     if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; return; }
+    if (capturada !== null) { hud.innerHTML = ''; decolarEl.hidden = true; pausaEl.hidden = true; dicaGestos.hidden = true; return; } // a cena da captura fica limpa
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
     hud.innerHTML = `<span class="pts">${cor.pontos(s).toLocaleString('pt-BR')}</span><span class="est">🪙 ${s.moedas}</span>${
       s.dobro > 0 ? `<span class="poder dobro">✖2 ${Math.ceil(s.dobro)}s</span>` : ''}${
-      tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
+      tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, { mochila: '🎒', capa: '🦸‍♀️', nave: '🛸' }[s.vooTipo] ?? '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
     const podeDecolar = emCorrida && s.arrancadas > 0 && s.t <= cor.JANELA_ARRANCADA && s.voo <= 0;
     decolarEl.hidden = !podeDecolar;
     if (podeDecolar) decolarEl.innerHTML = `🎒 Decolar! <small>${s.arrancadas}</small><i style="width:${Math.round((1 - s.t / cor.JANELA_ARRANCADA) * 100)}%"></i>`;
@@ -466,7 +475,7 @@ export function montar(area, ctl) {
 
   const SOM = {
     pulo: 'passo', superpulo: 'superpulo', troca: 'clique', moeda: 'moeda', raio: 'acerto', 'carga-cheia': 'premio', poder: 'item',
-    escudo: 'captura', desliza: 'carta', batida: 'erro', decolar: 'decolar', 'pouso-jato': 'pouso-jato', supercarga: 'turbo', skate: 'skate',
+    escudo: 'captura', desliza: 'carta', batida: 'erro', decolar: 'decolar', 'pouso-jato': 'pouso-jato', heroi: 'heroi', 'pouso-heroi': 'pouso-heroi', teletransporte: 'teletransporte', supercarga: 'turbo', skate: 'skate',
     'skate-quebrou': 'quebra', quebra: 'quebra', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
   };
 
@@ -487,12 +496,22 @@ export function montar(area, ctl) {
     if (!s.vivo) {
       // a batida: quem persegue alcança a menina antes da tela de fim
       pegando += dt;
-      if (cor.alcancar(s, dt) || pegando > 1.4) {
-        desenhar(agora / 1000);
-        rodando = false;
+      if (capturada === null && (cor.alcancar(s, dt) || pegando > 1.4)) {
+        // pegou! ela se vira para a tela, triste, presa por quem a perseguia
+        capturada = 0;
         desenharHud();
         ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
-        return setTimeout(fimDeJogo, 350);
+        setTimeout(() => ctl.som('derrota'), 700);
+      }
+      if (capturada !== null) {
+        capturada += dt;
+        if (capturada > 2.8) {
+          desenhar(agora / 1000);
+          rodando = false;
+          capturada = null;
+          desenharHud();
+          return fimDeJogo();
+        }
       }
     }
     desenhar(agora / 1000);
@@ -506,7 +525,9 @@ export function montar(area, ctl) {
 
   function sonsContinuos() {
     if (!prefs.som || !s || pausado || !rodando) { desligarLacos(); ambiente = null; return; }
-    if (s.voo > 0) ligarLaco('jato'); else desligarLaco('jato');
+    for (const [tipo, som] of [['mochila', 'jato'], ['capa', 'capa'], ['nave', 'nave']]) {
+      if (s.voo > 0 && s.vooTipo === tipo) ligarLaco(som); else desligarLaco(som);
+    }
     const tema = cenarioDaCorrida(prefs.cenario ?? 'passeio', s.dist);
     if (tema !== ambiente) { if (ambiente) desligarLaco(ambiente); ligarLaco(tema); ambiente = tema; }
   }
@@ -519,6 +540,7 @@ export function montar(area, ctl) {
     s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
     temaVisto = null;
     pegando = 0;
+    capturada = null;
     camada.innerHTML = '';
     camada.hidden = true;
     pausado = false;
@@ -579,7 +601,10 @@ export function montar(area, ctl) {
 
   const topoLobby = () => {
     const c = prefs.carteira;
-    return `<div class="lobby-topo"><span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
+    const eu = perfilAtual();
+    const nome = eu.nome.replace(/[&<>"]/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[x]);
+    const quem = temVariosPerfis() ? `<span class="pilula jogador">${eu.avatar} <b>${nome}</b></span>` : '';
+    return `<div class="lobby-topo">${quem}<span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
   };
   // Sem 3D, o retrato desenhado ocupa o lugar da menina.
   // (o retrato fica escondido pelo CSS quando o 3D carrega, mesmo que carregue depois de a tela abrir)
