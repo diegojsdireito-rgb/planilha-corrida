@@ -6,8 +6,9 @@ import { texBrilho } from './3d/base.js';
 import { montarCenario, criarObstaculo } from './3d/cenarios.js';
 import { criarPerseguidor, quemPersegue } from './3d/perseguidores.js';
 import { LONGE } from './corrida.js';
+import { criarItem, temItem3D, recursosDosItens } from './3d/itens.js';
 
-let GEO_MOEDA; let MAT_MOEDA; let TEX_PODER;
+let GEO_MOEDA; let MAT_MOEDA;
 
 function prepararComuns() {
   if (GEO_MOEDA) return;
@@ -26,22 +27,10 @@ function prepararComuns() {
     new THREE.MeshStandardMaterial({ color: 0xffffff, map: texMoeda, ...ouro }),
     new THREE.MeshStandardMaterial({ color: 0xffffff, map: texMoeda, ...ouro }),
   ];
-  const bolha = (icone, cor, texto = false) => textura(128, 128, (ctx) => {
-    const g = ctx.createRadialGradient(44, 40, 6, 64, 64, 62); g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, cor); g.addColorStop(1, 'rgba(0,0,0,.35)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(64, 64, 60, 0, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 5; ctx.stroke();
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    if (texto) { ctx.font = 'bold 54px sans-serif'; ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(120,0,40,.6)'; ctx.lineWidth = 6; ctx.strokeText(icone, 64, 68); ctx.fillText(icone, 64, 68); }
-    else { ctx.font = '62px sans-serif'; ctx.fillText(icone, 64, 68); }
-  });
-  TEX_PODER = {
-    ima: bolha('🧲', '#ff5a5a'), pulo: bolha('👟', '#35c46a'), escudo: bolha('🛡️', '#3e8bff'), raio: bolha('⚡', '#ffb800'),
-    dobro: bolha('×2', '#ff4f81', true), bau: bolha('💰', '#e0a000'), turbo: bolha('🚀', '#ff7a1f'), prancha: bolha('🛹', '#29b7dc'), capa: bolha('🦸‍♀️', '#e8344a'),
-  };
 }
 
 const suave = (x) => x * x * (3 - 2 * x);
-const COMUNS = () => new Set([GEO_MOEDA, ...MAT_MOEDA, ...Object.values(TEX_PODER), texBrilho()]);
+const COMUNS = () => new Set([GEO_MOEDA, ...MAT_MOEDA, ...recursosDosItens(), texBrilho()]);
 
 function criarObjeto(o, tema) {
   if (o.tipo === 'moeda') {
@@ -78,14 +67,7 @@ function criarObjeto(o, tema) {
     g.userData.gira = true;
     return g;
   }
-  if (TEX_PODER[o.tipo]) {
-    const g = new THREE.Group();
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX_PODER[o.tipo] }));
-    sp.scale.set(0.62, 0.62, 1);
-    g.add(sp);
-    g.userData.flutua = true;
-    return g;
-  }
+  if (temItem3D(o.tipo)) return criarItem(o.tipo);
   return criarObstaculo(o, tema);
 }
 
@@ -222,7 +204,7 @@ export function criarMundo(canvas) {
       if (!m) { m = criarObjeto(o, tema); objetos.set(o, m); cena.add(m); }
       vistos.add(o);
       m.position.set(xDe(o.faixa), o.h ?? 0, o.z);
-      if (m.userData.gira) m.rotation.y = t * (o.tipo === 'maleta' ? 2 : 4) + o.z * 0.3;
+      if (m.userData.gira) m.rotation.y = t * 2 + o.z * 0.3;
       if (m.userData.flutua) m.position.y = (o.h ?? 0.7) + Math.sin(t * 4 + o.z) * 0.08;
     }
     const manter = COMUNS();
