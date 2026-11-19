@@ -756,3 +756,28 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .pintar-cores .pintar-sub { grid-column: 1 / -1; font-size: 12px; font-weight: 700; color: var(--suave); margin-top: 4px; }
 .pintar-cores button.neon { box-shadow: 0 0 6px var(--c), 0 0 12px var(--c); border-color: rgba(255, 255, 255, .7); }
 .pintar-cores button.metal { background: linear-gradient(135deg, #fff 0%, var(--c) 35%, color-mix(in srgb, var(--c) 60%, #000) 60%, var(--c) 80%, #fff 100%); }
+
+/* ---------- Mahjong ---------- */
+.mj-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.mj-info { font-size: 14px; color: var(--suave); font-variant-numeric: tabular-nums; }
+.mj-info b { color: var(--texto); }
+.mj-botoes { display: flex; gap: 6px; }
+.mj-botao { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 1px solid var(--borda); background: var(--cartao); border-radius: 12px; padding: 5px 9px; font-size: 18px; box-shadow: var(--sombra); color: var(--texto); }
+.mj-botao span { font-size: 10px; font-weight: 700; }
+.mj-botao.chama { animation: chama 1s ease-in-out infinite; border-color: var(--marca); }
+.mj-mesa { position: relative; display: flex; justify-content: center; padding: 10px 4px; border-radius: 18px; background: radial-gradient(circle at 50% 30%, #3f9a72, #1f5f45); box-shadow: inset 0 2px 12px rgba(0, 0, 0, .35); overflow: hidden; }
+.mahjong { position: relative; }
+.mj-peca {
+  position: absolute; width: var(--tw); height: var(--th); padding: 0; border-radius: calc(var(--tw) * .14);
+  background: linear-gradient(160deg, #fffdf6, #f1e8d2); border: 1px solid #b9a984;
+  box-shadow: var(--esp) var(--esp) 0 #c9b88f, calc(var(--esp) + 1px) calc(var(--esp) + 1px) 0 #8d7a52, calc(var(--esp) + 2px) calc(var(--esp) + 3px) 5px rgba(0, 0, 0, .35);
+  transition: transform .12s, filter .12s, opacity .2s;
+}
+.mj-peca svg { width: 100%; height: 100%; display: block; }
+.mj-peca:not(.livre) { filter: brightness(.78) saturate(.8); }
+.mj-peca.escolhida { background: linear-gradient(160deg, #fff6b0, #ffd84d); transform: translate(-2px, -3px); outline: 3px solid #ff9f1a; }
+.mj-peca.dica { animation: mj-pisca .7s ease-in-out 3; outline: 3px solid #29b6f6; }
+.mj-peca.saindo { transform: scale(.6) translateY(-20px); opacity: 0; }
+.mj-peca.treme { animation: mj-treme .3s; }
+@keyframes mj-pisca { 50% { transform: translateY(-4px); } }
+@keyframes mj-treme { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
