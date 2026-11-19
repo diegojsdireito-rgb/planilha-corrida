@@ -690,3 +690,54 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .form-jogador .avatares button[aria-pressed="true"] { border-color: var(--marca); background: var(--cartao); }
 .apagar-jogador { margin-top: 18px; }
 .pilula.jogador b { max-width: 110px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* ---------- Pintar ---------- */
+.pintar-galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.pintar-cartao {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 18px; text-align: left;
+  border: 1px solid var(--borda); background: var(--cartao); box-shadow: var(--sombra); color: var(--texto);
+}
+.pintar-cartao .miniatura { position: relative; display: block; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #fff; isolation: isolate; }
+.pintar-cartao .miniatura img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pintar-cartao .miniatura .linhas { mix-blend-mode: multiply; }
+.pintar-cartao strong { font-size: 15px; padding: 0 2px 2px; }
+.pintar-cartao .selo { position: absolute; top: 14px; right: 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: var(--marca); color: var(--marca-texto); padding: 2px 7px; border-radius: 999px; }
+
+.pintar-folha {
+  position: relative; width: 100%; max-width: 520px; margin: 0 auto; aspect-ratio: 1; border-radius: 16px; overflow: hidden;
+  background: #fff; box-shadow: var(--sombra); border: 1px solid var(--borda); touch-action: none; isolation: isolate;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.pintar-folha canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pintar-folha .linhas { mix-blend-mode: multiply; pointer-events: none; }
+.pintar-folha .traco { pointer-events: none; }
+.pintar-folha[data-ferramenta="balde"] { cursor: cell; }
+.pintar-folha[data-ferramenta]:not([data-ferramenta="balde"]) { cursor: crosshair; }
+
+.pintar-acoes { display: flex; gap: 8px; justify-content: center; margin: 10px 0 8px; }
+.pintar-acao { border: 1px solid var(--borda); background: var(--cartao); border-radius: 12px; min-width: 44px; height: 42px; font-size: 20px; padding: 0 10px; box-shadow: var(--sombra); color: var(--texto); }
+.pintar-acao.pronto { font-size: 15px; font-weight: 700; background: var(--marca); color: var(--marca-texto); border-color: transparent; }
+
+.pintar-ferramentas, .pintar-tipos { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 8px; padding: 2px 16px 4px; scrollbar-width: none; }
+.pintar-ferramentas::-webkit-scrollbar, .pintar-tipos::-webkit-scrollbar { display: none; }
+.pintar-ferramentas button {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 66px; padding: 6px 2px; border-radius: 14px;
+  border: 2px solid transparent; background: var(--preenchido); color: var(--texto);
+}
+.pintar-ferramentas button b { font-size: 24px; line-height: 1.1; }
+.pintar-ferramentas button span { font-size: 10px; font-weight: 600; line-height: 1.1; text-align: center; }
+.pintar-ferramentas button[aria-pressed="true"] { border-color: var(--marca); background: var(--cartao); transform: translateY(-2px); box-shadow: var(--sombra); }
+
+.pintar-cores { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 5px; margin-bottom: 8px; }
+.pintar-cores button { aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(0, 0, 0, .12); padding: 0; min-width: 0; }
+.pintar-cores button[aria-pressed="true"] { outline: 3px solid var(--texto); outline-offset: 2px; transform: scale(1.08); }
+
+.pintar-tipos button { flex: none; border: 2px solid transparent; background: var(--preenchido); color: var(--texto); border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; }
+.pintar-tipos button[aria-pressed="true"] { border-color: var(--marca); background: var(--cartao); }
+
+.pintar-linha { display: flex; align-items: center; gap: 10px; }
+.pintar-tamanhos { display: flex; gap: 4px; padding: 4px; background: var(--preenchido); border-radius: 12px; }
+.pintar-tamanhos button { width: 40px; height: 36px; border: 0; border-radius: 9px; background: transparent; display: grid; place-items: center; padding: 0; }
+.pintar-tamanhos button i { display: block; border-radius: 50%; background: var(--texto); }
+.pintar-tamanhos button[aria-pressed="true"] { background: var(--cartao); box-shadow: var(--sombra); }
+.pintar-rotulo { font-size: 13px; color: var(--suave); font-weight: 600; }
