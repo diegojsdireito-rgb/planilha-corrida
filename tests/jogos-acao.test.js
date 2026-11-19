@@ -250,3 +250,10 @@ test('corrida: o robô de teste corre mais de 2 km no difícil em várias sement
     assert.ok(s.dist >= 2000, `semente ${n}: parou em ${Math.round(s.dist)} m, velocidade ${s.vel.toFixed(1)}`);
   }
 });
+
+test('corrida: cenário escolhido fica fixo e o Passeio troca a cada 500 m', async () => {
+  const { cenarioDaCorrida } = await import('../jogos/src/telas/corrida.js');
+  assert.equal(cenarioDaCorrida('praia', 3000), 'praia');
+  assert.equal(cenarioDaCorrida('desconhecido', 0), 'cidade');
+  assert.deepEqual([0, 499, 500, 1000, 1500, 2000].map((d) => cenarioDaCorrida('passeio', d)), ['cidade', 'cidade', 'praia', 'floresta', 'neve', 'cidade']);
+});

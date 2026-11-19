@@ -5,6 +5,20 @@ import * as loja from '../loja.js';
 import { retrato, desenharDeCostas, PELES, ROUPAS } from '../personagem.js';
 
 const C = 5; // distância da câmera: controla a perspectiva
+const CENARIOS = [
+  { id: 'cidade', nome: 'Cidade', icone: '🏙️' },
+  { id: 'praia', nome: 'Praia', icone: '🏖️' },
+  { id: 'floresta', nome: 'Floresta', icone: '🌲' },
+  { id: 'neve', nome: 'Vila da Neve', icone: '❄️' },
+  { id: 'passeio', nome: 'Passeio', icone: '🔄' },
+];
+const TRECHO_PASSEIO = 500; // metros em cada cenário no modo Passeio
+
+// Cenário em que a corrida está agora.
+export function cenarioDaCorrida(escolha, dist) {
+  if (escolha !== 'passeio') return CENARIOS.some((c) => c.id === escolha && c.id !== 'passeio') ? escolha : 'cidade';
+  return CENARIOS[Math.floor(dist / TRECHO_PASSEIO) % 4].id;
+}
 
 export function recorde() {
   let r = 0;
@@ -35,7 +49,7 @@ export function montar(area, ctl) {
   area.append(palco, controles);
 
   const ctx = tela.getContext('2d');
-  let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
+  let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
 
   // 3D quando o aparelho permite; senão, o desenho em 2D continua valendo.
@@ -281,7 +295,15 @@ export function montar(area, ctl) {
   function desenhar(t) {
     if (!W) return;
     if (mundo) {
-      mundo.desenhar(s ?? parado, t, prefs.personagem);
+      const tema = cenarioDaCorrida(prefs.cenario ?? 'passeio', s?.dist ?? 0);
+      if (s && rodando && tema !== temaVisto) {
+        if (temaVisto) {
+          palco.classList.remove('troca-cenario'); void palco.offsetWidth; palco.classList.add('troca-cenario');
+          ctl.status(`Chegando: ${CENARIOS.find((c) => c.id === tema).nome}!`, 'voce');
+        }
+        temaVisto = tema;
+      }
+      mundo.desenhar(s ?? parado, t, prefs.personagem, tema);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -447,6 +469,7 @@ export function montar(area, ctl) {
     ativa = ctl.ativa();
     const c = prefs.carteira;
     s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas });
+    temaVisto = null;
     camada.innerHTML = '';
     camada.hidden = true;
     pausaEl.hidden = false;
@@ -506,6 +529,7 @@ export function montar(area, ctl) {
         ${presente ? '<button class="botao presente" data-presente>🎁 Abrir o presente do dia</button>' : ''}
         <div class="escolha"><span>Pele</span>${PELES.map((cor_, k) => `<button class="amostra${prefs.personagem.pele === k ? ' sel' : ''}" data-pele="${k}" style="background:${cor_}" aria-label="Tom de pele ${k + 1}"></button>`).join('')}</div>
         <div class="escolha"><span>Roupa</span>${ROUPAS.map((cor_, k) => `<button class="amostra${prefs.personagem.roupa === k ? ' sel' : ''}" data-roupa="${k}" style="background:${cor_}" aria-label="Cor da roupa ${k + 1}"></button>`).join('')}</div>
+        <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
         <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque em 🛹 durante a corrida</small>
         <button class="botao grande" data-correr>Correr!</button>`;
     } else if (aba === 'loja') {
@@ -554,6 +578,9 @@ export function montar(area, ctl) {
     const q = (sel) => camada.querySelectorAll(sel);
     q('[data-aba]').forEach((b) => { b.onclick = () => { ctl.som('clique'); telaInicial(b.dataset.aba); }; });
     q('[data-correr]').forEach((b) => { b.onclick = comecar; });
+    q('[data-cenario]').forEach((b) => {
+      b.onclick = () => { prefs.cenario = b.dataset.cenario; guardar(); ctl.som('clique'); telaInicial(aba); };
+    });
     q('[data-pele],[data-roupa]').forEach((a) => {
       a.onclick = () => {
         if (a.dataset.pele) prefs.personagem.pele = Number(a.dataset.pele);

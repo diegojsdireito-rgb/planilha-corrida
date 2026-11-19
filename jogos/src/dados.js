@@ -19,6 +19,7 @@ export const prefs = {
   historico: inicial.historico ?? [],
   personagem: inicial.personagem ?? { pele: 1, roupa: 0 },
   carteira: normalizar(inicial.carteira),
+  cenario: inicial.cenario ?? 'passeio',
 };
 
 // Migra o placar da primeira versão, que não guardava histórico.

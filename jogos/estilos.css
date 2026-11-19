@@ -554,3 +554,12 @@ h2 { font-size: 20px; }
 /* Corrida em 3D: o canvas 3D fica embaixo; o 2D, por cima, só para efeitos */
 .corrida .tela-3d { display: none; }
 .corrida.em-3d .tela-3d { display: block; }
+
+/* Escolha do cenário e a passagem de um para outro */
+.cenarios { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; align-items: stretch; }
+.cenarios > span { grid-column: 1 / -1; font-size: 13px; color: var(--suave); font-weight: 600; text-align: center; }
+.cenarios button { border: 1px solid var(--borda); background: var(--fundo); border-radius: 12px; padding: 6px 2px; font-size: 11px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--texto); }
+.cenarios button b { font-size: 20px; }
+.cenarios button[aria-pressed="true"] { border-color: var(--marca); box-shadow: 0 0 0 2px var(--marca); background: var(--cartao); }
+.corrida.troca-cenario::after { content: ""; position: absolute; inset: 0; background: #fff; pointer-events: none; animation: clarao .9s ease-out forwards; z-index: 1; }
+@keyframes clarao { 0% { opacity: 0; } 25% { opacity: .9; } 100% { opacity: 0; } }
