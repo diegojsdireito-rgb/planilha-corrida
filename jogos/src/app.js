@@ -1,5 +1,7 @@
 import { el } from './comum.js';
-import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo } from './dados.js';
+import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo, pedirPersistencia } from './dados.js';
+import { montarCopiaCartao } from './copia.js';
+import { ligarPuxada } from '../../src/gestos.js';
 import { tocar, destravar } from './som.js';
 import { montarPainel } from './painel.js';
 import { formatarTempo } from './comum.js';
@@ -11,6 +13,9 @@ import * as telaLig4 from './telas/lig4.js';
 import * as telaVelha from './telas/velha.js';
 import * as telaPaciencia from './telas/paciencia.js';
 import * as telaSudoku from './telas/sudoku.js';
+import * as telaDocinhos from './telas/docinhos.js';
+import * as telaCorrida from './telas/corrida.js';
+import { retrato } from './personagem.js';
 
 const app = document.getElementById('app');
 const NIVEIS = [['facil', 'Fácil'], ['medio', 'Médio'], ['dificil', 'Difícil']];
@@ -25,6 +30,9 @@ const ICONES = {
   paciencia: '<svg viewBox="0 0 12 12"><rect width="12" height="12" rx="2" fill="#1f6f4a"/><g transform="rotate(-12 6 7)"><rect x="2" y="2.6" width="5" height="7" rx=".6" fill="#fff" stroke="#ccc" stroke-width=".15"/><text x="3.4" y="4.8" font-size="1.8" fill="#d03b3b">A</text></g><g transform="rotate(10 6 7)"><rect x="5" y="2.4" width="5" height="7" rx=".6" fill="#fff" stroke="#ccc" stroke-width=".15"/><text x="7.5" y="7.4" font-size="3.2" text-anchor="middle" fill="#1d1b18">♠&#xFE0E;</text></g></svg>',
   sudoku: '<svg viewBox="0 0 12 12"><rect width="12" height="12" rx="2" fill="#fff" stroke="#d8d2c4" stroke-width=".3"/><path d="M4 1v10M8 1v10M1 4h10M1 8h10" stroke="#3b3a36" stroke-width=".35"/><g font-size="2.4" text-anchor="middle" font-family="sans-serif" font-weight="700"><text x="2.5" y="3.4" fill="#1d1b18">5</text><text x="6" y="7" fill="#2a78d6">3</text><text x="9.5" y="10.6" fill="#1d1b18">9</text><text x="9.5" y="3.4" fill="#2a78d6">1</text><text x="2.5" y="10.6" fill="#1d1b18">7</text></g></svg>',
 };
+
+ICONES.docinhos = '<svg viewBox="0 0 12 12"><rect width="12" height="12" rx="2" fill="#ffe3ec"/><path d="M3.4 5.6C1.9 4.5 1.5 3.6 2 2.9 2.5 2.2 3.2 2.5 3.4 3 3.6 2.5 4.3 2.2 4.8 2.9 5.3 3.6 4.9 4.5 3.4 5.6Z" fill="#ef4b5f"/><circle cx="8.6" cy="3.7" r="1.7" fill="#ff9a1f"/><path d="M3.4 6.6 4 8 5.4 8.1 4.3 9 4.7 10.4 3.4 9.6 2.1 10.4 2.5 9 1.4 8.1 2.8 8Z" fill="#ffd21f"/><path d="M8.6 6.4C9.4 7.6 10.1 8.3 10.1 9A1.5 1.5 0 0 1 7.1 9C7.1 8.3 7.8 7.6 8.6 6.4Z" fill="#3e8bff"/></svg>';
+ICONES.corrida = `<svg viewBox="0 0 100 100"><defs><linearGradient id="ceu-c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc4ff"/><stop offset="1" stop-color="#ffe2c4"/></linearGradient></defs><rect width="100" height="100" rx="18" fill="url(#ceu-c)"/><path d="M0 70 H100 V100 H0Z" fill="#6cc070"/><path d="M38 62 H62 L92 100 H8Z" fill="#efe2d1"/><g transform="translate(14 22) scale(.72)">${retrato({ pele: 1, roupa: 0 }).replace(/<\/?svg[^>]*>/g, '')}</g></svg>`;
 
 const JOGOS = [
   { id: 'ludo', nome: 'Ludo', descricao: 'Você e até 3 robôs', tela: telaLudo, regras: [
@@ -60,6 +68,45 @@ const JOGOS = [
     'No nível difícil, o robô não erra: o melhor resultado possível é o empate.',
     'Quem começa alterna a cada partida.',
   ] },
+  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Mochila a jato, skates e poderes', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
+    resumo() {
+      const n = prefs.historico.filter((h) => h.j === 'corrida').length;
+      const r = telaCorrida.recorde();
+      return {
+        cartao: r ? `<b>${r.toLocaleString('pt-BR')}</b> recorde` : 'Sem corridas ainda',
+        placar: `<span class="lado"><span class="avatar voce">🏃‍♀️</span>Corridas <span class="num">${n}</span></span><span class="x">·</span><span class="lado">Recorde <span class="num">${r ? r.toLocaleString('pt-BR') : '—'}</span></span>`,
+        painel: { valor: r ? r.toLocaleString('pt-BR') : '—', rotulo: 'recorde de pontos', sub: `${n} ${n === 1 ? 'corrida' : 'corridas'}` },
+      };
+    },
+    regras: [
+      'Deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. Os botões embaixo e as setas do teclado também funcionam.',
+      'Pule as cercas, deslize por baixo das bandeirinhas e troque de faixa para fugir dos carrinhos de sorvete.',
+      'Pegue moedas: elas ficam guardadas e compram skates, cargas de skate e melhorias na Loja.',
+      'Na pista aparecem itens que valem na hora em que são pegos: 🎒 mochila a jato (voa por cima de tudo), 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🛡️ escudo, ✖2 pontos em dobro, 💰 baú com 50 moedas, 🚀 foguete (supercarga na hora) e 🛹 skate grátis.',
+      'Bônus de largada: com uma mochila a jato comprada na Loja, toque em "Decolar" nos primeiros segundos e comece voando.',
+      'Os raios ⚡ enchem a supercarga. Cheia, toque no botão ⚡: corre mais rápido, pula mais alto e atravessa os obstáculos.',
+      'Toque em 🛹 para subir no skate: ele aguenta uma batida. O voador pula mais alto; o supersônico é mais rápido e dá moedas em dobro.',
+      'Cumpra missões e abra o presente do dia na aba Prêmios para ganhar mais moedas.',
+    ] },
+  { id: 'docinhos', nome: 'Docinhos', descricao: 'Junte 3 doces iguais', solo: true, semNivel: true, tela: telaDocinhos,
+    resumo() {
+      const fase = telaDocinhos.nivelLiberado();
+      const melhores = {};
+      for (const h of prefs.historico) if (h.j === 'docinhos' && h.estrelas) melhores[h.nivel] = Math.max(melhores[h.nivel] ?? 0, h.estrelas);
+      const est = Object.values(melhores).reduce((t, n) => t + n, 0);
+      return {
+        cartao: `<b>Fase ${fase}</b> · ${est} ★`,
+        placar: `<span class="lado"><span class="avatar voce">🍬</span>Fase <span class="num">${fase}</span></span><span class="x">·</span><span class="lado">Estrelas <span class="num">${est}</span></span>`,
+        painel: { valor: `Fase ${fase}`, rotulo: 'próxima fase', sub: `${est} ${est === 1 ? 'estrela' : 'estrelas'} conquistadas` },
+      };
+    },
+    regras: [
+      'Arraste um doce para o lado, ou toque nele e depois no vizinho, para trocar os dois de lugar.',
+      'A troca só vale se formar uma linha de 3 ou mais doces iguais. Os doces somem e outros caem de cima.',
+      '4 em linha vira um doce listrado, que limpa a linha ou a coluna. L ou T vira uma bomba. 5 em linha vira o arco-íris, que limpa todos de uma cor.',
+      'Faça a meta de pontos antes de acabarem os movimentos. Mais pontos dão até 3 estrelas.',
+      'Ficou parado? O robô mostra uma troca possível.',
+    ] },
   { id: 'paciencia', nome: 'Paciência', descricao: 'Solo, com dicas do robô', solo: true, semNivel: true, tela: telaPaciencia, regras: [
     'Monte as quatro fundações, uma por naipe, do Ás ao Rei.',
     'Nas colunas, as cartas descem alternando vermelho e preto. Só o Rei vai para coluna vazia.',
@@ -121,6 +168,7 @@ function haQuanto(t) {
 }
 
 function resumoDoJogo(jogo) {
+  if (jogo.resumo) return jogo.resumo().cartao;
   if (jogo.solo) {
     const n = prefs.historico.filter((h) => h.j === jogo.id && h.r === 'vitoria').length;
     const m = melhorTempo(jogo.id);
@@ -135,6 +183,7 @@ function resumoDoJogo(jogo) {
 function inicio() {
   sairDaTela?.();
   sairDaTela = null;
+  naTelaInicial = true;
   app.replaceChildren();
   document.title = 'Mesa de Jogos';
 
@@ -173,11 +222,31 @@ function inicio() {
 
   app.append(el('p', 'rotulo', 'Seu painel'));
   montarPainel(app, JOGOS, abrir);
+  montarCopiaCartao(app, JOGOS, inicio);
+}
+
+pedirPersistencia();
+
+// Puxar para atualizar: só no app aberto pelo ícone, que não tem o recarregar do Safari,
+// e só na tela inicial, para não confundir com arrastar peças nos tabuleiros.
+const instalado = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let naTelaInicial = false;
+if (instalado) {
+  ligarPuxada(app, document.getElementById('puxada'), {
+    podeIniciar: () => naTelaInicial,
+    async aoAtualizar() {
+      // Busca a versão nova antes de recarregar; as partidas já estão salvas no aparelho.
+      try { await fetch(location.pathname, { cache: 'reload' }); } catch { /* sem internet: recarrega o que houver */ }
+      location.reload();
+      await new Promise(() => {});
+    },
+  });
 }
 
 // ---------- Tela de jogo ----------
 
 function abrir(jogo) {
+  naTelaInicial = false;
   tocar('clique');
   sairDaTela?.();
   app.replaceChildren();
@@ -205,10 +274,11 @@ function abrir(jogo) {
   const regras = el('details', 'regras', `<summary>Como jogar</summary><ul>${jogo.regras.map((r) => `<li>${r}</li>`).join('')}</ul>`);
 
   app.append(barra);
-  if (!jogo.semNivel) app.append(seletorNivel(jogo.solo ? 'Nível da próxima grade' : 'Nível do robô'));
+  if (!jogo.semNivel) app.append(seletorNivel(jogo.rotuloNivel ?? (jogo.solo ? 'Nível da próxima grade' : 'Nível do robô')));
   app.append(placar, status, area, acoes, regras);
 
   const desenharPlacar = () => {
+    if (jogo.resumo) { placar.innerHTML = jogo.resumo().placar; return; }
     if (jogo.solo) {
       const n = prefs.historico.filter((h) => h.j === jogo.id && h.r === 'vitoria').length;
       const m = melhorTempo(jogo.id, jogo.semNivel ? undefined : prefs.nivel);
@@ -232,6 +302,7 @@ function abrir(jogo) {
     ativa() { const g = geracao; return () => g === geracao; },
     salvar(estado) { salvar(jogo.id, estado); },
     salvo: () => lerSalvo(jogo.id),
+    apagar: () => apagarSalvo(jogo.id),
     // Quem começa alterna a cada partida terminada.
     roboComeca() { const p = placarDe(jogo.id); return (p.v + p.d + p.e) % 2 === 1; },
     fim(resultado, texto, alvo, extra = {}) {
@@ -239,7 +310,7 @@ function abrir(jogo) {
       registrar(jogo.id, resultado, extra);
       desenharPlacar();
       tocar(resultado);
-      const padrao = { vitoria: jogo.solo ? 'Resolvido! 🎉' : 'Você venceu! 🎉', derrota: 'O robô venceu 🤖', empate: 'Empate 🤝' }[resultado];
+      const padrao = { vitoria: jogo.solo ? 'Resolvido! 🎉' : 'Você venceu! 🎉', derrota: jogo.solo ? 'Não foi dessa vez' : 'O robô venceu 🤖', empate: 'Empate 🤝', concluida: 'Fim da corrida' }[resultado];
       ctl.status(texto ?? padrao, resultado);
       if (alvo) alvo.append(el('div', 'faixa-fim', `<div>${padrao}</div>`));
     },

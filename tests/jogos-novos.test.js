@@ -97,3 +97,19 @@ test('sudoku: gera grade com solução única e pistas do nível', () => {
     for (const j of sudoku.VIZINHOS[i]) assert.notEqual(solucao[i], solucao[j]);
   }
 });
+
+test('cópia de segurança: junta históricos sem repetir e fica com a partida mais recente', async () => {
+  const { mesclar } = await import('../jogos/src/dados.js');
+  const atual = [{ j: 'xadrez', r: 'vitoria', t: 10 }, { j: 'velha', r: 'empate', t: 20 }];
+  const copia = {
+    app: 'mesa-de-jogos', versao: 1,
+    historico: [{ j: 'xadrez', r: 'vitoria', t: 10 }, { j: 'ludo', r: 'derrota', t: 5 }, { j: 'x', r: 'invalido', t: 1 }],
+    salvos: { damas: { t: [1], quando: 50 }, velha: { t: [2], quando: 1 } },
+  };
+  const r = mesclar(atual, { velha: { t: [3], quando: 9 } }, copia);
+  assert.equal(r.novos, 1);
+  assert.deepEqual(r.historico.map((h) => h.t), [5, 10, 20]);
+  assert.deepEqual(r.salvos.velha.t, [3]);
+  assert.deepEqual(r.salvos.damas.t, [1]);
+  assert.throws(() => mesclar([], {}, { app: 'outro', historico: [] }), /não é uma cópia/);
+});

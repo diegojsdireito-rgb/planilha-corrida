@@ -85,9 +85,11 @@ Esses limites são prudência, não garantia contra lesões. A planilha não sub
 
 ## Mesa de Jogos
 
-App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 robôs), Xadrez, Damas (regras brasileiras), Reversi, Quatro em Linha e Jogo da Velha, e dois desafios solo com dicas do robô: Paciência e Sudoku. O robô tem três níveis (fácil, médio e difícil).
+App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 robôs), Xadrez, Damas (regras brasileiras), Reversi, Quatro em Linha e Jogo da Velha, e desafios solo: Paciência e Sudoku (com dicas do robô), Docinhos (junte 3 doces iguais, com fases e estrelas) e Corrida dos Cachinhos (corrida sem fim em 3 faixas). Os dois últimos têm como personagem uma menina de cabelo castanho ondulado e roupa esportiva, com tom de pele e cor da roupa à escolha. Na corrida, as moedas ficam guardadas e compram skates (clássico, voador e supersônico), cargas de skate e melhorias dos poderes (ímã, tênis de mola, mochila a jato e supercarga) e mochilas a jato de largada; na pista, os itens valem na hora em que são pegos (mochila a jato, ímã, tênis de mola, escudo, pontos em dobro, baú de moedas, foguete e skate grátis); há missões com prêmio, presente do dia e sons próprios (ronco do jato e ambiente de cada cenário). O robô tem três níveis (fácil, médio e difícil).
 
 - **Salvamento automático:** cada partida em andamento fica guardada no aparelho e volta do ponto em que parou, inclusive depois de fechar o navegador.
+- **Cópia de segurança:** no fim da tela inicial, "Salvar cópia" gera um arquivo com placar, histórico e partidas em andamento, e "Restaurar cópia" junta o arquivo ao que já está no aparelho, sem repetir partidas. No iPhone, apagar o ícone da tela de início apaga os dados, por isso o app avisa quando a última cópia tem mais de 14 dias.
+- **Puxar para atualizar:** no app aberto pelo ícone da tela de início, puxar a tela inicial para baixo busca a versão nova (o Safari já faz isso sozinho; nos tabuleiros o gesto fica desligado para não atrapalhar as jogadas). Usa o mesmo `src/gestos.js` do app de corrida.
 - **Sons:** gerados na hora pelo navegador (Web Audio), sem arquivos; dá para desligar no botão de alto-falante.
 - **Painel:** na tela inicial, aproveitamento contra o robô, sequências de vitórias, partidas dos últimos 14 dias, aproveitamento por jogo, recordes dos desafios solo e últimas partidas.
 
@@ -102,9 +104,19 @@ Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai 
 | `jogos/src/reversi.js` | Jogadas válidas, viradas e robô por minimax com pesos por casa. |
 | `jogos/src/lig4.js` | Quatro em linha com robô por minimax. |
 | `jogos/src/velha.js` | Jogo da velha; no difícil, o robô joga perfeito. |
+| `jogos/src/docinhos.js` | Docinhos: trincas, doces especiais (listrado, bomba, arco-íris), cascatas, fases e jogada para a dica. |
+| `jogos/src/corrida.js` | Corrida dos Cachinhos: física, obstáculos sempre com passagem, colisões, moedas, poderes, skate e supercarga. |
+| `jogos/src/loja.js` | Carteira, loja, missões, presente do dia e junção de carteiras na cópia de segurança. |
+| `jogos/src/mundo3d.js` | Motor da corrida em 3D: liga a menina, o cenário e os objetos da pista, com câmera atrás dela. Se o aparelho não tiver 3D, a corrida usa o desenho em 2D. |
+| `jogos/src/3d/cenarios.js` | Os 4 cenários (Cidade, Praia, Floresta e Vila da Neve), cada um com chão, céu, enfeites e a sua versão dos obstáculos. No modo Passeio, o cenário troca a cada 500 m. |
+| `jogos/src/3d/menina.js` | A menina em 3D: peças torneadas com material de pele e tecido, roupa com textura, tênis detalhado e cabelo em mechas que balançam. |
+| `jogos/src/3d/base.js` | Medidas da pista, texturas desenhadas na hora e materiais comuns. |
+| `jogos/vendor/three.module.min.js` | Biblioteca three.js 0.170 (licença MIT, em `jogos/vendor/three.LICENSE`), guardada no app para funcionar sem internet. |
+| `jogos/src/personagem.js` | A menina: retrato de frente (SVG) e desenho de costas correndo (canvas), com luz e sombra. |
 | `jogos/src/paciencia.js` | Paciência (Klondike), movimento automático e dica do robô. |
 | `jogos/src/sudoku.js` | Gera grades com solução única em três níveis. |
-| `jogos/src/dados.js` | Histórico, placar, recordes e partidas salvas, tudo no aparelho. |
+| `jogos/src/dados.js` | Histórico, placar, recordes, partidas salvas e cópia de segurança, tudo no aparelho. |
+| `jogos/src/copia.js` | Cartão "Seus dados": salvar e restaurar a cópia. |
 | `jogos/src/som.js` | Efeitos sonoros sintetizados. |
 | `jogos/src/painel.js` | Números e gráficos da tela inicial. |
 | `jogos/src/app.js` e `jogos/src/telas/` | Telas, tabuleiros e animações. |
