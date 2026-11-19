@@ -159,19 +159,22 @@ export function criarMundo(canvas) {
     cena.add(perseguidor.raiz);
   }
 
-  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao') {
+  // vitrine: no saguão e na tela de fim ela fica de frente para a câmera, à esquerda da tela,
+  // com a rua do cenário ao fundo ('vitrine', 'comemora' ou 'triste')
+  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao', vitrine = null) {
     trocarCenario(tema);
     trocarPerseguidor(quemPersegue(tema, escolhaFloresta));
     const dt = Math.min(0.05, Math.max(0, t - ultimoT));
     ultimoT = t;
     const dist = s.dist;
     menina.vestir(visual.pele, visual.roupa, visual.estilo);
-    menina.posar(s, t);
+    menina.posar(s, t, vitrine);
+    if (vitrine) menina.raiz.rotation.set(0, Math.PI + 0.28 + Math.sin(t * 0.4) * 0.05, 0);
 
     // quem persegue: logo atrás dela, um pouco de lado para não tapar a menina
     const dp = s.perseguidor?.dist ?? 99;
     // mais longe que isso ele já estaria em cima da câmera: some de vista
-    perseguidor.raiz.visible = dp < 1.9;
+    perseguidor.raiz.visible = dp < 1.9 && !vitrine;
     if (perseguidor.raiz.visible) {
       perX += (xDe(s.x) - perX) * 0.08;
       const lado = s.faixa === 0 ? -1 : 1; // fica do lado de dentro da pista
@@ -203,10 +206,17 @@ export function criarMundo(canvas) {
     }
 
     const px = xDe(s.x);
-    camX += (px * 0.75 - camX) * 0.12;
-    camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 - camY) * 0.1;
-    camera.position.set(camX, camY, -2.9);
-    camera.lookAt(px * 0.85, 0.95 + s.y * 0.6, 6);
+    if (vitrine) {
+      // de frente para ela; olhando um pouco para a direita da tela (−x), ela fica à esquerda
+      camX = px - 0.62; camY = 2.35;
+      camera.position.set(px - 0.62, 1.05, -2.75);
+      camera.lookAt(px - 0.62, 0.84, 0);
+    } else {
+      camX += (px * 0.75 - camX) * 0.12;
+      camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 - camY) * 0.1;
+      camera.position.set(camX, camY, -2.9);
+      camera.lookAt(px * 0.85, 0.95 + s.y * 0.6, 6);
+    }
     sol.position.set(px - 4, 9, -2);
     sol.target.position.set(px, 0, 6);
     preenche.position.set(camX, camY + 1, -6);
