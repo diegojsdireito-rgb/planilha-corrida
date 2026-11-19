@@ -16,6 +16,7 @@ export const prefs = {
   nivel: inicial.nivel ?? 'medio',
   som: inicial.som ?? true,
   historico: inicial.historico ?? [],
+  personagem: inicial.personagem ?? { pele: 1, roupa: 0 },
 };
 
 // Migra o placar da primeira versão, que não guardava histórico.
@@ -39,7 +40,7 @@ export function placarDe(jogo) {
   const p = { v: 0, d: 0, e: 0 };
   for (const h of prefs.historico) {
     if (h.j !== jogo) continue;
-    if (h.r === 'vitoria') p.v++; else if (h.r === 'derrota') p.d++; else p.e++;
+    if (h.r === 'vitoria') p.v++; else if (h.r === 'derrota') p.d++; else if (h.r === 'empate') p.e++;
   }
   return p;
 }
@@ -69,7 +70,7 @@ export function montarCopia(jogos) {
     const s = lerSalvo(id);
     if (s) salvos[id] = s;
   }
-  return { app: MARCA, versao: 1, criada: Date.now(), nivel: prefs.nivel, som: prefs.som, historico: prefs.historico, salvos };
+  return { app: MARCA, versao: 1, criada: Date.now(), nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, historico: prefs.historico, salvos };
 }
 
 const chaveDoRegistro = (h) => `${h.j}|${h.r}|${h.t}|${h.tempo ?? ''}`;
@@ -83,7 +84,7 @@ export function mesclar(historicoAtual, salvosAtuais, copia) {
   const historico = [...historicoAtual];
   let novos = 0;
   for (const h of copia.historico) {
-    if (!h || typeof h.j !== 'string' || !['vitoria', 'derrota', 'empate'].includes(h.r)) continue;
+    if (!h || typeof h.j !== 'string' || !['vitoria', 'derrota', 'empate', 'concluida'].includes(h.r)) continue;
     const k = chaveDoRegistro(h);
     if (vistos.has(k)) continue;
     vistos.add(k);
@@ -106,6 +107,7 @@ export function restaurarCopia(texto, jogos) {
   for (const id of jogos) { const s = lerSalvo(id); if (s) salvosAtuais[id] = s; }
   const r = mesclar(prefs.historico, salvosAtuais, copia);
   prefs.historico = r.historico;
+  if (copia.personagem) prefs.personagem = copia.personagem;
   guardar();
   for (const [id, s] of Object.entries(r.salvos)) {
     try { localStorage.setItem(SALVO + id, JSON.stringify(s)); } catch { /* sem armazenamento */ }

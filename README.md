@@ -85,7 +85,7 @@ Esses limites são prudência, não garantia contra lesões. A planilha não sub
 
 ## Mesa de Jogos
 
-App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 robôs), Xadrez, Damas (regras brasileiras), Reversi, Quatro em Linha e Jogo da Velha, e dois desafios solo com dicas do robô: Paciência e Sudoku. O robô tem três níveis (fácil, médio e difícil).
+App separado, na pasta `jogos/`, com jogos contra o robô: Ludo (você e até 3 robôs), Xadrez, Damas (regras brasileiras), Reversi, Quatro em Linha e Jogo da Velha, e desafios solo: Paciência e Sudoku (com dicas do robô), Docinhos (junte 3 doces iguais, com fases e estrelas) e Corrida dos Cachinhos (corrida sem fim em 3 faixas). Os dois últimos têm como personagem uma menina de cabelo castanho cacheado, com tom de pele e cor da roupa à escolha. O robô tem três níveis (fácil, médio e difícil).
 
 - **Salvamento automático:** cada partida em andamento fica guardada no aparelho e volta do ponto em que parou, inclusive depois de fechar o navegador.
 - **Cópia de segurança:** no fim da tela inicial, "Salvar cópia" gera um arquivo com placar, histórico e partidas em andamento, e "Restaurar cópia" junta o arquivo ao que já está no aparelho, sem repetir partidas. No iPhone, apagar o ícone da tela de início apaga os dados, por isso o app avisa quando a última cópia tem mais de 14 dias.
@@ -104,6 +104,9 @@ Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai 
 | `jogos/src/reversi.js` | Jogadas válidas, viradas e robô por minimax com pesos por casa. |
 | `jogos/src/lig4.js` | Quatro em linha com robô por minimax. |
 | `jogos/src/velha.js` | Jogo da velha; no difícil, o robô joga perfeito. |
+| `jogos/src/docinhos.js` | Docinhos: trincas, doces especiais (listrado, bomba, arco-íris), cascatas, fases e jogada para a dica. |
+| `jogos/src/corrida.js` | Corrida dos Cachinhos: física, geração de obstáculos sempre com passagem, colisões, ímã e escudo. |
+| `jogos/src/personagem.js` | A menina: retrato de frente (SVG) e desenho de costas correndo (canvas). |
 | `jogos/src/paciencia.js` | Paciência (Klondike), movimento automático e dica do robô. |
 | `jogos/src/sudoku.js` | Gera grades com solução única em três níveis. |
 | `jogos/src/dados.js` | Histórico, placar, recordes, partidas salvas e cópia de segurança, tudo no aparelho. |

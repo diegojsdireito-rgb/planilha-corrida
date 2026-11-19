@@ -143,17 +143,20 @@ export function montarPainel(raiz, jogos, abrirJogo) {
 
   // Desafios solo
   const cartaoSolo = el('div', 'grafico solo');
-  cartaoSolo.innerHTML = `<h3>Desafios solo</h3>${e.solo.map((s) => `
-    <div class="solo-linha"><span class="mini">${s.jogo.icone}</span><span><strong>${s.jogo.nome}</strong><small>${plural(s.resolvidos, 'resolvido', 'resolvidos')}</small></span><span class="tempo">${s.melhor ? `<small>melhor tempo</small>${formatarTempo(s.melhor)}` : '<small>sem recorde</small>—'}</span></div>`).join('')}`;
+  cartaoSolo.innerHTML = `<h3>Desafios solo</h3>${e.solo.map((s) => {
+    const r = s.jogo.resumo?.().painel;
+    if (r) return `<div class="solo-linha"><span class="mini">${s.jogo.icone}</span><span><strong>${s.jogo.nome}</strong><small>${r.sub}</small></span><span class="tempo"><small>${r.rotulo}</small>${r.valor}</span></div>`;
+    return `<div class="solo-linha"><span class="mini">${s.jogo.icone}</span><span><strong>${s.jogo.nome}</strong><small>${plural(s.resolvidos, 'resolvido', 'resolvidos')}</small></span><span class="tempo">${s.melhor ? `<small>melhor tempo</small>${formatarTempo(s.melhor)}` : '<small>sem recorde</small>—'}</span></div>`;
+  }).join('')}`;
 
   // Últimas partidas
   const cartaoRecentes = el('div', 'grafico');
   const nomeJogo = Object.fromEntries(jogos.map((j) => [j.id, j.nome]));
-  const LETRA = { vitoria: 'V', derrota: 'D', empate: 'E' };
-  const PALAVRA = { vitoria: 'Vitória', derrota: 'Derrota', empate: 'Empate' };
+  const LETRA = { vitoria: 'V', derrota: 'D', empate: 'E', concluida: '★' };
+  const PALAVRA = { vitoria: 'Vitória', derrota: 'Derrota', empate: 'Empate', concluida: 'Partida' };
   cartaoRecentes.innerHTML = `<h3>Últimas partidas</h3>${e.recentes.length ? `<div class="recentes">${e.recentes.map((h) => `
     <span class="chip ${h.r}" title="${PALAVRA[h.r]} em ${nomeJogo[h.j] ?? h.j}${h.t ? `, ${ddmm(h.t)}` : ''}"><b>${LETRA[h.r]}</b>${nomeJogo[h.j] ?? h.j}</span>`).join('')}</div>
-    <p class="legenda"><span class="chip vitoria"><b>V</b>vitória</span><span class="chip empate"><b>E</b>empate</span><span class="chip derrota"><b>D</b>derrota</span></p>` : '<p class="sub">Nenhuma partida ainda.</p>'}`;
+    <p class="legenda"><span class="chip vitoria"><b>V</b>vitória</span><span class="chip empate"><b>E</b>empate</span><span class="chip derrota"><b>D</b>derrota</span>${e.recentes.some((h) => h.r === 'concluida') ? '<span class="chip concluida"><b>★</b>corrida</span>' : ''}</p>` : '<p class="sub">Nenhuma partida ainda.</p>'}`;
 
   const graficos = el('div', 'graficos');
   graficos.append(cartaoDias, cartaoJogos, cartaoSolo, cartaoRecentes);
