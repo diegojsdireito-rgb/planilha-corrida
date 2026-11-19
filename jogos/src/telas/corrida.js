@@ -2,6 +2,7 @@ import * as cor from '../corrida.js';
 import { el } from '../comum.js';
 import { prefs, guardar } from '../dados.js';
 import * as loja from '../loja.js';
+import { ligarLaco, desligarLaco, desligarLacos } from '../som.js';
 import { retrato, desenharDeCostas, PELES, ROUPAS } from '../personagem.js';
 
 const C = 5; // distância da câmera: controla a perspectiva
@@ -39,8 +40,10 @@ export function montar(area, ctl) {
   const skateEl = el('button', 'acao-corrida acao-skate');
   skateEl.setAttribute('aria-label', 'Subir no skate');
   const turboEl = el('button', 'acao-corrida acao-turbo', '<i></i><span>⚡</span>');
+  const decolarEl = el('button', 'acao-decolar');
+  decolarEl.hidden = true;
   turboEl.setAttribute('aria-label', 'Ativar a supercarga');
-  palco.append(tela3d, tela, hud, pausaEl, skateEl, turboEl, camada);
+  palco.append(tela3d, tela, hud, pausaEl, skateEl, turboEl, decolarEl, camada);
   const controles = el('div', 'corrida-controles', `
     <button data-acao="esquerda" aria-label="Esquerda">◀</button>
     <button data-acao="pular" aria-label="Pular">▲</button>
@@ -68,6 +71,7 @@ export function montar(area, ctl) {
   const vigia = setInterval(() => {
     if (palco.isConnected) return;
     clearInterval(vigia);
+    calarTudo();
     observador?.disconnect();
     mundo?.destruir();
     mundo = null;
@@ -214,8 +218,8 @@ export function montar(area, ctl) {
     ctx.restore();
   }
 
-  const ICONE = { ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡' };
-  const COR_BOLHA = { ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800' };
+  const ICONE = { ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹' };
+  const COR_BOLHA = { ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc' };
   function bolha(x, y, r, tipo, t) {
     const yy = y + Math.sin(t * 4) * r * 0.12;
     const g = ctx.createRadialGradient(x - r * 0.35, yy - r * 0.4, r * 0.1, x, yy, r);
@@ -433,10 +437,14 @@ export function montar(area, ctl) {
     const emCorrida = Boolean(s) && rodando;
     skateEl.hidden = !emCorrida;
     turboEl.hidden = !emCorrida;
-    if (!s) { hud.innerHTML = ''; return; }
+    if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; return; }
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
     hud.innerHTML = `<span class="pts">${cor.pontos(s).toLocaleString('pt-BR')}</span><span class="est">🪙 ${s.moedas}</span>${
+      s.dobro > 0 ? `<span class="poder dobro">✖2 ${Math.ceil(s.dobro)}s</span>` : ''}${
       tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
+    const podeDecolar = emCorrida && s.arrancadas > 0 && s.t <= cor.JANELA_ARRANCADA && s.voo <= 0;
+    decolarEl.hidden = !podeDecolar;
+    if (podeDecolar) decolarEl.innerHTML = `🎒 Decolar! <small>${s.arrancadas}</small><i style="width:${Math.round((1 - s.t / cor.JANELA_ARRANCADA) * 100)}%"></i>`;
     skateEl.innerHTML = `🛹<small>${s.cargas}</small>`;
     skateEl.disabled = s.cargas <= 0 || s.skate > 0;
     turboEl.style.setProperty('--carga', `${Math.round(s.energia * 100)}%`);
@@ -445,8 +453,9 @@ export function montar(area, ctl) {
   }
 
   const SOM = {
-    pulo: 'passo', superpulo: 'superpulo', troca: 'clique', moeda: 'moeda', raio: 'acerto', 'carga-cheia': 'premio', poder: 'acerto',
-    escudo: 'captura', desliza: 'carta', batida: 'erro', maleta: 'voo', supercarga: 'turbo', skate: 'skate', 'skate-quebrou': 'quebra', quebra: 'quebra',
+    pulo: 'passo', superpulo: 'superpulo', troca: 'clique', moeda: 'moeda', raio: 'acerto', 'carga-cheia': 'premio', poder: 'item',
+    escudo: 'captura', desliza: 'carta', batida: 'erro', decolar: 'decolar', 'pouso-jato': 'pouso-jato', supercarga: 'turbo', skate: 'skate',
+    'skate-quebrou': 'quebra', quebra: 'quebra', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
   };
 
   function laco(agora) {
@@ -457,6 +466,7 @@ export function montar(area, ctl) {
       cor.avancar(s, dt);
       for (const e of s.eventos) if (SOM[e]) ctl.som(SOM[e]);
       s.eventos.length = 0;
+      if (quadro % 10 === 0) sonsContinuos();
       if (++quadro % 6 === 0) desenharHud();
     }
     desenhar(agora / 1000);
@@ -464,11 +474,21 @@ export function montar(area, ctl) {
     requestAnimationFrame(laco);
   }
 
+  // Ronco da mochila enquanto voa e o som ambiente do cenário em que ela está.
+  let ambiente = null;
+  function sonsContinuos() {
+    if (!prefs.som || !s || pausado || !rodando) { desligarLacos(); ambiente = null; return; }
+    if (s.voo > 0) ligarLaco('jato'); else desligarLaco('jato');
+    const tema = cenarioDaCorrida(prefs.cenario ?? 'passeio', s.dist);
+    if (tema !== ambiente) { if (ambiente) desligarLaco(ambiente); ligarLaco(tema); ambiente = tema; }
+  }
+  function calarTudo() { desligarLacos(); ambiente = null; }
+
   function comecar() {
     ctl.som('clique');
     ativa = ctl.ativa();
     const c = prefs.carteira;
-    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas });
+    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
     temaVisto = null;
     camada.innerHTML = '';
     camada.hidden = true;
@@ -486,6 +506,7 @@ export function montar(area, ctl) {
     pausaEl.textContent = sim ? '▶' : 'Ⅱ';
     pausaEl.setAttribute('aria-label', sim ? 'Continuar' : 'Pausar');
     camada.hidden = !sim;
+    if (sim) calarTudo();
     if (sim) {
       camada.innerHTML = '<div class="cartao-corrida"><strong>Pausado</strong></div>';
       const b = el('button', 'botao', 'Continuar');
@@ -506,13 +527,14 @@ export function montar(area, ctl) {
 
   function carteiraHtml() {
     const c = prefs.carteira;
-    return `<div class="carteira"><span>🪙 <b>${fmt(c.moedas)}</b></span><span>🛹 <b>${c.cargas}</b> ${c.cargas === 1 ? 'carga' : 'cargas'}</span></div>`;
+    return `<div class="carteira"><span>🪙 <b>${fmt(c.moedas)}</b></span><span>🛹 <b>${c.cargas}</b></span><span>🎒 <b>${c.arrancadas}</b></span></div>`;
   }
 
   function salvarCarteira(c) { prefs.carteira = c; guardar(); }
 
   function telaInicial(aba = 'correr', aviso = '') {
     rodando = false;
+    calarTudo();
     s = null;
     pausaEl.hidden = true;
     camada.hidden = false;
@@ -531,6 +553,7 @@ export function montar(area, ctl) {
         <div class="escolha"><span>Roupa</span>${ROUPAS.map((cor_, k) => `<button class="amostra${prefs.personagem.roupa === k ? ' sel' : ''}" data-roupa="${k}" style="background:${cor_}" aria-label="Cor da roupa ${k + 1}"></button>`).join('')}</div>
         <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
         <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque em 🛹 durante a corrida</small>
+        ${c.arrancadas ? `<small class="equipado">🎒 ${c.arrancadas} mochila${c.arrancadas > 1 ? 's' : ''} a jato: toque em "Decolar" no começo</small>` : ''}
         <button class="botao grande" data-correr>Correr!</button>`;
     } else if (aba === 'loja') {
       corpo = `
@@ -544,6 +567,9 @@ export function montar(area, ctl) {
         <h4>Cargas de skate</h4>
         <div class="item-loja"><span class="icone-item">🛹</span><div><b>Você tem ${c.cargas}</b><small>Cada carga liga o skate por ${cor.DURACAO_SKATE} s.</small></div>
           <span class="dupla"><button class="botao" data-cargas="1" ${c.moedas < loja.PRECO_CARGA ? 'disabled' : ''}>+1 · 🪙 ${loja.PRECO_CARGA}</button><button class="botao" data-cargas="5" ${c.moedas < loja.PRECO_CARGA * 5 ? 'disabled' : ''}>+5 · 🪙 ${fmt(loja.PRECO_CARGA * 5)}</button></span></div>
+        <h4>Bônus de largada</h4>
+        <div class="item-loja"><span class="icone-item">🎒</span><div><b>Mochila a jato · você tem ${c.arrancadas}</b><small>Toque em "Decolar" nos primeiros ${cor.JANELA_ARRANCADA} s da corrida e comece voando.</small></div>
+          <span class="dupla"><button class="botao" data-arrancadas="1" ${c.moedas < loja.PRECO_ARRANCADA ? 'disabled' : ''}>+1 · 🪙 ${loja.PRECO_ARRANCADA}</button><button class="botao" data-arrancadas="3" ${c.moedas < loja.PRECO_ARRANCADA * 3 ? 'disabled' : ''}>+3 · 🪙 ${fmt(loja.PRECO_ARRANCADA * 3)}</button></span></div>
         <h4>Poderes da pista</h4>
         ${Object.entries(loja.PODERES).map(([id, pd]) => {
           const nv = c.poderes[id];
@@ -599,6 +625,7 @@ export function montar(area, ctl) {
     q('[data-skate]').forEach((b) => { b.onclick = () => resultado(loja.comprarSkate(prefs.carteira, b.dataset.skate), `${cor.SKATES[b.dataset.skate].nome} é seu!`); });
     q('[data-equipar]').forEach((b) => { b.onclick = () => resultado(loja.equipar(prefs.carteira, b.dataset.equipar), `Usando o ${cor.SKATES[b.dataset.equipar].nome}.`); });
     q('[data-cargas]').forEach((b) => { b.onclick = () => resultado(loja.comprarCargas(prefs.carteira, Number(b.dataset.cargas)), `+${b.dataset.cargas} ${b.dataset.cargas === '1' ? 'carga' : 'cargas'} de skate.`); });
+    q('[data-arrancadas]').forEach((b) => { b.onclick = () => resultado(loja.comprarArrancadas(prefs.carteira, Number(b.dataset.arrancadas)), `+${b.dataset.arrancadas} mochila${b.dataset.arrancadas === '1' ? '' : 's'} a jato de largada.`); });
     q('[data-poder]').forEach((b) => { b.onclick = () => resultado(loja.melhorar(prefs.carteira, b.dataset.poder), `${loja.PODERES[b.dataset.poder].nome} melhorou!`); });
     q('[data-presente]').forEach((b) => {
       b.onclick = () => {
@@ -610,6 +637,7 @@ export function montar(area, ctl) {
   }
 
   function fimDeJogo() {
+    calarTudo();
     const res = cor.resumo(s);
     const antes = recorde();
     const fechado = loja.fecharCorrida(prefs.carteira, res);
@@ -655,6 +683,7 @@ export function montar(area, ctl) {
     toque = null;
   });
   skateEl.onclick = () => agir('skate');
+  decolarEl.onclick = () => agir('arrancada');
   turboEl.onclick = () => agir('supercarga');
   controles.addEventListener('click', (e) => {
     const b = e.target.closest('[data-acao]');
@@ -662,7 +691,7 @@ export function montar(area, ctl) {
   });
   const teclas = (e) => {
     if (!palco.isConnected) { document.removeEventListener('keydown', teclas); observador.disconnect(); mundo?.destruir(); mundo = null; return; }
-    const mapa = { ArrowLeft: 'esquerda', a: 'esquerda', ArrowRight: 'direita', d: 'direita', ArrowUp: 'pular', w: 'pular', ' ': 'pular', ArrowDown: 'deslizar', s: 'deslizar', k: 'skate', e: 'supercarga' };
+    const mapa = { ArrowLeft: 'esquerda', a: 'esquerda', ArrowRight: 'direita', d: 'direita', ArrowUp: 'pular', w: 'pular', ' ': 'pular', ArrowDown: 'deslizar', s: 'deslizar', k: 'skate', e: 'supercarga', j: 'arrancada' };
     const acao = mapa[e.key];
     if (acao && rodando) { e.preventDefault(); agir(acao); }
     if (e.key === 'Escape' || e.key === 'p') pausar(!pausado);

@@ -92,6 +92,32 @@ function mecha(angulo, comprimento, largura, fase) {
   return g;
 }
 
+// Mochila a jato (também usada, menor, como item na pista).
+export function criarMochilaJato() {
+  const grupo = new THREE.Group();
+  const lona = new THREE.MeshStandardMaterial({ color: 0x3e6fd6, roughness: 0.7 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0xc9ced8, roughness: 0.3, metalness: 0.8 });
+  const escuro = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.5, metalness: 0.5 });
+  const corpo = sombrear(new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.14, 6, 14), lona)); corpo.scale.set(1.25, 1, 0.55); grupo.add(corpo);
+  const bolso = sombrear(new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.05, 4, 12), new THREE.MeshStandardMaterial({ color: 0xffb020, roughness: 0.7 })));
+  bolso.scale.set(1.3, 1, 0.5); bolso.position.set(0, -0.04, -0.05); grupo.add(bolso);
+  for (const lado of [-1, 1]) {
+    const alca = sombrear(new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 12, Math.PI), escuro)); alca.rotation.y = Math.PI / 2; alca.position.set(lado * 0.08, 0.1, 0.06); grupo.add(alca);
+  }
+  const chamas = [];
+  for (const lado of [-1, 1]) {
+    const tanque = sombrear(new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.2, 6, 12), metal)); tanque.position.set(lado * 0.1, 0, -0.07); grupo.add(tanque);
+    const anel = sombrear(new THREE.Mesh(new THREE.TorusGeometry(0.046, 0.008, 6, 14), new THREE.MeshStandardMaterial({ color: 0xe5484d, roughness: 0.5 }))); anel.rotation.x = Math.PI / 2; anel.position.set(lado * 0.1, 0.06, -0.07); grupo.add(anel);
+    const bocal = sombrear(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.06, 12), escuro)); bocal.position.set(lado * 0.1, -0.16, -0.07); grupo.add(bocal);
+    const fogo = new THREE.Group(); fogo.position.set(lado * 0.1, -0.19, -0.07);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.3, 10), new THREE.MeshBasicMaterial({ color: 0xff8a1f, transparent: true, opacity: 0.9 })); cone.rotation.x = Math.PI; cone.position.y = -0.15; fogo.add(cone);
+    const miolo = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.18, 8), new THREE.MeshBasicMaterial({ color: 0xfff3a0 })); miolo.rotation.x = Math.PI; miolo.position.y = -0.09; fogo.add(miolo);
+    grupo.add(fogo);
+    chamas.push(fogo);
+  }
+  return { grupo, chamas };
+}
+
 export function criarMenina() {
   const tex = criarTexturas();
   const raiz = new THREE.Group();
@@ -218,11 +244,16 @@ export function criarMenina() {
     return g;
   };
   const chamasSkate = [-0.1, 0.1].map((dx) => { const f = fogo(0xff7a1f); f.rotation.x = -Math.PI / 2; f.position.set(dx, 0.07, -0.48); skate.add(f); return f; });
-  const maleta = new THREE.Group(); maleta.position.set(0, 0.26, -0.15); tronco.add(maleta);
-  const couro = new THREE.MeshStandardMaterial({ color: 0x8e5426, roughness: 0.55 });
-  const caixa = peca(new THREE.BoxGeometry(0.3, 0.32, 0.13), couro); maleta.add(caixa);
-  const fecho = peca(new THREE.BoxGeometry(0.31, 0.03, 0.14), new THREE.MeshStandardMaterial({ color: 0xe8c27a, metalness: 0.6, roughness: 0.3 })); fecho.position.y = 0.04; maleta.add(fecho);
-  const chamasMaleta = [-0.08, 0.08].map((dx) => { const f = fogo(0xff9a1f); f.position.set(dx, -0.16, 0); maleta.add(f); return f; });
+  // mochila a jato: mochila acolchoada, dois tanques com bocais, fogo e fumaça
+  const maleta = new THREE.Group(); maleta.position.set(0, 0.25, -0.13); tronco.add(maleta);
+  const { grupo: mochila, chamas: chamasMaleta } = criarMochilaJato();
+  maleta.add(mochila);
+  const fumaca = Array.from({ length: 18 }, () => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0xdfe3ea, transparent: true, depthWrite: false, opacity: 0 }));
+    sp.visible = false; raiz.add(sp);
+    return { sp, vida: 0 };
+  });
+  let proximaFumaca = 0; let ultimoT = 0;
   const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), transparent: true, depthWrite: false, opacity: 0.55 }));
   aura.scale.set(1.6, 2.2, 1); aura.position.y = 0.75; raiz.add(aura);
 
@@ -302,6 +333,26 @@ export function criarMenina() {
     }
     maleta.visible = s.voo > 0;
     chamasMaleta.forEach((f) => f.scale.set(1, 0.7 + Math.random() * 0.6, 1));
+    // fumaça: nuvenzinhas que saem dos bocais e ficam para trás
+    const dt = Math.min(0.05, Math.max(0, t - ultimoT)); ultimoT = t;
+    if (s.voo > 0 && t >= proximaFumaca) {
+      proximaFumaca = t + 0.04;
+      const livre = fumaca.find((f) => f.vida <= 0);
+      if (livre) {
+        livre.vida = 0.7;
+        livre.sp.visible = true;
+        livre.sp.position.set((Math.random() - 0.5) * 0.15, 0.55, -0.2);
+        livre.sp.scale.setScalar(0.18);
+      }
+    }
+    for (const f of fumaca) {
+      if (f.vida <= 0) { f.sp.visible = false; continue; }
+      f.vida -= dt;
+      f.sp.position.z -= dt * (s.vel ?? 12) * 0.6;
+      f.sp.position.y -= dt * 0.4;
+      f.sp.scale.setScalar(0.18 + (0.7 - f.vida) * 0.9);
+      f.sp.material.opacity = Math.max(0, f.vida) * 0.7;
+    }
     const corAura = s.supercarga > 0 ? 0xffc828 : s.escudo ? 0x50aaff : s.ima > 0 ? 0xff5a5a : null;
     aura.visible = corAura !== null;
     if (corAura !== null) { aura.material.color.setHex(corAura); aura.material.opacity = 0.45 + Math.sin(t * 8) * 0.1; }

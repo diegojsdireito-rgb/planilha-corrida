@@ -1,7 +1,9 @@
 // Corrida dos Cachinhos: corrida sem fim em 3 faixas.
 // z é a distância à frente da personagem (0 = onde ela está). Faixas 0, 1 e 2. Alturas em unidades (ela tem ~1,35).
 // Obstáculos: cerca (pular), bandeirinhas (deslizar) e carrinho de sorvete (trocar de faixa ou super pulo).
-// Na pista: moedas, ímã, tênis de mola (super pulo), maleta voadora, raio (enche a supercarga) e bolha (escudo).
+// Na pista: moedas e itens que valem na hora em que são pegos: ímã, tênis de mola (super pulo),
+// mochila a jato (id 'maleta', para não perder as melhorias já compradas), escudo, pontos em dobro,
+// baú de moedas, foguete (supercarga na hora), skate grátis e raio (enche a barra da supercarga).
 
 export const LONGE = 70;
 const GRAVIDADE = 30;
@@ -12,6 +14,9 @@ const TROCA_DE_FAIXA = 11; // faixas por segundo
 const COMPRIMENTO_CARRINHO = 5;
 const ALTURA_VOO = 3.6;
 export const DURACAO_SKATE = 30;
+export const DURACAO_DOBRO = 10;
+export const MOEDAS_BAU = 50;
+export const JANELA_ARRANCADA = 6; // segundos do começo em que dá para decolar com a mochila de bônus
 
 const VELOCIDADE = {
   facil: { base: 11, max: 24, ganho: 0.14 },
@@ -35,11 +40,12 @@ export function nova(nivel = 'medio', cfg = {}) {
     nivel, t: 0, dist: 0, vel: VELOCIDADE[nivel].base,
     faixa: 1, x: 1, y: 0, vy: 0, deslizando: 0,
     moedas: 0, objetos: [], ultimaLinha: 0,
-    ima: 0, superPulo: 0, voo: 0, supercarga: 0, energia: 0, escudo: false, invencivel: 0,
+    ima: 0, superPulo: 0, voo: 0, supercarga: 0, energia: 0, escudo: false, invencivel: 0, dobro: 0, bonus: 0,
+    arrancadas: cfg.arrancadas ?? 0,
     skate: 0, skateTipo: SKATES[cfg.skate] ? cfg.skate : 'classico', cargas: cfg.cargas ?? 0,
     poderes,
     vivo: true, eventos: [],
-    contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0 },
+    contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0 },
   };
 }
 
@@ -77,12 +83,21 @@ export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false)
   } else if (livres.length && r() < 0.85) {
     objetos.push(...fileira(livres[Math.floor(r() * livres.length)], z, 3 + Math.floor(r() * 5)));
   }
-  if (livres.length && dist > 120 && r() < 0.11) {
-    const p = r();
-    const tipo = p < 0.3 ? 'raio' : p < 0.5 ? 'ima' : p < 0.68 ? 'pulo' : p < 0.84 ? 'escudo' : 'maleta';
-    objetos.push({ tipo, faixa: livres[livres.length - 1], z: z + 0.5, h: 0.7 });
+  if (livres.length && dist > 120 && r() < 0.14) {
+    objetos.push({ tipo: sortearItem(r()), faixa: livres[livres.length - 1], z: z + 0.5, h: 0.7 });
   }
   return objetos;
+}
+
+// Itens da pista, com a chance de cada um aparecer (somam 1).
+export const ITENS = [
+  ['raio', 0.2], ['ima', 0.13], ['pulo', 0.12], ['escudo', 0.1], ['maleta', 0.11],
+  ['dobro', 0.11], ['bau', 0.1], ['turbo', 0.06], ['prancha', 0.07],
+];
+export function sortearItem(x) {
+  let soma = 0;
+  for (const [tipo, chance] of ITENS) { soma += chance; if (x < soma) return tipo; }
+  return 'raio';
 }
 
 const skateAtivo = (s) => (s.skate > 0 ? SKATES[s.skateTipo] : null);
@@ -108,7 +123,13 @@ export function comando(s, acao) {
     s.cargas--;
     s.skate = DURACAO_SKATE;
     s.contagem.skates++;
+    s.contagem.cargasUsadas++;
     s.eventos.push('skate');
+  } else if (acao === 'arrancada' && s.arrancadas > 0 && s.t <= JANELA_ARRANCADA && s.voo <= 0) {
+    // bônus de largada: começa voando com a mochila a jato, por mais tempo que a da pista
+    s.arrancadas--;
+    s.contagem.arrancadas++;
+    voar(s, duracao(s.poderes.maleta) + 4);
   } else if (acao === 'supercarga' && s.energia >= 1 && s.supercarga <= 0) {
     s.energia = 0;
     s.supercarga = duracao(s.poderes.supercarga) * 0.6;
@@ -137,6 +158,7 @@ export function avancar(s, dt, aleatorio = Math.random) {
   s.vel = Math.min(cfg.max, cfg.base + cfg.ganho * s.t) * turbo * (sk?.velocidade ?? 1);
   const dz = s.vel * dt;
   s.dist += dz;
+  if (s.dobro > 0) s.bonus += dz;
 
   // personagem
   const passo = TROCA_DE_FAIXA * dt;
@@ -151,8 +173,12 @@ export function avancar(s, dt, aleatorio = Math.random) {
   }
   const voava = s.voo > 0;
   s.deslizando = Math.max(0, s.deslizando - dt);
-  for (const k of ['ima', 'superPulo', 'voo', 'supercarga', 'invencivel']) s[k] = Math.max(0, s[k] - dt);
-  if (voava && s.voo === 0) { s.vy = 0; s.invencivel = Math.max(s.invencivel, 1.2); s.eventos.push('pouso'); }
+  for (const k of ['ima', 'superPulo', 'voo', 'supercarga', 'invencivel', 'dobro']) {
+    const antes = s[k];
+    s[k] = Math.max(0, s[k] - dt);
+    if (antes > 0 && s[k] === 0 && ['ima', 'superPulo', 'supercarga', 'dobro'].includes(k)) s.eventos.push('poder-fim');
+  }
+  if (voava && s.voo === 0) { s.vy = 0; s.invencivel = Math.max(s.invencivel, 1.2); s.eventos.push('pouso-jato'); }
   if (s.skate > 0) {
     s.skate = Math.max(0, s.skate - dt);
     if (s.skate === 0) s.eventos.push('skate-fim');
@@ -203,9 +229,19 @@ export function avancar(s, dt, aleatorio = Math.random) {
   return s;
 }
 
+function voar(s, segundos) {
+  s.voo = segundos;
+  s.deslizando = 0;
+  s.contagem.maletas++;
+  // tira da frente os obstáculos que já estavam perto: ela decola por cima deles
+  s.objetos = s.objetos.filter((x) => x.z < 2 || !['cerca', 'faixa', 'carrinho'].includes(x.tipo));
+  s.eventos.push('decolar');
+}
+
 function coletar(s, o) {
   const sk = skateAtivo(s);
   const d = (nome) => duracao(s.poderes[nome]);
+  if (o.tipo !== 'moeda') s.contagem.itens++;
   switch (o.tipo) {
     case 'moeda':
       s.moedas += sk?.moedas ?? 1;
@@ -218,20 +254,26 @@ function coletar(s, o) {
       break;
     case 'ima': s.ima = d('ima'); s.eventos.push('poder'); break;
     case 'pulo': s.superPulo = d('pulo'); s.eventos.push('poder'); break;
-    case 'maleta':
-      s.voo = d('maleta') * 0.75;
-      s.deslizando = 0;
-      s.contagem.maletas++;
-      s.objetos = s.objetos.filter((x) => x.z < 2 || !['cerca', 'faixa', 'carrinho'].includes(x.tipo));
-      s.eventos.push('maleta');
+    case 'maleta': voar(s, d('maleta') * 0.75); break;
+    case 'dobro': s.dobro = DURACAO_DOBRO + s.poderes.supercarga; s.eventos.push('dobro'); break;
+    case 'bau': s.moedas += MOEDAS_BAU; s.energia = Math.min(1, s.energia + 0.1); s.eventos.push('bau'); break;
+    case 'turbo':
+      s.supercarga = Math.max(s.supercarga, d('supercarga') * 0.6);
+      s.contagem.supercargas++;
+      s.eventos.push('supercarga');
+      break;
+    case 'prancha':
+      if (s.skate <= 0) { s.skate = DURACAO_SKATE; s.contagem.skates++; }
+      else s.skate = DURACAO_SKATE; // já estava no skate: renova o tempo
+      s.eventos.push('skate');
       break;
     case 'escudo': s.escudo = true; s.eventos.push('poder'); break;
     default:
   }
 }
 
-// Pontos: distância mais 5 por moeda. As moedas também vão para a carteira.
-export const pontos = (s) => Math.floor(s.dist) + s.moedas * 5;
+// Pontos: distância (em dobro enquanto vale o ×2) mais 5 por moeda. As moedas também vão para a carteira.
+export const pontos = (s) => Math.floor(s.dist + s.bonus) + s.moedas * 5;
 
 export const resumo = (s) => ({
   pontos: pontos(s), moedas: s.moedas, metros: Math.floor(s.dist), ...s.contagem,

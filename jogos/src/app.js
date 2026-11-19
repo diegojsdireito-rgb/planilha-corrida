@@ -68,7 +68,7 @@ const JOGOS = [
     'No nível difícil, o robô não erra: o melhor resultado possível é o empate.',
     'Quem começa alterna a cada partida.',
   ] },
-  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Moedas, skates e poderes', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
+  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Mochila a jato, skates e poderes', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
     resumo() {
       const n = prefs.historico.filter((h) => h.j === 'corrida').length;
       const r = telaCorrida.recorde();
@@ -82,7 +82,8 @@ const JOGOS = [
       'Deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. Os botões embaixo e as setas do teclado também funcionam.',
       'Pule as cercas, deslize por baixo das bandeirinhas e troque de faixa para fugir dos carrinhos de sorvete.',
       'Pegue moedas: elas ficam guardadas e compram skates, cargas de skate e melhorias na Loja.',
-      'Na pista aparecem poderes: 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🎒 maleta voadora e 🛡️ escudo.',
+      'Na pista aparecem itens que valem na hora em que são pegos: 🎒 mochila a jato (voa por cima de tudo), 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🛡️ escudo, ✖2 pontos em dobro, 💰 baú com 50 moedas, 🚀 foguete (supercarga na hora) e 🛹 skate grátis.',
+      'Bônus de largada: com uma mochila a jato comprada na Loja, toque em "Decolar" nos primeiros segundos e comece voando.',
       'Os raios ⚡ enchem a supercarga. Cheia, toque no botão ⚡: corre mais rápido, pula mais alto e atravessa os obstáculos.',
       'Toque em 🛹 para subir no skate: ele aguenta uma batida. O voador pula mais alto; o supersônico é mais rápido e dá moedas em dobro.',
       'Cumpra missões e abra o presente do dia na aba Prêmios para ganhar mais moedas.',

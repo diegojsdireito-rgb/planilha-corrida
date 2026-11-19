@@ -130,7 +130,7 @@ test('corrida: tênis de mola faz o super pulo passar por cima do carrinho', () 
   assert.equal(s.contagem.superPulos, 1);
 });
 
-test('corrida: maleta voadora leva por cima de tudo e pega moedas no ar', () => {
+test('corrida: mochila a jato leva por cima de tudo e pega moedas no ar', () => {
   const s = cenario([{ tipo: 'maleta', faixa: 1, z: 1, h: 0.7 }, { tipo: 'carrinho', faixa: 1, z: 25, comp: 5 }, { tipo: 'moeda', faixa: 1, z: 30, h: 4.2 }], { quadros: 200 });
   assert.equal(s.vivo, true);
   assert.equal(s.contagem.maletas, 1);
@@ -191,7 +191,7 @@ test('loja: missões cumpridas pagam prêmio e são trocadas', () => {
   assert.equal(c.missoes.length, 3);
   assert.equal(new Set(c.missoes.map((m) => m.tipo)).size, 3);
   const alvo = c.missoes[0];
-  const resultado = { moedas: 40, metros: 0, pontos: 0, pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, superPulos: 0, skates: 1, [alvo.tipo]: alvo.alvo };
+  const resultado = { moedas: 40, metros: 0, pontos: 0, pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, superPulos: 0, skates: 1, cargasUsadas: 1, itens: 0, arrancadas: 0, [alvo.tipo]: alvo.alvo };
   const r = loja.fecharCorrida({ ...c, cargas: 2 }, resultado, semente(4));
   assert.ok(r.concluidas.some((m) => m.tipo === alvo.tipo));
   assert.equal(r.carteira.moedas, resultado.moedas + r.premio);
@@ -256,4 +256,42 @@ test('corrida: cenário escolhido fica fixo e o Passeio troca a cada 500 m', asy
   assert.equal(cenarioDaCorrida('praia', 3000), 'praia');
   assert.equal(cenarioDaCorrida('desconhecido', 0), 'cidade');
   assert.deepEqual([0, 499, 500, 1000, 1500, 2000].map((d) => cenarioDaCorrida('passeio', d)), ['cidade', 'cidade', 'praia', 'floresta', 'neve', 'cidade']);
+});
+
+test('corrida: itens da pista valem na hora em que são pegos', () => {
+  const pega = (tipo, antes = () => {}) => cenario([{ tipo, faixa: 1, z: 1, h: 0.7 }], { antes, quadros: 30 });
+  const dobro = pega('dobro');
+  assert.ok(dobro.dobro > 0);
+  assert.ok(dobro.bonus > 0);
+  assert.ok(corrida.pontos(dobro) > Math.floor(dobro.dist));
+  assert.equal(pega('bau').moedas, corrida.MOEDAS_BAU);
+  assert.ok(pega('turbo').supercarga > 0);
+  const prancha = pega('prancha');
+  assert.ok(prancha.skate > 0);
+  assert.equal(prancha.cargas, 1); // skate da pista não gasta carga
+  assert.equal(prancha.contagem.cargasUsadas, 0);
+  assert.equal(pega('ima').contagem.itens, 1);
+  // os sorteios dão todos os tipos de item
+  const vistos = new Set(Array.from({ length: 200 }, (_, k) => corrida.sortearItem(k / 200)));
+  assert.equal(vistos.size, corrida.ITENS.length);
+});
+
+test('corrida: mochila a jato de bônus só decola no começo e gasta o bônus', () => {
+  const s = corrida.nova('medio', { arrancadas: 1 });
+  s.ultimaLinha = 1e9;
+  corrida.comando(s, 'arrancada');
+  assert.ok(s.voo > corrida.duracao(0));
+  assert.equal(s.arrancadas, 0);
+  const tarde = corrida.nova('medio', { arrancadas: 2 });
+  tarde.t = corrida.JANELA_ARRANCADA + 1;
+  corrida.comando(tarde, 'arrancada');
+  assert.equal(tarde.voo, 0);
+  // na loja: compra e desconto no fim da corrida
+  let c = { ...loja.carteiraNova(), moedas: 1000 };
+  assert.equal(c.arrancadas, 1);
+  c = loja.comprarArrancadas(c, 2).carteira;
+  assert.equal(c.arrancadas, 3);
+  assert.equal(c.moedas, 1000 - 2 * loja.PRECO_ARRANCADA);
+  const r = loja.fecharCorrida(c, { moedas: 0, metros: 10, pontos: 10, arrancadas: 1, cargasUsadas: 0 });
+  assert.equal(r.carteira.arrancadas, 2);
 });

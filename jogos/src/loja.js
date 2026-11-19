@@ -4,7 +4,7 @@
 export const PODERES = {
   ima: { nome: 'Ímã de moedas', icone: '🧲', texto: 'Puxa as moedas das três faixas.' },
   pulo: { nome: 'Tênis de mola', icone: '👟', texto: 'Super pulos: passa até por cima dos carrinhos.' },
-  maleta: { nome: 'Maleta voadora', icone: '🎒', texto: 'Voa por cima de tudo, pegando moedas no ar.' },
+  maleta: { nome: 'Mochila a jato', icone: '🎒', texto: 'Voa por cima de tudo, pegando moedas no ar.' },
   supercarga: { nome: 'Supercarga', icone: '⚡', texto: 'Corre mais rápido, pula mais alto e atravessa os obstáculos.' },
 };
 export const NIVEL_MAXIMO = 5;
@@ -16,6 +16,7 @@ export const SKATES_LOJA = [
   { id: 'supersonico', preco: 5000, texto: 'Protege de uma batida, corre mais rápido e vale moedas em dobro.' },
 ];
 export const PRECO_CARGA = 250;
+export const PRECO_ARRANCADA = 400; // bônus de largada: decolar com a mochila a jato
 
 export function carteiraNova() {
   return {
@@ -23,6 +24,7 @@ export function carteiraNova() {
     skates: ['classico'],
     skate: 'classico',
     cargas: 2,
+    arrancadas: 1,
     poderes: { ima: 0, pulo: 0, maleta: 0, supercarga: 0 },
     missoes: [],
     feitas: 0,
@@ -64,6 +66,12 @@ export function comprarCargas(c, n = 1) {
   return { carteira: { ...c, moedas: c.moedas - preco, cargas: c.cargas + n } };
 }
 
+export function comprarArrancadas(c, n = 1) {
+  const preco = PRECO_ARRANCADA * n;
+  if (c.moedas < preco) return erro(`Faltam ${preco - c.moedas} moedas.`);
+  return { carteira: { ...c, moedas: c.moedas - preco, arrancadas: c.arrancadas + n } };
+}
+
 export function melhorar(c, poder) {
   if (!PODERES[poder]) return erro('Poder desconhecido.');
   const nivel = c.poderes[poder];
@@ -80,7 +88,8 @@ const MODELOS = [
   { tipo: 'pulos', alvos: [15, 30, 50], texto: (n) => `Pule ${n} vezes numa corrida` },
   { tipo: 'deslizes', alvos: [10, 20, 35], texto: (n) => `Deslize ${n} vezes numa corrida` },
   { tipo: 'pontos', alvos: [1000, 2500, 5000], texto: (n) => `Faça ${n.toLocaleString('pt-BR')} pontos` },
-  { tipo: 'maletas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Voe com a maleta voadora' : `Voe ${n} vezes com a maleta`) },
+  { tipo: 'maletas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Voe com a mochila a jato' : `Voe ${n} vezes com a mochila a jato`) },
+  { tipo: 'itens', alvos: [3, 6, 10], texto: (n) => `Pegue ${n} itens na pista` },
   { tipo: 'supercargas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Ative a supercarga' : `Ative a supercarga ${n} vezes`) },
   { tipo: 'superPulos', alvos: [5, 12], texto: (n) => `Dê ${n} super pulos` },
   { tipo: 'skates', alvos: [1], texto: () => 'Ande de skate numa corrida' },
@@ -109,7 +118,8 @@ export function fecharCorrida(c, resultado, aleatorio = Math.random) {
   carteira = {
     ...carteira,
     moedas: carteira.moedas + resultado.moedas + premio,
-    cargas: Math.max(0, carteira.cargas - (resultado.skates ?? 0)),
+    cargas: Math.max(0, carteira.cargas - (resultado.cargasUsadas ?? 0)),
+    arrancadas: Math.max(0, carteira.arrancadas - (resultado.arrancadas ?? 0)),
     feitas: carteira.feitas + concluidas.length,
     missoes: carteira.missoes.filter((m) => !concluidas.includes(m)),
   };
@@ -144,6 +154,7 @@ export function mesclarCarteiras(a, b) {
     ...x,
     moedas: Math.max(x.moedas, y.moedas),
     cargas: Math.max(x.cargas, y.cargas),
+    arrancadas: Math.max(x.arrancadas, y.arrancadas),
     skates: [...x.skates, ...y.skates],
     poderes: Object.fromEntries(Object.keys(PODERES).map((k) => [k, Math.max(x.poderes[k], y.poderes[k])])),
     feitas: Math.max(x.feitas, y.feitas),

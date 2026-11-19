@@ -61,6 +61,12 @@ const SONS = {
   turbo: (c) => { tom(c, 220, 0, 0.45, { tipo: 'sawtooth', vol: 0.07, ate: 880 }); tom(c, 660, 0.3, 0.3, { tipo: 'triangle', vol: 0.12 }); },
   skate: (c) => { ruido(c, 0, 0.2, { vol: 0.2, freq: 1200 }); tom(c, 520, 0, 0.15, { tipo: 'triangle', vol: 0.12, ate: 780 }); },
   quebra: (c) => ruido(c, 0, 0.18, { vol: 0.4, freq: 500 }),
+  decolar: (c) => { ruido(c, 0, 0.6, { vol: 0.35, freq: 900 }); tom(c, 120, 0, 0.6, { tipo: 'sawtooth', vol: 0.08, ate: 420 }); tom(c, 660, 0.15, 0.25, { tipo: 'triangle', vol: 0.1, ate: 990 }); },
+  'pouso-jato': (c) => { ruido(c, 0, 0.25, { vol: 0.3, freq: 300 }); tom(c, 180, 0, 0.2, { tipo: 'sine', vol: 0.2, ate: 90 }); },
+  dobro: (c) => [523, 784, 1046, 1568].forEach((f, k) => tom(c, f, k * 0.06, 0.16, { tipo: 'square', vol: 0.05 })),
+  bau: (c) => { for (let k = 0; k < 9; k++) tom(c, 1200 + (k % 4) * 260, k * 0.045, 0.08, { tipo: 'square', vol: 0.04 }); ruido(c, 0, 0.12, { vol: 0.2, freq: 3000 }); },
+  item: (c) => { tom(c, 880, 0, 0.08, { tipo: 'triangle', vol: 0.14 }); tom(c, 1320, 0.07, 0.14, { tipo: 'triangle', vol: 0.14 }); },
+  'poder-fim': (c) => tom(c, 700, 0, 0.18, { tipo: 'triangle', vol: 0.08, ate: 350 }),
   premio: (c) => [784, 988, 1175, 1568, 1976].forEach((f, k) => tom(c, f, k * 0.07, 0.18, { tipo: 'triangle', vol: 0.14 })),
   acerto: (c) => tom(c, 1046, 0, 0.12, { tipo: 'sine', vol: 0.12 }),
   erro: (c) => tom(c, 180, 0, 0.22, { tipo: 'sawtooth', vol: 0.07, ate: 120 }),
@@ -74,3 +80,106 @@ export function tocar(nome) {
   if (!c || !SONS[nome]) return;
   try { SONS[nome](c); } catch { /* áudio indisponível */ }
 }
+
+// ---------- Sons contínuos: o ronco da mochila a jato e o ambiente de cada cenário ----------
+function ruidoEmLaco(c, segundos = 2) {
+  const n = Math.floor(c.sampleRate * segundos);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const d = buf.getChannelData(0);
+  let ultimo = 0;
+  for (let i = 0; i < n; i++) { ultimo = ultimo * 0.97 + (Math.random() * 2 - 1) * 0.3; d[i] = ultimo; } // ruído "marrom", mais grave
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  return src;
+}
+
+// Cada laço devolve uma função que o desliga suavemente.
+function montarLaco(c, volume, ligar) {
+  const saida = c.createGain();
+  saida.gain.setValueAtTime(0.0001, c.currentTime);
+  saida.gain.exponentialRampToValueAtTime(volume, c.currentTime + 0.4);
+  saida.connect(c.destination);
+  const partes = [];
+  const timers = [];
+  ligar(saida, partes, timers);
+  return () => {
+    const t = c.currentTime;
+    saida.gain.cancelScheduledValues(t);
+    saida.gain.setValueAtTime(Math.max(0.0001, saida.gain.value), t);
+    saida.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    timers.forEach(clearInterval);
+    setTimeout(() => { partes.forEach((p) => { try { p.stop(); } catch { /* já parou */ } }); saida.disconnect(); }, 450);
+  };
+}
+
+function filtro(c, tipo, freq, q = 0.8) { const f = c.createBiquadFilter(); f.type = tipo; f.frequency.value = freq; f.Q.value = q; return f; }
+
+function oscilar(c, alvo, freq, profundidade, partes) {
+  const lfo = c.createOscillator(); const g = c.createGain();
+  lfo.frequency.value = freq; g.gain.value = profundidade;
+  lfo.connect(g).connect(alvo); lfo.start(); partes.push(lfo);
+}
+
+const LACOS = {
+  jato: (c) => montarLaco(c, 0.22, (saida, partes) => {
+    const r = ruidoEmLaco(c); const f = filtro(c, 'bandpass', 650, 0.6); const g = c.createGain(); g.gain.value = 1;
+    r.connect(f).connect(g).connect(saida); r.start(); partes.push(r);
+    oscilar(c, g.gain, 11, 0.25, partes); // tremor do jato
+    const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 72; const go = c.createGain(); go.gain.value = 0.12;
+    o.connect(filtro(c, 'lowpass', 300)).connect(go).connect(saida); o.start(); partes.push(o);
+  }),
+  cidade: (c) => montarLaco(c, 0.06, (saida, partes, timers) => {
+    const r = ruidoEmLaco(c); r.connect(filtro(c, 'lowpass', 260)).connect(saida); r.start(); partes.push(r);
+    timers.push(setInterval(() => { if (Math.random() < 0.35) tocarNo(c, saida, (cc, s2) => carroPassando(cc, s2)); }, 2500));
+  }),
+  praia: (c) => montarLaco(c, 0.12, (saida, partes, timers) => {
+    const r = ruidoEmLaco(c, 3); const f = filtro(c, 'lowpass', 700); const g = c.createGain(); g.gain.value = 0.55;
+    r.connect(f).connect(g).connect(saida); r.start(); partes.push(r);
+    oscilar(c, g.gain, 0.13, 0.45, partes); // ondas indo e vindo
+    timers.push(setInterval(() => { if (Math.random() < 0.3) tocarNo(c, saida, gaivota); }, 3000));
+  }),
+  floresta: (c) => montarLaco(c, 0.1, (saida, partes, timers) => {
+    const r = ruidoEmLaco(c); const g = c.createGain(); g.gain.value = 0.25;
+    r.connect(filtro(c, 'bandpass', 500, 0.4)).connect(g).connect(saida); r.start(); partes.push(r);
+    timers.push(setInterval(() => { if (Math.random() < 0.7) tocarNo(c, saida, passarinho); }, 1300));
+  }),
+  neve: (c) => montarLaco(c, 0.1, (saida, partes, timers) => {
+    const r = ruidoEmLaco(c, 3); const f = filtro(c, 'bandpass', 600, 1.2);
+    r.connect(f).connect(saida); r.start(); partes.push(r);
+    oscilar(c, f.frequency, 0.2, 350, partes); // vento assoviando
+    timers.push(setInterval(() => { if (Math.random() < 0.25) tocarNo(c, saida, sininho); }, 3500));
+  }),
+};
+
+function tocarNo(c, saida, som) { try { som(c, saida); } catch { /* nada */ } }
+
+function bip(c, saida, freq, inicio, dur, { tipo = 'sine', vol = 0.3, ate = null } = {}) {
+  const o = c.createOscillator(); const g = c.createGain(); const t0 = c.currentTime + inicio;
+  o.type = tipo; o.frequency.setValueAtTime(freq, t0); if (ate) o.frequency.exponentialRampToValueAtTime(ate, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(saida); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const passarinho = (c, s) => { const f = 2400 + Math.random() * 1600; for (let k = 0; k < 2 + Math.floor(Math.random() * 3); k++) bip(c, s, f, k * 0.12, 0.08, { vol: 0.5, ate: f * 1.4 }); };
+const gaivota = (c, s) => { bip(c, s, 1400, 0, 0.35, { tipo: 'triangle', vol: 0.35, ate: 900 }); bip(c, s, 1300, 0.4, 0.3, { tipo: 'triangle', vol: 0.3, ate: 850 }); };
+const sininho = (c, s) => [1568, 2093].forEach((f, k) => bip(c, s, f, k * 0.15, 0.6, { vol: 0.25 }));
+const carroPassando = (c, s) => {
+  const o = c.createOscillator(); o.type = 'sawtooth'; const g = c.createGain(); const t0 = c.currentTime;
+  o.frequency.setValueAtTime(90, t0); o.frequency.linearRampToValueAtTime(70, t0 + 1.4);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.4);
+  o.connect(filtro(c, 'lowpass', 400)).connect(g).connect(s); o.start(t0); o.stop(t0 + 1.5);
+};
+
+const ligados = new Map();
+export function ligarLaco(nome) {
+  if (ligados.has(nome)) return;
+  const c = contexto();
+  if (!c || !LACOS[nome]) return;
+  try { ligados.set(nome, LACOS[nome](c)); } catch { /* áudio indisponível */ }
+}
+export function desligarLaco(nome) {
+  ligados.get(nome)?.();
+  ligados.delete(nome);
+}
+export function desligarLacos() { for (const nome of [...ligados.keys()]) desligarLaco(nome); }
+export const lacoLigado = (nome) => ligados.has(nome);
