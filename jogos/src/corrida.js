@@ -16,7 +16,9 @@ const ALTURA_VOO = 3.6;
 export const DURACAO_SKATE = 30;
 export const DURACAO_DOBRO = 10;
 export const MOEDAS_BAU = 50;
-export const JANELA_ARRANCADA = 6; // segundos do começo em que dá para decolar com a mochila de bônus
+export const JANELA_ARRANCADA = 6;
+// Quem persegue a menina: começa colado nela, fica para trás e volta a chegar perto quando ela tropeça.
+export const PERSEGUIDOR = { perto: 0.9, longe: 14, largada: 3, tropeco: 4 }; // segundos do começo em que dá para decolar com a mochila de bônus
 
 const VELOCIDADE = {
   facil: { base: 11, max: 24, ganho: 0.14 },
@@ -44,7 +46,8 @@ export function nova(nivel = 'medio', cfg = {}) {
     arrancadas: cfg.arrancadas ?? 0,
     skate: 0, skateTipo: SKATES[cfg.skate] ? cfg.skate : 'classico', cargas: cfg.cargas ?? 0,
     poderes,
-    vivo: true, eventos: [],
+    vivo: true, eventos: ['perseguidor'],
+    perseguidor: { dist: PERSEGUIDOR.perto, perto: PERSEGUIDOR.largada },
     contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0 },
   };
 }
@@ -184,6 +187,15 @@ export function avancar(s, dt, aleatorio = Math.random) {
     if (s.skate === 0) s.eventos.push('skate-fim');
   }
 
+  // supercarga: liga sozinha quando a barra enche (o jogo é só por gestos, sem botão)
+  if (s.energia >= 1 && s.supercarga <= 0) comando(s, 'supercarga');
+
+  // quem persegue: chega perto (rápido) ou fica para trás (devagar)
+  const p = s.perseguidor;
+  p.perto = Math.max(0, p.perto - dt);
+  const alvo = p.perto > 0 ? PERSEGUIDOR.perto : PERSEGUIDOR.longe;
+  p.dist += (alvo - p.dist) * Math.min(1, dt * (alvo < p.dist ? 3 : 0.5));
+
   // mundo
   for (const o of s.objetos) {
     o.z -= dz;
@@ -212,6 +224,7 @@ export function avancar(s, dt, aleatorio = Math.random) {
     o.atingido = true;
     if (s.supercarga > 0) { o.quebrado = true; s.eventos.push('quebra'); continue; } // a supercarga atravessa
     if (s.invencivel > 0) continue;
+    if (s.escudo || s.skate > 0) tropecar(s);
     if (s.escudo) {
       s.escudo = false;
       s.invencivel = 1.2;
@@ -227,6 +240,17 @@ export function avancar(s, dt, aleatorio = Math.random) {
     }
   }
   return s;
+}
+
+function tropecar(s) {
+  s.perseguidor.perto = PERSEGUIDOR.tropeco;
+  s.eventos.push('perseguidor');
+}
+
+// Depois da batida: quem persegue alcança a menina (só para a animação do fim).
+export function alcancar(s, dt) {
+  s.perseguidor.dist = Math.max(0.35, s.perseguidor.dist - dt * 8);
+  return s.perseguidor.dist <= 0.36;
 }
 
 function voar(s, segundos) {

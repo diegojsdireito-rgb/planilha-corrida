@@ -575,3 +575,31 @@ h2 { font-size: 20px; }
 .acao-decolar i { position: absolute; left: 0; bottom: 0; height: 4px; background: #ffe066; }
 .corrida-hud .dobro { background: #ff4f81; color: #fff; }
 @keyframes pulso-decolar { to { transform: translateX(-50%) scale(1.07); box-shadow: 0 0 0 6px rgba(255, 160, 40, .4), 0 6px 16px rgba(0, 0, 0, .3); } }
+.cenarios.bichos { grid-template-columns: repeat(2, 1fr); }
+.cenarios.bichos button { flex-direction: row; justify-content: center; gap: 8px; font-size: 14px; padding: 8px; }
+
+/* ---------- Corrida em tela cheia, só com gestos ---------- */
+html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-behavior: none; height: 100%; }
+.corrida.tela-cheia {
+  position: fixed; inset: 0; z-index: 50; max-width: none; width: 100vw; height: 100vh; height: 100dvh;
+  margin: 0; border-radius: 0; box-shadow: none;
+}
+.corrida .botao-icone[hidden] { display: none; }
+.corrida.tela-cheia .corrida-hud { top: calc(env(safe-area-inset-top) + 10px); left: 12px; right: 64px; }
+.corrida.tela-cheia .pausa { top: calc(env(safe-area-inset-top) + 8px); right: 10px; }
+.corrida.tela-cheia .acao-decolar { top: calc(env(safe-area-inset-top) + 60px); }
+.sair-corrida, .som-corrida { position: absolute; z-index: 3; top: calc(env(safe-area-inset-top) + 8px); background: rgba(255, 255, 255, .9); }
+.sair-corrida { left: 10px; font-size: 24px; }
+.som-corrida { right: 10px; }
+.corrida.tela-cheia .corrida-camada { padding: calc(env(safe-area-inset-top) + 56px) 14px calc(env(safe-area-inset-bottom) + 16px); }
+.corrida-hud .energia { position: relative; overflow: hidden; min-width: 54px; }
+.corrida-hud .energia i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ff9a1f, #ffe066); opacity: .55; z-index: -1; }
+.corrida-hud .energia { isolation: isolate; }
+.cenarios.velocidade { grid-template-columns: repeat(3, 1fr); }
+.dica-gestos {
+  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 28px); transform: translateX(-50%); z-index: 2; width: max-content; max-width: 90%;
+  background: rgba(0, 0, 0, .55); color: #fff; border-radius: 16px; padding: 10px 14px; font-size: 14px; text-align: center; line-height: 1.5; pointer-events: none;
+}
+.dica-gestos[hidden] { display: none; }
+.dica-gestos.some { animation: some-dica 4.2s ease-in forwards; }
+@keyframes some-dica { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }

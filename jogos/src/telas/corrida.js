@@ -3,6 +3,7 @@ import { el } from '../comum.js';
 import { prefs, guardar } from '../dados.js';
 import * as loja from '../loja.js';
 import { ligarLaco, desligarLaco, desligarLacos } from '../som.js';
+import { quemPersegue, OPCOES_FLORESTA, NOMES, EMOJI, SOM as SOM_PERSEGUIDOR } from '../perseguidores.js';
 import { retrato, desenharDeCostas, PELES, ROUPAS } from '../personagem.js';
 
 const C = 5; // distância da câmera: controla a perspectiva
@@ -28,7 +29,9 @@ export function recorde() {
 }
 
 export function montar(area, ctl) {
-  const palco = el('div', 'corrida');
+  // Tela cheia: a corrida cobre o app inteiro e se controla só com gestos.
+  const palco = el('div', 'corrida tela-cheia');
+  document.documentElement.classList.add('jogo-tela-cheia');
   const tela3d = el('canvas', 'tela-3d');
   const tela = el('canvas');
   tela.setAttribute('role', 'img');
@@ -37,19 +40,21 @@ export function montar(area, ctl) {
   const pausaEl = el('button', 'botao-icone pausa', 'Ⅱ');
   pausaEl.setAttribute('aria-label', 'Pausar');
   const camada = el('div', 'corrida-camada');
-  const skateEl = el('button', 'acao-corrida acao-skate');
-  skateEl.setAttribute('aria-label', 'Subir no skate');
-  const turboEl = el('button', 'acao-corrida acao-turbo', '<i></i><span>⚡</span>');
   const decolarEl = el('button', 'acao-decolar');
   decolarEl.hidden = true;
-  turboEl.setAttribute('aria-label', 'Ativar a supercarga');
-  palco.append(tela3d, tela, hud, pausaEl, skateEl, turboEl, decolarEl, camada);
-  const controles = el('div', 'corrida-controles', `
-    <button data-acao="esquerda" aria-label="Esquerda">◀</button>
-    <button data-acao="pular" aria-label="Pular">▲</button>
-    <button data-acao="deslizar" aria-label="Deslizar">▼</button>
-    <button data-acao="direita" aria-label="Direita">▶</button>`);
-  area.append(palco, controles);
+  const sairEl = el('button', 'botao-icone sair-corrida', '‹');
+  sairEl.setAttribute('aria-label', 'Sair da corrida');
+  const somEl = el('button', 'botao-icone som-corrida');
+  const dicaGestos = el('div', 'dica-gestos', '<b>Deslize</b> ◀ ▶ troca de faixa · ▲ pula · ▼ desliza<br><b>Toque duas vezes</b> para subir no skate 🛹');
+  dicaGestos.hidden = true;
+  palco.append(tela3d, tela, hud, pausaEl, decolarEl, sairEl, somEl, dicaGestos, camada);
+  area.append(palco);
+  sairEl.onclick = () => ctl.sair();
+  const desenharSom = () => { somEl.textContent = prefs.som ? '🔊' : '🔇'; somEl.setAttribute('aria-label', prefs.som ? 'Desligar sons' : 'Ligar sons'); };
+  somEl.onclick = () => { ctl.alternarSom(); desenharSom(); };
+  desenharSom();
+  // a página por trás não rola nem puxa: deslizar na corrida é só jogada (as telas da loja continuam rolando)
+  palco.addEventListener('touchmove', (e) => { if (!e.target.closest('.cartao-corrida')) e.preventDefault(); }, { passive: false });
 
   const ctx = tela.getContext('2d');
   let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
@@ -67,10 +72,11 @@ export function montar(area, ctl) {
     })
     .catch(() => { /* fica no 2D */ });
 
-  // Ao sair da tela, libera a memória do 3D.
+  // Ao sair da tela, libera a memória do 3D e devolve a rolagem ao app.
   const vigia = setInterval(() => {
     if (palco.isConnected) return;
     clearInterval(vigia);
+    document.documentElement.classList.remove('jogo-tela-cheia');
     calarTudo();
     observador?.disconnect();
     mundo?.destruir();
@@ -307,7 +313,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, prefs.personagem, tema);
+      mundo.desenhar(s ?? parado, t, prefs.personagem, tema, prefs.perseguidorFloresta);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -351,6 +357,14 @@ export function montar(area, ctl) {
     });
     if ((s?.voo ?? 0) > 0) desenharMaleta(x, y - altura * u, u, t);
     for (const o of perto) (o.enfeite ? desenharEnfeite(o) : desenharObjeto(o, t));
+    const dp = s?.perseguidor?.dist ?? 99;
+    if (dp < 1.9) {
+      const id = quemPersegue(cenarioDaCorrida(prefs.cenario ?? 'passeio', s.dist), prefs.perseguidorFloresta);
+      const tam = u * (1.6 - dp * 0.25);
+      ctx.font = `${Math.round(tam)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(EMOJI[id], x + u * 0.5, H - camera + dp * u * 0.4 + Math.abs(Math.sin(t * 9)) * u * 0.1);
+      ctx.textBaseline = 'alphabetic';
+    }
     ctx.restore();
   }
 
@@ -435,8 +449,9 @@ export function montar(area, ctl) {
 
   function desenharHud() {
     const emCorrida = Boolean(s) && rodando;
-    skateEl.hidden = !emCorrida;
-    turboEl.hidden = !emCorrida;
+    sairEl.hidden = emCorrida;
+    somEl.hidden = emCorrida;
+    pausaEl.hidden = !emCorrida;
     if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; return; }
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
     hud.innerHTML = `<span class="pts">${cor.pontos(s).toLocaleString('pt-BR')}</span><span class="est">🪙 ${s.moedas}</span>${
@@ -445,11 +460,7 @@ export function montar(area, ctl) {
     const podeDecolar = emCorrida && s.arrancadas > 0 && s.t <= cor.JANELA_ARRANCADA && s.voo <= 0;
     decolarEl.hidden = !podeDecolar;
     if (podeDecolar) decolarEl.innerHTML = `🎒 Decolar! <small>${s.arrancadas}</small><i style="width:${Math.round((1 - s.t / cor.JANELA_ARRANCADA) * 100)}%"></i>`;
-    skateEl.innerHTML = `🛹<small>${s.cargas}</small>`;
-    skateEl.disabled = s.cargas <= 0 || s.skate > 0;
-    turboEl.style.setProperty('--carga', `${Math.round(s.energia * 100)}%`);
-    turboEl.classList.toggle('pronto', s.energia >= 1 && s.supercarga <= 0);
-    turboEl.disabled = !(s.energia >= 1 && s.supercarga <= 0);
+    hud.insertAdjacentHTML('beforeend', `<span class="poder">🛹 ${s.cargas}</span><span class="energia" title="Supercarga">⚡<i style="width:${Math.round(s.energia * 100)}%"></i></span>`);
   }
 
   const SOM = {
@@ -464,18 +475,34 @@ export function montar(area, ctl) {
     anterior = agora;
     if (!pausado) {
       cor.avancar(s, dt);
-      for (const e of s.eventos) if (SOM[e]) ctl.som(SOM[e]);
+      for (const e of s.eventos) {
+        if (e === 'perseguidor') ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
+        else if (SOM[e]) ctl.som(SOM[e]);
+      }
       s.eventos.length = 0;
       if (quadro % 10 === 0) sonsContinuos();
       if (++quadro % 6 === 0) desenharHud();
     }
+    if (!s.vivo) {
+      // a batida: quem persegue alcança a menina antes da tela de fim
+      pegando += dt;
+      if (cor.alcancar(s, dt) || pegando > 1.4) {
+        desenhar(agora / 1000);
+        rodando = false;
+        desenharHud();
+        ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
+        return setTimeout(fimDeJogo, 350);
+      }
+    }
     desenhar(agora / 1000);
-    if (!s.vivo) { rodando = false; desenharHud(); return fimDeJogo(); }
     requestAnimationFrame(laco);
   }
 
   // Ronco da mochila enquanto voa e o som ambiente do cenário em que ela está.
   let ambiente = null;
+  const perseguidorAgora = () => quemPersegue(cenarioDaCorrida(prefs.cenario ?? 'passeio', s?.dist ?? 0), prefs.perseguidorFloresta);
+  let pegando = 0;
+
   function sonsContinuos() {
     if (!prefs.som || !s || pausado || !rodando) { desligarLacos(); ambiente = null; return; }
     if (s.voo > 0) ligarLaco('jato'); else desligarLaco('jato');
@@ -490,11 +517,15 @@ export function montar(area, ctl) {
     const c = prefs.carteira;
     s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
     temaVisto = null;
+    pegando = 0;
     camada.innerHTML = '';
     camada.hidden = true;
-    pausaEl.hidden = false;
     pausado = false;
     rodando = true;
+    desenharHud();
+    dicaGestos.hidden = false;
+    dicaGestos.classList.remove('some'); void dicaGestos.offsetWidth; dicaGestos.classList.add('some');
+    setTimeout(() => { dicaGestos.hidden = true; }, 4200);
     anterior = 0;
     ctl.status('◀ ▶ troca de faixa · ▲ pula · ▼ desliza', 'voce');
     requestAnimationFrame(laco);
@@ -551,8 +582,10 @@ export function montar(area, ctl) {
         ${presente ? '<button class="botao presente" data-presente>🎁 Abrir o presente do dia</button>' : ''}
         <div class="escolha"><span>Pele</span>${PELES.map((cor_, k) => `<button class="amostra${prefs.personagem.pele === k ? ' sel' : ''}" data-pele="${k}" style="background:${cor_}" aria-label="Tom de pele ${k + 1}"></button>`).join('')}</div>
         <div class="escolha"><span>Roupa</span>${ROUPAS.map((cor_, k) => `<button class="amostra${prefs.personagem.roupa === k ? ' sel' : ''}" data-roupa="${k}" style="background:${cor_}" aria-label="Cor da roupa ${k + 1}"></button>`).join('')}</div>
+        <div class="cenarios velocidade"><span>Velocidade</span>${[['facil', 'Fácil', '🐢'], ['medio', 'Médio', '🏃‍♀️'], ['dificil', 'Difícil', '⚡']].map(([id, nome, ic]) => `<button data-velocidade="${id}" aria-pressed="${prefs.nivel === id}"><b>${ic}</b>${nome}</button>`).join('')}</div>
         <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
-        <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque em 🛹 durante a corrida</small>
+        ${['floresta', 'passeio'].includes(prefs.cenario ?? 'passeio') ? `<div class="cenarios bichos"><span>Na floresta, quem corre atrás?</span>${OPCOES_FLORESTA.map((o) => `<button data-bicho="${o.id}" aria-pressed="${prefs.perseguidorFloresta === o.id}"><b>${o.icone}</b>${o.nome}</button>`).join('')}</div>` : ''}
+        <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque duas vezes na tela para subir</small>
         ${c.arrancadas ? `<small class="equipado">🎒 ${c.arrancadas} mochila${c.arrancadas > 1 ? 's' : ''} a jato: toque em "Decolar" no começo</small>` : ''}
         <button class="botao grande" data-correr>Correr!</button>`;
     } else if (aba === 'loja') {
@@ -604,6 +637,16 @@ export function montar(area, ctl) {
     const q = (sel) => camada.querySelectorAll(sel);
     q('[data-aba]').forEach((b) => { b.onclick = () => { ctl.som('clique'); telaInicial(b.dataset.aba); }; });
     q('[data-correr]').forEach((b) => { b.onclick = comecar; });
+    q('[data-velocidade]').forEach((b) => {
+      b.onclick = () => { prefs.nivel = b.dataset.velocidade; guardar(); ctl.som('clique'); telaInicial(aba); };
+    });
+    q('[data-bicho]').forEach((b) => {
+      b.onclick = () => {
+        prefs.perseguidorFloresta = b.dataset.bicho; guardar();
+        ctl.som(SOM_PERSEGUIDOR[b.dataset.bicho]);
+        telaInicial(aba);
+      };
+    });
     q('[data-cenario]').forEach((b) => {
       b.onclick = () => { prefs.cenario = b.dataset.cenario; guardar(); ctl.som('clique'); telaInicial(aba); };
     });
@@ -649,7 +692,8 @@ export function montar(area, ctl) {
     camada.hidden = false;
     camada.innerHTML = `<div class="cartao-corrida">
       <div class="retrato pequeno">${retrato({ ...prefs.personagem, sorriso: 'uau' })}</div>
-      <strong>${novo ? 'Novo recorde! 🎉' : 'Opa, bateu!'}</strong>
+      <strong>${novo ? 'Novo recorde! 🎉' : 'Ops, bateu!'}</strong>
+      <small class="alcancou">${EMOJI[perseguidorAgora()]} ${NOMES[perseguidorAgora()].replace(/^./, (l) => l.toUpperCase())} te alcançou!</small>
       <span class="grande-num">${fmt(res.pontos)}</span>
       <small>${res.metros} m${novo || !antes ? '' : ` · recorde ${fmt(antes)}`}</small>
       <div class="ganhos"><span>🪙 +${fmt(res.moedas)} moedas pegas</span>
@@ -678,17 +722,16 @@ export function montar(area, ctl) {
     toque.feito = true;
     agir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'direita' : 'esquerda') : (dy < 0 ? 'pular' : 'deslizar'));
   });
-  palco.addEventListener('pointerup', () => {
-    if (toque && !toque.feito && s && rodando && !pausado) agir('pular'); // toque simples também pula
+  let ultimoToque = 0;
+  palco.addEventListener('pointerup', (e) => {
+    if (toque && !toque.feito && s && rodando && !pausado) {
+      // toque duplo: sobe no skate
+      if (e.timeStamp - ultimoToque < 320) { agir('skate'); ultimoToque = 0; } else ultimoToque = e.timeStamp;
+    }
     toque = null;
   });
-  skateEl.onclick = () => agir('skate');
+  palco.addEventListener('pointercancel', () => { toque = null; });
   decolarEl.onclick = () => agir('arrancada');
-  turboEl.onclick = () => agir('supercarga');
-  controles.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-acao]');
-    if (b) agir(b.dataset.acao);
-  });
   const teclas = (e) => {
     if (!palco.isConnected) { document.removeEventListener('keydown', teclas); observador.disconnect(); mundo?.destruir(); mundo = null; return; }
     const mapa = { ArrowLeft: 'esquerda', a: 'esquerda', ArrowRight: 'direita', d: 'direita', ArrowUp: 'pular', w: 'pular', ' ': 'pular', ArrowDown: 'deslizar', s: 'deslizar', k: 'skate', e: 'supercarga', j: 'arrancada' };

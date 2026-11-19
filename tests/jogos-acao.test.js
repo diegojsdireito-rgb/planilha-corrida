@@ -150,12 +150,11 @@ test('corrida: skate segura uma batida e gasta uma carga', () => {
   assert.equal(t.skate, 0);
 });
 
-test('corrida: raios enchem a supercarga, que atravessa obstáculos', () => {
+test('corrida: raios enchem a supercarga, que liga sozinha e atravessa obstáculos', () => {
   const s = cenario([0, 1, 2].map((k) => ({ tipo: 'raio', faixa: 1, z: 1 + k * 2, h: 0.7 })), { quadros: 40 });
-  assert.equal(s.energia, 1);
-  corrida.comando(s, 'supercarga');
   assert.ok(s.supercarga > 0);
   assert.equal(s.energia, 0);
+  assert.equal(s.contagem.supercargas, 1);
   s.objetos = [{ tipo: 'carrinho', faixa: 1, z: 3, comp: 5 }];
   for (let k = 0; k < 60; k++) corrida.avancar(s, 1 / 60);
   assert.equal(s.vivo, true);
@@ -294,4 +293,35 @@ test('corrida: mochila a jato de bônus só decola no começo e gasta o bônus',
   assert.equal(c.moedas, 1000 - 2 * loja.PRECO_ARRANCADA);
   const r = loja.fecharCorrida(c, { moedas: 0, metros: 10, pontos: 10, arrancadas: 1, cargasUsadas: 0 });
   assert.equal(r.carteira.arrancadas, 2);
+});
+
+test('corrida: quem persegue começa perto, fica para trás e volta quando ela tropeça', () => {
+  const s = corrida.nova('medio');
+  s.ultimaLinha = 1e9;
+  assert.ok(s.eventos.includes('perseguidor'));
+  assert.ok(s.perseguidor.dist < 2);
+  for (let k = 0; k < 60 * 8; k++) corrida.avancar(s, 1 / 60);
+  assert.ok(s.perseguidor.dist > 10, `longe: ${s.perseguidor.dist}`);
+  // tropeço: o escudo segura a batida e quem persegue volta a chegar perto
+  s.escudo = true;
+  s.eventos.length = 0;
+  s.objetos = [{ tipo: 'carrinho', faixa: 1, z: 1, comp: 5 }];
+  for (let k = 0; k < 90; k++) corrida.avancar(s, 1 / 60);
+  assert.equal(s.vivo, true);
+  assert.ok(s.eventos.includes('perseguidor'));
+  assert.ok(s.perseguidor.dist < 3, `perto: ${s.perseguidor.dist}`);
+  // na batida final, ele alcança a menina
+  let pegou = false;
+  for (let k = 0; k < 120 && !pegou; k++) pegou = corrida.alcancar(s, 1 / 60);
+  assert.ok(pegou);
+});
+
+test('corrida: quem persegue em cada cenário, com leão ou panda na floresta', async () => {
+  const { quemPersegue } = await import('../jogos/src/perseguidores.js');
+  assert.equal(quemPersegue('cidade'), 'policial');
+  assert.equal(quemPersegue('neve'), 'urso');
+  assert.equal(quemPersegue('praia'), 'caranguejo');
+  assert.equal(quemPersegue('floresta', 'leao'), 'leao');
+  assert.equal(quemPersegue('floresta', 'panda'), 'panda');
+  assert.equal(quemPersegue('floresta', 'outro'), 'leao');
 });

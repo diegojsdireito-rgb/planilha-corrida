@@ -110,6 +110,7 @@ Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai 
 | `jogos/src/mundo3d.js` | Motor da corrida em 3D: liga a menina, o cenário e os objetos da pista, com câmera atrás dela. Se o aparelho não tiver 3D, a corrida usa o desenho em 2D. |
 | `jogos/src/3d/cenarios.js` | Os 4 cenários (Cidade, Praia, Floresta e Vila da Neve), cada um com chão, céu, enfeites e a sua versão dos obstáculos. No modo Passeio, o cenário troca a cada 500 m. |
 | `jogos/src/3d/menina.js` | A menina em 3D: peças torneadas com material de pele e tecido, roupa com textura, tênis detalhado e cabelo em mechas que balançam. |
+| `jogos/src/3d/perseguidores.js` e `jogos/src/perseguidores.js` | Quem corre atrás da menina: policial (cidade), caranguejo (praia), leão ou panda (floresta, à escolha) e urso-polar (neve). Aparece na largada, volta quando ela tropeça e a alcança na batida, com som próprio. |
 | `jogos/src/3d/base.js` | Medidas da pista, texturas desenhadas na hora e materiais comuns. |
 | `jogos/vendor/three.module.min.js` | Biblioteca three.js 0.170 (licença MIT, em `jogos/vendor/three.LICENSE`), guardada no app para funcionar sem internet. |
 | `jogos/src/personagem.js` | A menina: retrato de frente (SVG) e desenho de costas correndo (canvas), com luz e sombra. |
