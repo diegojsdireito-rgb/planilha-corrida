@@ -140,8 +140,10 @@ export function criarMenina() {
   const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
 
   // ---- pernas: quadril -> joelho -> pé ----
+  // quadril: gira ao contrário dos ombros a cada passada, como numa corrida de verdade
+  const quadril = new THREE.Group(); quadril.position.y = 0.62; corpo.add(quadril);
   const pernas = [-1, 1].map((lado) => {
-    const coxa = new THREE.Group(); coxa.position.set(lado * 0.082, 0.62, 0);
+    const coxa = new THREE.Group(); coxa.position.set(lado * 0.082, 0, 0);
     const mCoxa = peca(torneada([[0, 0.02], [0.058, 0.012], [0.067, -0.04], [0.064, -0.13], [0.054, -0.22], [0.047, -0.28], [0.04, -0.305], [0.022, -0.318], [0, -0.322]]), mat.pele);
     mCoxa.scale.z = 0.92; coxa.add(mCoxa);
     const barra = peca(new THREE.CylinderGeometry(0.071, 0.074, 0.11, 18), mat.short); barra.position.y = -0.035; coxa.add(barra);
@@ -163,14 +165,14 @@ export function criarMenina() {
       const risco = peca(new THREE.BoxGeometry(0.004, 0.016, 0.1), mat.detalhe); risco.position.set(l * 0.051, -0.002, -0.005); risco.rotation.x = 0.35; tenis.add(risco);
     }
     const calcanhar = peca(new THREE.BoxGeometry(0.03, 0.035, 0.01), mat.detalhe); calcanhar.position.set(0, 0.03, -0.112); tenis.add(calcanhar);
-    corpo.add(coxa);
-    return { coxa, joelho };
+    quadril.add(coxa);
+    return { coxa, joelho, tenis, lado };
   });
 
   // ---- tronco ----
   const tronco = new THREE.Group(); tronco.position.y = 0.62; corpo.add(tronco);
   const short = peca(torneada([[0, 0.12], [0.135, 0.12], [0.148, 0.06], [0.157, -0.02], [0.16, -0.07], [0.12, -0.085], [0, -0.09]], 28), mat.shortTorneado);
-  short.scale.z = 0.78; tronco.add(short);
+  short.scale.z = 0.78; quadril.add(short);
   const camiseta = peca(torneada([[0, 0.06], [0.142, 0.06], [0.134, 0.14], [0.14, 0.24], [0.152, 0.33], [0.158, 0.38], [0.13, 0.43], [0.06, 0.455], [0, 0.46]], 36), mat.camiseta);
   camiseta.scale.z = 0.72; tronco.add(camiseta);
   const barraCamiseta = peca(new THREE.TorusGeometry(0.138, 0.012, 8, 28), mat.roupa); barraCamiseta.rotation.x = Math.PI / 2; barraCamiseta.scale.y = 0.72; barraCamiseta.position.y = 0.06; tronco.add(barraCamiseta);
@@ -271,57 +273,152 @@ export function criarMenina() {
   }
 
   const SKATE_COR = { classico: 0xd79a5b, voador: 0x29b7dc, supersonico: 0xd83a2c };
+  // ---------- Animação ----------
+  // Cada situação tem uma pose; as poses se misturam aos poucos (cerca de 0,1 s), como uma pessoa
+  // que passa de correr para pular, sem trocar de posição de repente.
+  // pos/rot = corpo inteiro; quadril e tronco giram ao contrário um do outro; cx/cz = coxa,
+  // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
+  const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'vento', 'balanco',
+    'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oz0', 'c0', 'ox1', 'oz1', 'c1'];
+  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, skate: 0, batida: 0 };
+  const lado = (k) => (k ? 1 : -1);
+  const POSES = {
+    parado: (s, t) => {
+      const w = Math.sin(t * 1.1); // passa o peso de uma perna para a outra
+      const r = { posX: 0.015 * w, quadrilZ: 0.05 * w, troncoZ: -0.03 * w, troncoX: 0.02 + 0.015 * Math.sin(t * 2.2), // respiração
+        cabecaY: 0.35 * Math.sin(t * 0.45), cabecaX: 0.04 * Math.sin(t * 0.7), vento: 0.08, balanco: 0.03 };
+      for (const k of [0, 1]) {
+        r[`cz${k}`] = lado(k) * (0.03 - 0.025 * w * lado(k));
+        r[`j${k}`] = 0.05 + 0.1 * Math.max(0, w * lado(k));
+        r[`ox${k}`] = -0.05 + 0.04 * Math.sin(t * 1.3 + k);
+        r[`oz${k}`] = lado(k) * 0.12;
+        r[`c${k}`] = -0.22;
+      }
+      return r;
+    },
+    corrida: (s, t, f) => {
+      const v = Math.min(1, (s.vel ?? 13) / 28);
+      const r = {
+        posY: 0.025 + 0.045 * Math.abs(Math.sin(f)), // sobe e desce a cada passada
+        quadrilY: 0.14 * Math.sin(f), troncoY: -0.2 * Math.sin(f), cabecaY: 0.1 * Math.sin(f), // quadril e ombros giram ao contrário; a cabeça fica firme
+        quadrilZ: 0.04 * Math.cos(f), troncoX: 0.16 + 0.12 * v, cabecaX: -0.14 - 0.06 * v + 0.03 * Math.sin(2 * f),
+        vento: 0.18 + (s.vel ?? 13) * 0.006, balanco: 0.05,
+      };
+      for (const k of [0, 1]) {
+        const sw = Math.sin(f + (k ? Math.PI : 0));
+        const cw = Math.cos(f + (k ? Math.PI : 0));
+        r[`cx${k}`] = -0.28 - 0.58 * sw; // a coxa vai à frente e volta
+        r[`j${k}`] = 0.22 + 1.35 * Math.max(0, cw) ** 1.3 + 0.25 * Math.max(0, -sw); // o joelho dobra quando a perna volta para a frente
+        r[`p${k}`] = 0.38 * Math.max(0, -sw) - 0.18 * Math.max(0, sw); // empurra com a ponta do pé; chega com o calcanhar
+        r[`cz${k}`] = lado(k) * 0.03;
+        const aw = Math.sin(f + (k ? 0 : Math.PI)); // cada braço acompanha a perna do outro lado
+        r[`ox${k}`] = -0.15 - 0.75 * aw;
+        r[`oz${k}`] = lado(k) * (0.16 - 0.08 * Math.max(0, aw));
+        r[`c${k}`] = -1.25 - 0.3 * Math.max(0, aw);
+      }
+      return r;
+    },
+    ar: (s) => {
+      // subindo: pernas encolhidas e braços para cima; descendo: pernas se esticam para o pouso
+      const m = Math.min(1, Math.max(0, (s.vy + 2) / 6));
+      const mix = (a, b) => a * m + b * (1 - m);
+      return {
+        troncoX: mix(0.12, 0.05), cabecaX: -0.2, vento: mix(-0.1, 0.5), balanco: 0.08,
+        cx0: mix(-1.1, -0.6), j0: mix(1.5, 0.55), p0: mix(-0.2, -0.15), cz0: -0.05,
+        cx1: mix(0.3, -0.1), j1: mix(1.15, 0.65), p1: mix(0.45, 0.15), cz1: 0.05,
+        ox0: mix(-2.3, -0.6), oz0: mix(-0.25, -0.95), c0: mix(-0.5, -0.4),
+        ox1: mix(-1.4, -0.6), oz1: mix(0.35, 0.95), c1: mix(-0.9, -0.4),
+      };
+    },
+    pouso: () => ({
+      // amortece: joelhos dobram, tronco vai à frente, braços equilibram
+      posY: -0.15, troncoX: 0.45, cabecaX: -0.35, vento: 0.35, balanco: 0.06,
+      cx0: -0.75, j0: 1.25, p0: -0.35, cx1: -0.6, j1: 1.1, p1: -0.3, cz0: -0.06, cz1: 0.06,
+      ox0: -0.55, oz0: -0.35, c0: -0.8, ox1: -0.45, oz1: 0.35, c1: -0.8,
+    }),
+    desliza: () => ({
+      // escorrega para trás, uma perna esticada à frente e a outra dobrada, olhando para a frente
+      rotX: -1.0, posY: 0.12, posZ: 0.75, troncoX: 0.25, cabecaX: 0.75, vento: 0.7, balanco: 0.04,
+      cx0: -0.25, j0: 0.05, p0: -0.3, cx1: 0.5, j1: 1.6, p1: 0.3,
+      ox0: 0.5, oz0: -0.6, c0: -0.3, ox1: 0.5, oz1: 0.6, c1: -0.3,
+    }),
+    voo: (s, t) => ({
+      // pendurada na mochila: pernas balançam soltas, braços abertos equilibram
+      posY: 0.04 * Math.sin(t * 2), troncoX: 0.3, cabecaX: -0.3, vento: 0.6, balanco: 0.12,
+      cx0: 0.1 + 0.12 * Math.sin(t * 3), j0: 0.6 + 0.1 * Math.sin(t * 3 + 1), p0: 0.5,
+      cx1: 0.3 + 0.12 * Math.sin(t * 3 + 1.4), j1: 0.8 + 0.1 * Math.sin(t * 3 + 2), p1: 0.5,
+      ox0: -0.5 + 0.1 * Math.sin(t * 2), oz0: -(1.1 + 0.1 * Math.sin(t * 3)), c0: -0.25,
+      ox1: -0.5 + 0.1 * Math.sin(t * 2 + 1), oz1: 1.1 + 0.1 * Math.sin(t * 3 + 1), c1: -0.25,
+    }),
+    skate: (s, t) => {
+      // de lado na prancha, joelhos dobrados acompanhando o balanço, braços abertos
+      const b = Math.sin(t * 4);
+      return {
+        rotY: 0.35, posY: -0.03 + 0.02 * b, troncoX: 0.2, cabecaY: -0.32, cabecaX: -0.1, vento: 0.45, balanco: 0.08,
+        cx0: -0.25 - 0.05 * b, j0: 0.45 + 0.08 * b, p0: -0.1, cz0: -0.08,
+        cx1: 0.25 - 0.05 * b, j1: 0.55 + 0.08 * b, p1: 0.2, cz1: 0.08,
+        ox0: -0.5, oz0: -0.6 - 0.05 * b, c0: -0.6, ox1: 0.2, oz1: 0.7 + 0.05 * b, c1: -0.4,
+      };
+    },
+    batida: () => ({
+      // o susto da batida: tronco para trás e braços para cima
+      posY: -0.05, troncoX: -0.35, cabecaX: 0.3, vento: 0.2, balanco: 0.02,
+      cx0: -0.4, j0: 0.6, cx1: 0.2, j1: 0.4, ox0: -2.6, oz0: -0.5, c0: -0.4, ox1: -2.6, oz1: 0.5, c1: -0.4,
+    }),
+  };
+  let ultimoTPose = null; let yAntes = 0; let pouso = 0;
+
   function posar(s, t) {
-    const noAr = s.y > 0.05 || s.voo > 0;
+    const dtp = ultimoTPose === null ? 1 : Math.min(0.05, Math.max(0, t - ultimoTPose));
+    ultimoTPose = t;
+    const parado = s.t === 0 && s.dist === 0; // tela inicial: ela espera, parada
     const naPrancha = s.skate > 0;
-    const fase = s.dist * 1.55;
-    raiz.position.set(xDe(s.x), s.y + (naPrancha ? 0.1 : 0), 0);
-    raiz.rotation.z = (s.x - s.faixa) * 0.25;
-    corpo.rotation.x = 0; corpo.position.y = 0; corpo.position.z = 0;
-    tronco.rotation.x = 0.14;
-    tronco.rotation.y = 0;
-    cabeca.rotation.x = -0.08;
-    let vento = 0.12; // quanto o cabelo voa para trás
-    let balanco = 0.05;
-    for (const b of bracos) b.ombro.rotation.z = 0;
-    if (s.deslizando > 0 && s.y < 0.2) {
-      corpo.rotation.x = -1.0; corpo.position.y = 0.12; corpo.position.z = 0.75;
-      for (const p of pernas) { p.coxa.rotation.x = -0.3; p.joelho.rotation.x = 0.1; }
-      for (const b of bracos) { b.ombro.rotation.x = -0.3; b.cotovelo.rotation.x = -0.4; }
-      vento = 0.7;
-    } else if (s.voo > 0) {
-      pernas.forEach((p, k) => { p.coxa.rotation.x = 0.15 + k * 0.2 + Math.sin(t * 6 + k) * 0.08; p.joelho.rotation.x = 0.5; });
-      bracos.forEach((b, k) => { b.ombro.rotation.x = -0.4; b.ombro.rotation.z = (k ? 1 : -1) * 0.9; b.cotovelo.rotation.x = -0.3; });
-      vento = 0.6; balanco = 0.12;
-    } else if (naPrancha && !noAr) {
-      pernas.forEach((p, k) => { p.coxa.rotation.x = k ? 0.35 : -0.35; p.joelho.rotation.x = 0.45; });
-      bracos.forEach((b, k) => { b.ombro.rotation.x = 0; b.ombro.rotation.z = (k ? 1 : -1) * 0.7; b.cotovelo.rotation.x = -0.5; });
-      tronco.rotation.y = 0.15;
-      vento = 0.45; balanco = 0.08;
-    } else if (noAr) {
-      pernas.forEach((p, k) => { p.coxa.rotation.x = k ? -1.0 : -0.3; p.joelho.rotation.x = k ? 1.5 : 0.7; });
-      bracos.forEach((b, k) => { b.ombro.rotation.x = -2.4 + k * 0.4; b.ombro.rotation.z = (k ? 1 : -1) * 0.3; b.cotovelo.rotation.x = -0.6; });
-      vento = s.vy > 0 ? -0.15 : 0.5; // sobe: o cabelo fica para baixo; desce: o cabelo sobe
-    } else {
-      pernas.forEach((p, k) => {
-        const sw = Math.sin(fase + (k ? Math.PI : 0));
-        p.coxa.rotation.x = -sw * 0.75;
-        p.joelho.rotation.x = 0.25 + Math.max(0, sw) * 1.35;
-      });
-      bracos.forEach((b, k) => {
-        const sw = Math.sin(fase + (k ? 0 : Math.PI));
-        b.ombro.rotation.x = -sw * 0.85;
-        b.ombro.rotation.z = (k ? 1 : -1) * 0.1;
-        b.cotovelo.rotation.x = -1.35;
-      });
-      tronco.rotation.y = Math.sin(fase) * 0.08; // o tronco gira um pouco a cada passada
-      corpo.position.y = Math.abs(Math.cos(fase)) * 0.045;
-      vento = 0.18 + s.vel * 0.006;
+    const fase = parado ? t * 2 : s.dist * 1.55;
+    if (yAntes > 0.15 && s.y <= 0.001 && s.voo <= 0) pouso = 0.22; // acabou de pousar
+    yAntes = s.y;
+    pouso = Math.max(0, pouso - dtp);
+    let estado = 'corrida';
+    if (!s.vivo) estado = 'batida';
+    else if (parado) estado = 'parado';
+    else if (s.voo > 0) estado = 'voo';
+    else if (s.deslizando > 0 && s.y < 0.2) estado = 'desliza';
+    else if (s.y > 0.05) estado = 'ar';
+    else if (pouso > 0) estado = 'pouso';
+    else if (naPrancha) estado = 'skate';
+    const k = dtp >= 1 ? 1 : 1 - Math.exp(-dtp * 14);
+    for (const nome of Object.keys(pesos)) pesos[nome] += ((nome === estado ? 1 : 0) - pesos[nome]) * k;
+    const a = Object.fromEntries(JUNTAS.map((j) => [j, 0]));
+    let total = 0;
+    for (const [nome, w] of Object.entries(pesos)) {
+      if (w < 0.01) continue;
+      const pose = POSES[nome](s, t, fase);
+      for (const j of JUNTAS) a[j] += (pose[j] ?? 0) * w;
+      total += w;
     }
+    for (const j of JUNTAS) a[j] /= total;
+
+    // troca de faixa: inclina para dentro da curva e vira um pouco o corpo para o lado
+    const desvio = s.x - s.faixa;
+    raiz.position.set(xDe(s.x), s.y + (naPrancha ? 0.1 : 0), 0);
+    raiz.rotation.set(0, desvio * 0.35, -desvio * 0.3);
+    corpo.position.set(a.posX, a.posY, a.posZ);
+    corpo.rotation.set(a.rotX, a.rotY, 0);
+    quadril.rotation.set(0, a.quadrilY, a.quadrilZ);
+    tronco.rotation.set(a.troncoX, a.troncoY, a.troncoZ);
+    cabeca.rotation.set(a.cabecaX, a.cabecaY, 0);
+    pernas.forEach((p, i) => {
+      p.coxa.rotation.set(a[`cx${i}`], 0, a[`cz${i}`]);
+      p.joelho.rotation.x = a[`j${i}`];
+      p.tenis.rotation.x = a[`p${i}`];
+    });
+    bracos.forEach((b, i) => {
+      b.ombro.rotation.set(a[`ox${i}`], 0, a[`oz${i}`]);
+      b.cotovelo.rotation.x = a[`c${i}`];
+    });
     // cada mecha balança com um pouco de atraso em relação às outras
     for (const m of mechas) {
-      m.piv.rotation.x = vento * 0.5 + Math.sin(fase * 2 + m.fase) * balanco;
-      m.piv.rotation.z = Math.sin(fase + m.fase * 0.7) * balanco * 0.6;
+      m.piv.rotation.x = a.vento * 0.5 + Math.sin(fase * 2 + m.fase) * a.balanco;
+      m.piv.rotation.z = Math.sin(fase + m.fase * 0.7) * a.balanco * 0.6;
     }
     skate.visible = naPrancha;
     if (naPrancha) {

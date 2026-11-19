@@ -166,19 +166,25 @@ function policial() {
     animar(fase) {
       pernas.forEach((p, k) => {
         const sw = Math.sin(fase + (k ? Math.PI : 0));
-        p.coxa.rotation.x = -sw * 0.7;
-        p.joelho.rotation.x = 0.25 + Math.max(0, sw) * 1.2;
+        const cw = Math.cos(fase + (k ? Math.PI : 0));
+        p.coxa.rotation.x = -0.25 - sw * 0.6;
+        p.joelho.rotation.x = 0.2 + Math.max(0, cw) * 1.25 + Math.max(0, -sw) * 0.2;
       });
       bracos.forEach((b, k) => {
         const sw = Math.sin(fase + (k ? 0 : Math.PI));
-        b.ombro.rotation.x = -sw * 0.8;
-        b.cotovelo.rotation.x = -1.2;
+        b.ombro.rotation.x = -0.1 - sw * 0.7;
+        b.ombro.rotation.z = (k ? 1 : -1) * 0.15;
+        b.cotovelo.rotation.x = -1.2 - Math.max(0, sw) * 0.3;
       });
+      // quadril e ombros giram ao contrário; o corpo sobe e desce a cada passada
+      corpo.rotation.y = Math.sin(fase) * 0.12;
+      tronco.rotation.y = -Math.sin(fase) * 0.22;
+      cabeca.rotation.y = Math.sin(fase) * 0.1;
       // um braço levantado, apontando para ela
       bracos[1].ombro.rotation.x = -2.3 + Math.sin(fase * 2) * 0.15;
       bracos[1].cotovelo.rotation.x = -0.2;
-      tronco.rotation.x = 0.12;
-      corpo.position.y = Math.abs(Math.cos(fase)) * 0.05;
+      tronco.rotation.x = 0.16;
+      corpo.position.y = 0.02 + Math.abs(Math.sin(fase)) * 0.05;
     },
   };
 }
