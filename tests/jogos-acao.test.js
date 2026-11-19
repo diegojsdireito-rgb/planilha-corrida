@@ -150,12 +150,11 @@ test('corrida: skate segura uma batida e gasta uma carga', () => {
   assert.equal(t.skate, 0);
 });
 
-test('corrida: raios enchem a supercarga, que atravessa obstáculos', () => {
+test('corrida: raios enchem a supercarga, que liga sozinha e atravessa obstáculos', () => {
   const s = cenario([0, 1, 2].map((k) => ({ tipo: 'raio', faixa: 1, z: 1 + k * 2, h: 0.7 })), { quadros: 40 });
-  assert.equal(s.energia, 1);
-  corrida.comando(s, 'supercarga');
   assert.ok(s.supercarga > 0);
   assert.equal(s.energia, 0);
+  assert.equal(s.contagem.supercargas, 1);
   s.objetos = [{ tipo: 'carrinho', faixa: 1, z: 3, comp: 5 }];
   for (let k = 0; k < 60; k++) corrida.avancar(s, 1 / 60);
   assert.equal(s.vivo, true);

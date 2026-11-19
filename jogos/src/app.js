@@ -79,13 +79,13 @@ const JOGOS = [
       };
     },
     regras: [
-      'Deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. Os botões embaixo e as setas do teclado também funcionam.',
+      'A corrida ocupa a tela inteira e é só com gestos: deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. No computador, use as setas.',
       'Pule as cercas, deslize por baixo das bandeirinhas e troque de faixa para fugir dos carrinhos de sorvete.',
       'Pegue moedas: elas ficam guardadas e compram skates, cargas de skate e melhorias na Loja.',
       'Na pista aparecem itens que valem na hora em que são pegos: 🎒 mochila a jato (voa por cima de tudo), 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🛡️ escudo, ✖2 pontos em dobro, 💰 baú com 50 moedas, 🚀 foguete (supercarga na hora) e 🛹 skate grátis.',
       'Bônus de largada: com uma mochila a jato comprada na Loja, toque em "Decolar" nos primeiros segundos e comece voando.',
-      'Os raios ⚡ enchem a supercarga. Cheia, toque no botão ⚡: corre mais rápido, pula mais alto e atravessa os obstáculos.',
-      'Toque em 🛹 para subir no skate: ele aguenta uma batida. O voador pula mais alto; o supersônico é mais rápido e dá moedas em dobro.',
+      'Os raios ⚡ enchem a barra da supercarga. Quando ela enche, a supercarga liga sozinha: corre mais rápido, pula mais alto e atravessa os obstáculos.',
+      'Toque duas vezes na tela para subir no skate (gasta uma carga): ele aguenta uma batida. O voador pula mais alto; o supersônico é mais rápido e dá moedas em dobro.',
       'Cumpra missões e abra o presente do dia na aba Prêmios para ganhar mais moedas.',
     ] },
   { id: 'docinhos', nome: 'Docinhos', descricao: 'Junte 3 doces iguais', solo: true, semNivel: true, tela: telaDocinhos,
@@ -183,6 +183,7 @@ function resumoDoJogo(jogo) {
 function inicio() {
   sairDaTela?.();
   sairDaTela = null;
+  document.documentElement.classList.remove('jogo-tela-cheia');
   naTelaInicial = true;
   app.replaceChildren();
   document.title = 'Mesa de Jogos';
@@ -247,6 +248,7 @@ if (instalado) {
 
 function abrir(jogo) {
   naTelaInicial = false;
+  document.documentElement.classList.remove('jogo-tela-cheia');
   tocar('clique');
   sairDaTela?.();
   app.replaceChildren();
@@ -302,6 +304,8 @@ function abrir(jogo) {
     ativa() { const g = geracao; return () => g === geracao; },
     salvar(estado) { salvar(jogo.id, estado); },
     salvo: () => lerSalvo(jogo.id),
+    sair: () => voltar.onclick(),
+    alternarSom: () => { prefs.som = !prefs.som; guardar(); tocar('clique'); return prefs.som; },
     apagar: () => apagarSalvo(jogo.id),
     // Quem começa alterna a cada partida terminada.
     roboComeca() { const p = placarDe(jogo.id); return (p.v + p.d + p.e) % 2 === 1; },

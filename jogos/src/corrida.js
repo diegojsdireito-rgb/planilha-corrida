@@ -187,6 +187,9 @@ export function avancar(s, dt, aleatorio = Math.random) {
     if (s.skate === 0) s.eventos.push('skate-fim');
   }
 
+  // supercarga: liga sozinha quando a barra enche (o jogo é só por gestos, sem botão)
+  if (s.energia >= 1 && s.supercarga <= 0) comando(s, 'supercarga');
+
   // quem persegue: chega perto (rápido) ou fica para trás (devagar)
   const p = s.perseguidor;
   p.perto = Math.max(0, p.perto - dt);
