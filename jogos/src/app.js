@@ -15,6 +15,9 @@ import * as telaPaciencia from './telas/paciencia.js';
 import * as telaSudoku from './telas/sudoku.js';
 import * as telaDocinhos from './telas/docinhos.js';
 import * as telaCorrida from './telas/corrida.js';
+import * as telaPintar from './telas/pintar.js';
+import * as telaMahjong from './telas/mahjong.js';
+import { DESENHOS } from './pintar-desenhos.js';
 import { retrato } from './personagem.js';
 
 const app = document.getElementById('app');
@@ -32,6 +35,8 @@ const ICONES = {
 };
 
 ICONES.docinhos = '<svg viewBox="0 0 12 12"><rect width="12" height="12" rx="2" fill="#ffe3ec"/><path d="M3.4 5.6C1.9 4.5 1.5 3.6 2 2.9 2.5 2.2 3.2 2.5 3.4 3 3.6 2.5 4.3 2.2 4.8 2.9 5.3 3.6 4.9 4.5 3.4 5.6Z" fill="#ef4b5f"/><circle cx="8.6" cy="3.7" r="1.7" fill="#ff9a1f"/><path d="M3.4 6.6 4 8 5.4 8.1 4.3 9 4.7 10.4 3.4 9.6 2.1 10.4 2.5 9 1.4 8.1 2.8 8Z" fill="#ffd21f"/><path d="M8.6 6.4C9.4 7.6 10.1 8.3 10.1 9A1.5 1.5 0 0 1 7.1 9C7.1 8.3 7.8 7.6 8.6 6.4Z" fill="#3e8bff"/></svg>';
+ICONES.pintar = '<svg viewBox="0 0 12 12"><rect width="12" height="12" rx="2" fill="#fff4d6"/><path d="M6 1.6C3 1.6 1.4 3.6 1.4 5.8c0 2.4 1.9 4.4 4.3 4.4.8 0 1-.5 1-.9 0-.6-.5-.8-.5-1.3 0-.6.5-.9 1.1-.9h1.2c1.3 0 2.2-.9 2.2-2.3C10.7 3.2 8.7 1.6 6 1.6Z" fill="#e9c27a" stroke="#9a6b22" stroke-width=".3"/><circle cx="3.6" cy="5.4" r=".8" fill="#e53935"/><circle cx="5.2" cy="3.6" r=".8" fill="#ffd21f"/><circle cx="7.5" cy="3.7" r=".8" fill="#2e9e4f"/><circle cx="8.9" cy="5.6" r=".8" fill="#1e63d6"/><circle cx="4" cy="7.7" r=".8" fill="#8e5bd6"/><path d="M11.2 6.8 7.4 10.6" stroke="#8d5a2b" stroke-width=".7" stroke-linecap="round"/><path d="M7.6 10.4 6.6 11.4l.3-1.3Z" fill="#ff5c8a" stroke="#ff5c8a" stroke-width=".5" stroke-linejoin="round"/></svg>';
+ICONES.mahjong = '<svg viewBox="0 0 12 12"><rect width="12" height="12" rx="2" fill="#2f7d5b"/><rect x="3.6" y="1.6" width="5.4" height="7" rx=".7" fill="#cfc3a6"/><rect x="3" y="2.2" width="5.4" height="7" rx=".7" fill="#fffaf0" stroke="#cfc3a6" stroke-width=".2"/><text x="5.7" y="7.2" font-size="4.2" text-anchor="middle" fill="#c62828" font-weight="700">中</text><rect x="1.4" y="5.2" width="4.4" height="5.6" rx=".6" fill="#fffaf0" stroke="#cfc3a6" stroke-width=".2"/><circle cx="3.6" cy="8" r="1.3" fill="#1f6fd1"/><circle cx="3.6" cy="8" r=".55" fill="#fff"/><rect x="6.6" y="5.6" width="4.2" height="5.4" rx=".6" fill="#fffaf0" stroke="#cfc3a6" stroke-width=".2"/><rect x="7.9" y="6.4" width=".7" height="1.9" rx=".3" fill="#2e9e4f"/><rect x="8.9" y="6.4" width=".7" height="1.9" rx=".3" fill="#2e9e4f"/><rect x="7.9" y="8.6" width=".7" height="1.9" rx=".3" fill="#2e9e4f"/><rect x="8.9" y="8.6" width=".7" height="1.9" rx=".3" fill="#2e9e4f"/></svg>';
 ICONES.corrida = `<svg viewBox="0 0 100 100"><defs><linearGradient id="ceu-c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc4ff"/><stop offset="1" stop-color="#ffe2c4"/></linearGradient></defs><rect width="100" height="100" rx="18" fill="url(#ceu-c)"/><path d="M0 70 H100 V100 H0Z" fill="#6cc070"/><path d="M38 62 H62 L92 100 H8Z" fill="#efe2d1"/><g transform="translate(14 22) scale(.72)">${retrato({ pele: 1, roupa: 0 }).replace(/<\/?svg[^>]*>/g, '')}</g></svg>`;
 
 const JOGOS = [
@@ -107,6 +112,30 @@ const JOGOS = [
       'Faça a meta de pontos antes de acabarem os movimentos. Mais pontos dão até 3 estrelas.',
       'Ficou parado? O robô mostra uma troca possível.',
     ] },
+  { id: 'pintar', nome: 'Pintar', descricao: 'Canetinhas, pincéis e purpurina', solo: true, semNivel: true, tela: telaPintar, rotuloNovo: 'Escolher outro desenho',
+    resumo() {
+      const n = telaPintar.desenhosTerminados();
+      const total = DESENHOS.length;
+      return {
+        cartao: n ? `<b>${n}</b> de ${total} pintados` : `${total} desenhos para pintar`,
+        placar: `<span class="lado"><span class="avatar voce">🎨</span>Desenhos pintados <span class="num">${n} de ${total}</span></span>`,
+        painel: { valor: `${n}`, rotulo: 'desenhos pintados', sub: `de ${total}` },
+      };
+    },
+    regras: [
+      'Escolha um desenho na galeria (ou a folha em branco) e pinte do seu jeito. A pintura fica guardada e continua de onde parou.',
+      'Ferramentas: canetinha, pincel, giz de cera, lápis de cor, spray, marca-texto, carimbos de estrelinhas e coraçõezinhos, balde de tinta e borracha.',
+      'O balde pinta de uma vez a parte do desenho em que você tocar. Os outros riscam por baixo das linhas, sem estragar o contorno.',
+      'Tipos de cor: normal, arco-íris (muda de cor enquanto você risca), purpurina, neon e degradê. Escolha também a grossura.',
+      'Use ↩️ para desfazer, 💾 para salvar a imagem em Fotos ou Arquivos e ✅ quando terminar.',
+    ] },
+  { id: 'mahjong', nome: 'Mahjong', descricao: 'Junte as peças iguais', solo: true, rotuloNivel: 'Tamanho da próxima mesa', tela: telaMahjong, regras: [
+    'Toque em duas peças iguais para tirá-las da mesa. Ganha quem tirar todas.',
+    'Só valem peças livres: sem nenhuma peça em cima e com o lado esquerdo ou o direito vazio. As peças presas ficam mais escuras.',
+    'Flores (🌸🌼🌺🌻) combinam com qualquer flor, e estações (🌱☀️🍁❄️) com qualquer estação.',
+    'Fácil é uma pirâmide de 72 peças, médio uma fortaleza de 104 e difícil uma torre de 144.',
+    'Use 💡 para ver um par (custa 10 segundos), 🔀 para embaralhar quando não houver mais pares livres e ↩️ para desfazer. Toda mesa nova tem solução.',
+  ] },
   { id: 'paciencia', nome: 'Paciência', descricao: 'Solo, com dicas do robô', solo: true, semNivel: true, tela: telaPaciencia, regras: [
     'Monte as quatro fundações, uma por naipe, do Ás ao Rei.',
     'Nas colunas, as cartas descem alternando vermelho e preto. Só o Rei vai para coluna vazia.',
@@ -396,7 +425,7 @@ function abrir(jogo) {
   status.setAttribute('aria-live', 'polite');
   const area = el('div', 'area');
   const acoes = el('div', 'acoes');
-  const nova = el('button', 'botao', 'Nova partida');
+  const nova = el('button', 'botao', jogo.rotuloNovo ?? 'Nova partida');
   acoes.append(nova);
   const regras = el('details', 'regras', `<summary>Como jogar</summary><ul>${jogo.regras.map((r) => `<li>${r}</li>`).join('')}</ul>`);
 
