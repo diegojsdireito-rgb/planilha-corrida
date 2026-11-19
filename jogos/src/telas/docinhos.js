@@ -66,7 +66,7 @@ export function montar(area, ctl) {
   const elementos = new Map();
 
   const desenharMascote = (humor = 'feliz') => {
-    mascote.innerHTML = retrato({ ...prefs.personagem, sorriso: humor });
+    mascote.innerHTML = retrato({ ...prefs.personagem, estilo: prefs.carteira?.estilo, sorriso: humor });
     mascote.append(fala);
   };
   const falar = (texto) => {

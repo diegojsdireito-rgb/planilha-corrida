@@ -13,27 +13,134 @@ function torneada(perfil, segmentos = 20) {
 
 function pele(cor) { return new THREE.MeshStandardMaterial({ color: cor, roughness: 0.55, metalness: 0 }); }
 
-// Camiseta: a cor da roupa com recortes brancos nas laterais e uma estrela nas costas.
-// Na peça torneada, u = 0 é a frente, 0,25 e 0,75 são as laterais e 0,5 são as costas.
-function texCamiseta(cor) {
+// ---------- Tecidos dos estilos (desenhados na hora) ----------
+// Nas peças torneadas, u = 0 é a frente, 0,25 e 0,75 as laterais e 0,5 as costas.
+function malhaFina(ctx, w, h) {
+  ctx.strokeStyle = 'rgba(0,0,0,.05)';
+  for (let y = 0; y < h; y += 3) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+}
+function clarear(cor, t) {
+  const c = new THREE.Color(cor); c.lerp(new THREE.Color(0xffffff), t); return `#${c.getHexString()}`;
+}
+function escurecer(cor, t) {
+  const c = new THREE.Color(cor); c.lerp(new THREE.Color(0x000000), t); return `#${c.getHexString()}`;
+}
+const texto = (ctx, txt, x, y, tam, cor, contorno) => {
+  ctx.font = `900 ${tam}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (contorno) { ctx.lineWidth = tam * 0.14; ctx.strokeStyle = contorno; ctx.strokeText(txt, x, y); }
+  ctx.fillStyle = cor; ctx.fillText(txt, x, y);
+};
+
+function xadrez(ctx, w, h, cor, escuro = '#1d2130', passo = 32) {
+  ctx.fillStyle = cor; ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 0.55; ctx.fillStyle = escuro;
+  for (let x = 0; x < w; x += passo) ctx.fillRect(x, 0, passo / 2, h);
+  for (let y = 0; y < h; y += passo) ctx.fillRect(0, y, w, passo / 2);
+  ctx.globalAlpha = 0.8; ctx.fillStyle = '#ffffff';
+  for (let x = passo * 0.75; x < w; x += passo) ctx.fillRect(x, 0, 2, h);
+  for (let y = passo * 0.75; y < h; y += passo) ctx.fillRect(0, y, w, 2);
+  ctx.globalAlpha = 1;
+}
+
+function jeans(ctx, w, h, comPatches) {
+  ctx.fillStyle = '#4a6fa5'; ctx.fillRect(0, 0, w, h);
+  for (let k = 0; k < 2500; k++) { ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.08)' : 'rgba(0,0,30,.1)'; ctx.fillRect(Math.random() * w, Math.random() * h, 3, 1); }
+  ctx.strokeStyle = '#e8a33a'; ctx.setLineDash([5, 4]); ctx.lineWidth = 2;
+  for (const u of [0.25, 0.75]) { ctx.beginPath(); ctx.moveTo(w * u - 6, 0); ctx.lineTo(w * u - 6, h); ctx.moveTo(w * u + 6, 0); ctx.lineTo(w * u + 6, h); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(0, h * 0.62); ctx.lineTo(w, h * 0.62); ctx.stroke();
+  ctx.setLineDash([]);
+  if (comPatches) {
+    // patches nas costas: coração, estrela e carinha feliz
+    texto(ctx, '♥', w * 0.44, h * 0.32, 46, '#ff4f81', '#ffffff');
+    texto(ctx, '★', w * 0.56, h * 0.42, 44, '#ffd21f', '#ffffff');
+    ctx.fillStyle = '#ffd21f'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.78, 22, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1d1b18'; ctx.beginPath(); ctx.arc(w * 0.5 - 7, h * 0.78 - 5, 3, 0, 7); ctx.arc(w * 0.5 + 7, h * 0.78 - 5, 3, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#1d1b18'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.78 + 2, 10, 0.2, Math.PI - 0.2); ctx.stroke();
+  }
+}
+
+function tieDye(ctx, w, h, cor) {
+  const cores = [cor, '#ff4f81', '#ffd21f', '#35c46a', '#3e8bff', '#9b5cf6'];
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+  for (const [cx, cy] of [[w * 0.5, h * 0.45], [0, h * 0.45], [w, h * 0.45]]) {
+    for (let r = Math.max(w, h); r > 0; r -= 14) {
+      ctx.fillStyle = cores[Math.floor(r / 14) % cores.length];
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      for (let a = 0; a <= Math.PI * 2 + 0.01; a += 0.2) ctx.lineTo(cx + Math.cos(a) * r * (1 + 0.12 * Math.sin(a * 5 + r / 20)), cy + Math.sin(a) * r * 0.6);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Parte de cima de cada estilo.
+function texParteDeCima(estilo, cor) {
   return textura(512, 256, (ctx, w, h) => {
-    ctx.fillStyle = cor; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#f4f4f4';
-    for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 14, 0, 28, h);
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
-    ctx.font = 'bold 70px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('★', w * 0.5, h * 0.62);
-    ctx.strokeStyle = 'rgba(0,0,0,.05)';
-    for (let y = 0; y < h; y += 3) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    if (estilo === 'street') {
+      ctx.fillStyle = cor; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = escurecer(cor, 0.15); ctx.fillRect(0, h - 26, w, 26); // barra canelada
+      ctx.fillStyle = 'rgba(0,0,0,.1)'; for (let x = 0; x < w; x += 6) ctx.fillRect(x, h - 26, 2, 26);
+      ctx.fillStyle = escurecer(cor, 0.12); ctx.fillRect(w * 0.9, h * 0.55, w * 0.2, h * 0.3); ctx.fillRect(-w * 0.1, h * 0.55, w * 0.2, h * 0.3); // bolso canguru
+      texto(ctx, 'CACHINHOS', w * 0.5, h * 0.5, 34, '#ffffff', escurecer(cor, 0.4));
+      malhaFina(ctx, w, h);
+    } else if (estilo === 'skatista') {
+      ctx.fillStyle = clarear(cor, 0.75); ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = cor; ctx.fillRect(0, 0, w, 14); ctx.fillRect(0, h - 14, w, 14);
+      // estampa grande nas costas: prancha e "SK8"
+      ctx.save(); ctx.translate(w * 0.5, h * 0.42); ctx.rotate(-0.4);
+      ctx.fillStyle = escurecer(cor, 0.2); ctx.beginPath(); ctx.ellipse(0, 0, 70, 20, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1d1b18'; for (const x of [-40, 40]) { ctx.beginPath(); ctx.arc(x, 24, 9, 0, 7); ctx.fill(); }
+      ctx.restore();
+      texto(ctx, 'SK8', w * 0.5, h * 0.74, 54, '#1d1b18', '#ffffff');
+      malhaFina(ctx, w, h);
+    } else if (estilo === 'jeans') {
+      jeans(ctx, w, h, true);
+    } else if (estilo === 'tiedye') {
+      tieDye(ctx, w, h, cor);
+      malhaFina(ctx, w, h);
+    } else {
+      ctx.fillStyle = cor; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#f4f4f4';
+      for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 14, 0, 28, h);
+      texto(ctx, '★', w * 0.5, h * 0.62, 70, 'rgba(255,255,255,.92)');
+      malhaFina(ctx, w, h);
+    }
   });
 }
 
-function texShort(cor) {
-  return textura(256, 64, (ctx, w, h) => {
-    ctx.fillStyle = '#2f3446'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = cor;
-    for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 4, 0, 8, h);
-    ruido(ctx, w, h, 600, 'rgba(255,255,255,.04)', 1);
+// Parte de baixo de cada estilo (short, calça, bermuda ou legging).
+function texParteDeBaixo(estilo, cor) {
+  return textura(256, 128, (ctx, w, h) => {
+    if (estilo === 'street') {
+      ctx.fillStyle = '#3a3f4f'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff'; for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 3, 0, 6, h);
+    } else if (estilo === 'skatista') {
+      xadrez(ctx, w, h, escurecer(cor, 0.1));
+    } else if (estilo === 'jeans') {
+      jeans(ctx, w, h, false);
+    } else if (estilo === 'tiedye') {
+      ctx.fillStyle = '#1f1a33'; ctx.fillRect(0, 0, w, h);
+      for (let k = 0; k < 160; k++) { ctx.fillStyle = Math.random() < 0.5 ? cor : '#ffffff'; ctx.globalAlpha = 0.3 + Math.random() * 0.6; ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 2.5, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = cor; for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 3, 0, 6, h);
+    } else {
+      ctx.fillStyle = '#2f3446'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = cor; for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 4, 0, 8, h);
+      ruido(ctx, w, h, 600, 'rgba(255,255,255,.04)', 1);
+    }
+  });
+}
+
+function texSaia(cor) {
+  return textura(256, 64, (ctx, w, h) => { xadrez(ctx, w, h, '#c8352a', '#1d2130', 24); ctx.fillStyle = cor; ctx.globalAlpha = 0.25; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1; });
+}
+
+function texMeiao(cor) {
+  return textura(64, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#f7f7f7'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = cor; ctx.fillRect(0, 10, w, 8); ctx.fillRect(0, 24, w, 8);
+    ruido(ctx, w, h, 200, 'rgba(0,0,0,.05)', 1);
   });
 }
 
@@ -136,6 +243,13 @@ export function criarMenina() {
     cadarco: new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.7 }),
     cabelo: CABELO.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, map: tex.cabelo, side: THREE.DoubleSide })),
     cabeloLiso: new THREE.MeshStandardMaterial({ color: CABELO[2], roughness: 0.45 }),
+    perna: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }), // calça, legging ou meião
+    meiao: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
+    mangaLonga: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, map: tex.tecido }),
+    saia: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide }),
+    jeans: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
+    chapeu: new THREE.MeshStandardMaterial({ color: ROUPAS[0], roughness: 0.75, map: tex.tecido }),
+    chapeu2: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, map: tex.tecido }),
   };
   const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
 
@@ -165,8 +279,12 @@ export function criarMenina() {
       const risco = peca(new THREE.BoxGeometry(0.004, 0.016, 0.1), mat.detalhe); risco.position.set(l * 0.051, -0.002, -0.005); risco.rotation.x = 0.35; tenis.add(risco);
     }
     const calcanhar = peca(new THREE.BoxGeometry(0.03, 0.035, 0.01), mat.detalhe); calcanhar.position.set(0, 0.03, -0.112); tenis.add(calcanhar);
+    // cano alto (estilos street e jeans): sobe pelo tornozelo
+    const cano = peca(new THREE.CylinderGeometry(0.047, 0.052, 0.08, 16), mat.tenis); cano.position.set(0, 0.06, -0.035); tenis.add(cano);
+    const bordaCano = peca(new THREE.TorusGeometry(0.047, 0.008, 6, 16), mat.detalhe); bordaCano.rotation.x = Math.PI / 2; bordaCano.position.set(0, 0.1, -0.035); tenis.add(bordaCano);
+    const barraCalca = peca(new THREE.CylinderGeometry(0.05, 0.046, 0.05, 16), mat.perna); barraCalca.position.y = -0.24; joelho.add(barraCalca);
     quadril.add(coxa);
-    return { coxa, joelho, tenis, lado };
+    return { coxa, joelho, tenis, lado, mCoxa, mCanela, barra, meia, cano: [cano, bordaCano], barraCalca };
   });
 
   // ---- tronco ----
@@ -177,6 +295,17 @@ export function criarMenina() {
   camiseta.scale.z = 0.72; tronco.add(camiseta);
   const barraCamiseta = peca(new THREE.TorusGeometry(0.138, 0.012, 8, 28), mat.roupa); barraCamiseta.rotation.x = Math.PI / 2; barraCamiseta.scale.y = 0.72; barraCamiseta.position.y = 0.06; tronco.add(barraCamiseta);
   const pescoco = peca(torneada([[0, 0.1], [0.042, 0.1], [0.046, 0.04], [0.054, 0], [0, 0]]), mat.pele); pescoco.position.y = 0.44; tronco.add(pescoco);
+  // jaqueta jeans por cima da camiseta, com gola virada
+  const jaqueta = peca(torneada([[0.15, 0.04], [0.15, 0.06], [0.146, 0.14], [0.152, 0.24], [0.164, 0.33], [0.17, 0.38], [0.14, 0.43], [0.075, 0.455], [0.07, 0.46]], 36), mat.jeans);
+  jaqueta.scale.z = 0.74; tronco.add(jaqueta);
+  const golaJaqueta = peca(new THREE.TorusGeometry(0.085, 0.022, 8, 24), mat.jeans); golaJaqueta.rotation.x = Math.PI / 2 - 0.25; golaJaqueta.position.set(0, 0.45, -0.01); golaJaqueta.scale.set(1, 0.8, 1); tronco.add(golaJaqueta);
+  // capuz do moletom, caído nas costas
+  const capuz = new THREE.Group(); capuz.position.set(0, 0.41, -0.085); tronco.add(capuz);
+  const mCapuz = peca(new THREE.SphereGeometry(0.12, 22, 16, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat.camiseta);
+  mCapuz.material = mat.mangaLonga; mCapuz.scale.set(1.1, 0.75, 0.75); mCapuz.rotation.x = -0.5; capuz.add(mCapuz);
+  const bordaCapuz = peca(new THREE.TorusGeometry(0.1, 0.014, 8, 24), mat.mangaLonga); bordaCapuz.rotation.x = Math.PI / 2 - 0.6; bordaCapuz.position.set(0, 0.03, 0.01); bordaCapuz.scale.set(1.1, 0.9, 1); capuz.add(bordaCapuz);
+  // saia xadrez rodada (estilo jeans)
+  const saia = peca(new THREE.CylinderGeometry(0.152, 0.245, 0.22, 32, 1, true), mat.saia); saia.position.y = -0.03; saia.scale.z = 0.82; quadril.add(saia);
   const gola = peca(new THREE.TorusGeometry(0.058, 0.012, 8, 20), mat.branco); gola.rotation.x = Math.PI / 2; gola.position.y = 0.45; tronco.add(gola);
 
   // ---- braços: ombro -> cotovelo -> mão ----
@@ -189,7 +318,8 @@ export function criarMenina() {
     const mao = new THREE.Group(); mao.position.y = -0.19; cotovelo.add(mao);
     const palma = peca(new THREE.SphereGeometry(0.036, 14, 10), mat.pele); palma.scale.set(0.8, 1.1, 0.6); mao.add(palma);
     const polegar = peca(new THREE.CapsuleGeometry(0.011, 0.03, 4, 8), mat.pele); polegar.position.set(-lado * 0.022, 0.005, 0.015); polegar.rotation.z = lado * 0.6; mao.add(polegar);
-    return { ombro, cotovelo };
+    const punho = peca(new THREE.CylinderGeometry(0.031, 0.033, 0.035, 14), mat.mangaLonga); punho.position.y = -0.165; cotovelo.add(punho);
+    return { ombro, cotovelo, manga, mBraco, mAnte, punho };
   });
 
   // ---- cabeça e cabelo ----
@@ -224,6 +354,21 @@ export function criarMenina() {
   // faixa de cabelo: arco de uma orelha à outra, por cima da cabeça
   const faixa = peca(new THREE.TorusGeometry(0.166, 0.015, 10, 40, Math.PI), mat.roupa);
   faixa.rotation.x = -0.25; faixa.position.set(0, -0.005, 0.01); cabeca.add(faixa);
+  // boné com a aba virada para trás (aparece bem de costas)
+  const bone = new THREE.Group(); bone.position.y = 0.03; cabeca.add(bone);
+  const copa = peca(new THREE.SphereGeometry(0.158, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), mat.chapeu); copa.scale.set(0.98, 0.85, 1.02); bone.add(copa);
+  const aba = peca(new THREE.CylinderGeometry(0.105, 0.105, 0.014, 24, 1, false, Math.PI * 0.5, Math.PI), mat.chapeu2); aba.position.set(0, 0.005, -0.12); aba.scale.set(1, 1, 0.9); aba.rotation.x = 0.12; bone.add(aba);
+  const botao = peca(new THREE.SphereGeometry(0.018, 10, 8), mat.chapeu2); botao.position.y = 0.135; bone.add(botao);
+  const fecho = peca(new THREE.TorusGeometry(0.035, 0.008, 6, 14, Math.PI), mat.chapeu2); fecho.position.set(0, 0.01, 0.15); bone.add(fecho);
+  // gorro com dobra e pompom
+  const gorro = new THREE.Group(); gorro.position.y = 0.025; cabeca.add(gorro);
+  const malhaGorro = peca(new THREE.SphereGeometry(0.162, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), mat.chapeu); malhaGorro.scale.set(0.98, 1.05, 1.02); gorro.add(malhaGorro);
+  const dobra = peca(new THREE.TorusGeometry(0.152, 0.03, 10, 30), mat.chapeu); dobra.rotation.x = Math.PI / 2; dobra.position.y = 0.0; dobra.scale.set(1, 1.03, 1); gorro.add(dobra);
+  const pompom = peca(new THREE.SphereGeometry(0.05, 14, 10), mat.chapeu2); pompom.position.y = 0.19; gorro.add(pompom);
+  // viseira esportiva
+  const viseira = new THREE.Group(); viseira.position.y = 0.05; cabeca.add(viseira);
+  const tira = peca(new THREE.TorusGeometry(0.158, 0.018, 8, 34), mat.chapeu); tira.rotation.x = Math.PI / 2 + 0.15; viseira.add(tira);
+  const abaViseira = peca(new THREE.CylinderGeometry(0.1, 0.1, 0.012, 24, 1, false, -Math.PI * 0.5, Math.PI), mat.chapeu2); abaViseira.position.set(0, -0.01, 0.13); viseira.add(abaViseira);
 
   // ---- acessórios: skate, maleta e aura ----
   const skate = new THREE.Group(); raiz.add(skate);
@@ -260,16 +405,63 @@ export function criarMenina() {
   aura.scale.set(1.6, 2.2, 1); aura.position.y = 0.75; raiz.add(aura);
 
   let visual = '';
-  function vestir(p, r) {
-    const chave = `${p}-${r}`;
+  const trocarMapa = (m, t) => { m.map?.dispose(); m.map = t; m.color.set(0xffffff); m.needsUpdate = true; };
+  function vestir(p, r, estilo = 'esportiva') {
+    const chave = `${p}-${r}-${estilo}`;
     if (chave === visual) return;
     visual = chave;
     mat.pele.color.set(PELES[p] ?? PELES[1]);
     const cor = ROUPAS[r] ?? ROUPAS[0];
     mat.roupa.color.set(cor);
     mat.detalhe.color.set(cor);
-    mat.camiseta.map?.dispose(); mat.camiseta.map = texCamiseta(cor); mat.camiseta.needsUpdate = true;
-    mat.shortTorneado.map?.dispose(); mat.shortTorneado.map = texShort(cor); mat.shortTorneado.needsUpdate = true;
+    trocarMapa(mat.camiseta, texParteDeCima(estilo === 'jeans' ? 'esportiva' : estilo, cor));
+    trocarMapa(mat.shortTorneado, texParteDeBaixo(estilo === 'jeans' ? 'esportiva' : estilo, cor));
+    // o que cada estilo usa
+    const e = {
+      esportiva: { faixa: true },
+      street: { capuz: true, mangaLonga: true, calca: true, cano: true },
+      skatista: { bone: true, bermuda: true, meiao: true, largo: true },
+      jeans: { jaqueta: true, mangaLonga: true, saia: true, meiao: true, cano: true, gorro: true },
+      tiedye: { viseira: true, calca: true },
+    }[estilo] ?? { faixa: true };
+    // cores e tecidos das peças
+    if (estilo === 'street') { mat.mangaLonga.color.set(cor); trocarMapa(mat.perna, texParteDeBaixo('street', cor)); mat.tenis.color.set(0x2b2e38); }
+    else if (estilo === 'jeans') {
+      trocarMapa(mat.jeans, texParteDeCima('jeans', cor)); mat.mangaLonga.map = null; mat.mangaLonga.color.set(0x4a6fa5); mat.mangaLonga.needsUpdate = true;
+      trocarMapa(mat.saia, texSaia(cor)); mat.chapeu.color.set(cor); mat.chapeu2.color.set(0xffffff); mat.tenis.color.set(0xffffff);
+    } else if (estilo === 'tiedye') { trocarMapa(mat.perna, texParteDeBaixo('tiedye', cor)); mat.chapeu.color.set(cor); mat.chapeu2.color.set(0xffffff); mat.tenis.color.set(cor).lerp(new THREE.Color(0xffffff), 0.45); }
+    else if (estilo === 'skatista') { mat.chapeu.color.set(0x1d2130); mat.chapeu2.color.set(cor); mat.tenis.color.set(0xb9bec8); }
+    else mat.tenis.color.set(0xffffff);
+    if (e.meiao) trocarMapa(mat.meiao, texMeiao(cor));
+    // partes de cima
+    faixa.visible = Boolean(e.faixa);
+    capuz.visible = Boolean(e.capuz);
+    jaqueta.visible = Boolean(e.jaqueta); golaJaqueta.visible = Boolean(e.jaqueta);
+    camiseta.scale.set(e.largo ? 1.07 : 1, 1, e.largo ? 0.78 : 0.72);
+    for (const b of bracos) {
+      b.manga.visible = !e.mangaLonga;
+      b.manga.scale.setScalar(e.largo ? 1.15 : 1);
+      b.mBraco.material = e.mangaLonga ? mat.mangaLonga : mat.pele;
+      b.mAnte.material = e.mangaLonga ? mat.mangaLonga : mat.pele;
+      b.punho.visible = Boolean(e.mangaLonga);
+    }
+    // partes de baixo
+    saia.visible = Boolean(e.saia);
+    for (const p2 of pernas) {
+      p2.mCoxa.material = e.calca ? mat.perna : mat.pele;
+      p2.mCanela.material = e.calca ? mat.perna : e.meiao ? mat.meiao : mat.pele;
+      p2.barra.visible = !e.calca;
+      p2.barra.material = e.bermuda ? mat.shortTorneado : mat.short;
+      p2.barra.scale.set(e.bermuda ? 1.08 : 1, e.bermuda ? 2.3 : 1, e.bermuda ? 1.08 : 1);
+      p2.barra.position.y = e.bermuda ? -0.1 : -0.035;
+      p2.meia.visible = !e.calca && !e.meiao;
+      p2.barraCalca.visible = Boolean(e.calca);
+      for (const c of p2.cano) c.visible = Boolean(e.cano);
+    }
+    // cabeça
+    bone.visible = Boolean(e.bone);
+    gorro.visible = Boolean(e.gorro);
+    viseira.visible = Boolean(e.viseira);
   }
 
   const SKATE_COR = { classico: 0xd79a5b, voador: 0x29b7dc, supersonico: 0xd83a2c };
@@ -351,13 +543,19 @@ export function criarMenina() {
       ox1: -0.5 + 0.1 * Math.sin(t * 2 + 1), oz1: 1.1 + 0.1 * Math.sin(t * 3 + 1), c1: -0.25,
     }),
     skate: (s, t) => {
-      // de lado na prancha, joelhos dobrados acompanhando o balanço, braços abertos
-      const b = Math.sin(t * 4);
+      // de lado na prancha, como quem anda de skate de verdade: o corpo vira 90°, os pés
+      // ficam afastados ao longo da prancha (um na frente, outro na rabeta), joelhos dobrados
+      // acompanhando o balanço, braços abertos e a cabeça virada para olhar o caminho
+      const b = Math.sin(t * 3.2);
+      const b2 = Math.sin(t * 1.6);
       return {
-        rotY: 0.35, posY: -0.03 + 0.02 * b, troncoX: 0.2, cabecaY: -0.32, cabecaX: -0.1, vento: 0.45, balanco: 0.08,
-        cx0: -0.25 - 0.05 * b, j0: 0.45 + 0.08 * b, p0: -0.1, cz0: -0.08,
-        cx1: 0.25 - 0.05 * b, j1: 0.55 + 0.08 * b, p1: 0.2, cz1: 0.08,
-        ox0: -0.5, oz0: -0.6 - 0.05 * b, c0: -0.6, ox1: 0.2, oz1: 0.7 + 0.05 * b, c1: -0.4,
+        rotY: -Math.PI / 2, posY: -0.07 + 0.02 * b, posZ: 0, troncoX: 0.22 + 0.03 * b, troncoY: 0.32, troncoZ: 0.04 * b2,
+        quadrilY: 0.05 * b2, cabecaY: 1.15, cabecaX: -0.12, vento: 0.45, balanco: 0.08,
+        // pernas abertas para os lados do corpo = ao longo da prancha
+        cx0: -0.35 - 0.06 * b, cz0: -0.3, j0: 0.75 + 0.1 * b, p0: -0.28,
+        cx1: -0.35 - 0.06 * b, cz1: 0.3, j1: 0.75 + 0.1 * b, p1: -0.28,
+        // braço da frente aberto para a frente, o de trás para trás, equilibrando
+        ox0: -0.2, oz0: -1.05 - 0.08 * b2, c0: -0.45, ox1: -0.35, oz1: 1.15 + 0.08 * b2, c1: -0.6,
       };
     },
     batida: () => ({

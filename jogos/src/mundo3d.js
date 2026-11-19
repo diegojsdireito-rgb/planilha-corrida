@@ -165,7 +165,7 @@ export function criarMundo(canvas) {
     const dt = Math.min(0.05, Math.max(0, t - ultimoT));
     ultimoT = t;
     const dist = s.dist;
-    menina.vestir(visual.pele, visual.roupa);
+    menina.vestir(visual.pele, visual.roupa, visual.estilo);
     menina.posar(s, t);
 
     // quem persegue: logo atrás dela, um pouco de lado para não tapar a menina

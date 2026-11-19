@@ -18,8 +18,60 @@ const escurecer = (hex, t = 0.25) => mistura(hex, '#000000', t);
 
 let serie = 0;
 
+// Roupa do retrato (do peito para baixo) em cada estilo.
+function roupaDoRetrato(estilo, cor, id) {
+  const ombros = 'M14 100 C15 88 24 81 40 79 Q50 85 60 79 C76 81 85 88 86 100Z';
+  if (estilo === 'street') {
+    return `<path d="M24 86 Q50 70 76 86 L74 92 Q50 80 26 92Z" fill="${escurecer(cor, 0.2)}"/>
+      <path d="${ombros}" fill="url(#${id('roupa')})"/>
+      <path d="M40 79 Q50 88 60 79" fill="none" stroke="${escurecer(cor, 0.25)}" stroke-width="3"/>
+      <path d="M45 84 L44 96 M55 84 L56 96" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>`;
+  }
+  if (estilo === 'skatista') {
+    return `<path d="M11 100 C12 87 23 80 40 78 Q50 84 60 78 C77 80 88 87 89 100Z" fill="${clarear(cor, 0.75)}"/>
+      <path d="M40 78 Q50 85 60 78" fill="none" stroke="${cor}" stroke-width="3"/>
+      <text x="50" y="97" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="9" fill="#1d1b18">SK8</text>`;
+  }
+  if (estilo === 'jeans') {
+    return `<path d="${ombros}" fill="#4a6fa5"/>
+      <path d="M40 79 L50 100 L60 79 Q50 86 40 79Z" fill="${cor}"/>
+      <path d="M36 78 L44 90 L40 79Z M64 78 L56 90 L60 79Z" fill="#3b5d91"/>
+      <path d="M22 88 L28 100 M78 88 L72 100" stroke="#e8a33a" stroke-width="1" stroke-dasharray="2 2"/>
+      <text x="28" y="96" font-size="7">★</text>`;
+  }
+  if (estilo === 'tiedye') {
+    return `<path d="${ombros}" fill="url(#${id('tie')})"/>
+      <path d="M40 79 Q50 86 60 79" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>`;
+  }
+  return `<path d="${ombros}" fill="url(#${id('roupa')})"/>
+    <path d="M40 79 Q50 86 60 79" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M24 84 L34 100 M76 84 L66 100" stroke="#fff" stroke-width="2.4" opacity=".9"/>`;
+}
+
+// O que vai na cabeça em cada estilo.
+function chapeuDoRetrato(estilo, cor) {
+  if (estilo === 'skatista') {
+    return `<path d="M27 40 C27 22 38 15 50 15 C62 15 73 22 73 40 Q50 31 27 40Z" fill="#1d2130"/>
+      <path d="M62 19 Q76 14 84 22 Q74 22 66 26Z" fill="${cor}"/>
+      <circle cx="50" cy="15.5" r="2.2" fill="${cor}"/>`;
+  }
+  if (estilo === 'jeans') {
+    return `<path d="M26 42 C25 22 37 13 50 13 C63 13 75 22 74 42Z" fill="${cor}"/>
+      <rect x="25" y="36" width="50" height="8" rx="4" fill="#fff"/>
+      <circle cx="50" cy="11" r="6" fill="#fff"/>
+      <path d="M33 30 v6 M41 26 v8 M50 25 v9 M59 26 v8 M67 30 v6" stroke="${escurecer(cor, 0.2)}" stroke-width="1.2"/>`;
+  }
+  if (estilo === 'tiedye') {
+    return `<path d="M29 39 Q50 30 71 39" fill="none" stroke="${cor}" stroke-width="4" stroke-linecap="round"/>
+      <path d="M33 38 Q50 44 67 38 Q60 47 50 47 Q40 47 33 38Z" fill="${cor}" opacity=".9"/>`;
+  }
+  if (estilo === 'street') return '';
+  return `<path d="M30 37 Q50 24 70 37" fill="none" stroke="${cor}" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M31 36.2 Q50 23.4 69 36.2" fill="none" stroke="#fff" stroke-width=".9" opacity=".6"/>`;
+}
+
 // ---------- Retrato de frente (SVG, viewBox 0 0 100 100) ----------
-export function retrato({ pele = 1, roupa = 0, sorriso = 'feliz' } = {}) {
+export function retrato({ pele = 1, roupa = 0, sorriso = 'feliz', estilo = 'esportiva' } = {}) {
   const tom = PELES[pele] ?? PELES[1];
   const cor = ROUPAS[roupa] ?? ROUPAS[0];
   const k = ++serie;
@@ -34,13 +86,12 @@ export function retrato({ pele = 1, roupa = 0, sorriso = 'feliz' } = {}) {
     <linearGradient id="${id('cab')}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${CABELO[0]}"/><stop offset=".5" stop-color="${CABELO[1]}"/><stop offset="1" stop-color="${CABELO[2]}"/></linearGradient>
     <linearGradient id="${id('roupa')}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${clarear(cor, 0.22)}"/><stop offset=".6" stop-color="${cor}"/><stop offset="1" stop-color="${escurecer(cor, 0.25)}"/></linearGradient>
     <radialGradient id="${id('iris')}" cx="45%" cy="40%" r="60%"><stop offset="0" stop-color="#9a6a3c"/><stop offset=".7" stop-color="#5a3a20"/><stop offset="1" stop-color="#2e1c10"/></radialGradient>
+    <linearGradient id="${id('tie')}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${cor}"/><stop offset=".3" stop-color="#ff4f81"/><stop offset=".55" stop-color="#ffd21f"/><stop offset=".8" stop-color="#35c46a"/><stop offset="1" stop-color="#3e8bff"/></linearGradient>
   </defs>
   <path d="M27 44 C24 30 34 18 50 18 C66 18 76 30 73 44 C76 52 72 58 75 66 C77 72 72 76 73 82 L27 82 C28 76 23 72 25 66 C28 58 24 52 27 44Z" fill="url(#${id('cab')})"/>
   <path d="M28 60 C26 66 30 72 28 80 M72 60 C74 66 70 72 72 80" fill="none" stroke="${CABELO[0]}" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
   <path d="M43 70 L57 70 L58 82 L42 82Z" fill="url(#${id('pesc')})"/>
-  <path d="M14 100 C15 88 24 81 40 79 Q50 85 60 79 C76 81 85 88 86 100Z" fill="url(#${id('roupa')})"/>
-  <path d="M40 79 Q50 86 60 79" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M24 84 L34 100 M76 84 L66 100" stroke="#fff" stroke-width="2.4" opacity=".9"/>
+  ${roupaDoRetrato(estilo, cor, id)}
   <path d="M60 79 C76 81 85 88 86 100 L80 100 C79 90 72 85 61 82Z" fill="#000" opacity=".12"/>
   <ellipse cx="29.5" cy="53" rx="3.6" ry="5.2" fill="${escurecer(tom, 0.06)}"/><ellipse cx="70.5" cy="53" rx="3.6" ry="5.2" fill="${escurecer(tom, 0.12)}"/>
   <path d="M30 48 C30 34 39 27 50 27 C61 27 70 34 70 48 C70 62 61 74 50 74 C39 74 30 62 30 48Z" fill="url(#${id('pele')})"/>
@@ -59,8 +110,7 @@ export function retrato({ pele = 1, roupa = 0, sorriso = 'feliz' } = {}) {
   <path d="M29 46 C27 30 38 20 52 21 C64 22 72 30 71 44 C69 38 66 34 62 32 C60 37 54 39 46 38 C40 37.5 35 40 31 46Z" fill="url(#${id('cab')})"/>
   <path d="M46 23 C40 27 37 33 36 39 M56 23 C51 28 50 33 52 38 M62 27 C66 31 68 35 69 40" fill="none" stroke="${CABELO[0]}" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>
   <path d="M38 25 Q50 19 63 25" fill="none" stroke="#c8895a" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>
-  <path d="M30 37 Q50 24 70 37" fill="none" stroke="${cor}" stroke-width="3.4" stroke-linecap="round"/>
-  <path d="M31 36.2 Q50 23.4 69 36.2" fill="none" stroke="#fff" stroke-width=".9" opacity=".6"/>
+  ${chapeuDoRetrato(estilo, cor)}
 </svg>`;
 }
 

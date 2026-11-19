@@ -325,3 +325,18 @@ test('corrida: quem persegue em cada cenário, com leão ou panda na floresta', 
   assert.equal(quemPersegue('floresta', 'panda'), 'panda');
   assert.equal(quemPersegue('floresta', 'outro'), 'leao');
 });
+
+test('loja: estilos de roupa são comprados uma vez e vestidos quando quiser', () => {
+  let c = { ...loja.carteiraNova(), moedas: 1000 };
+  assert.deepEqual(c.estilos, ['esportiva']);
+  assert.ok(loja.comprarEstilo(c, 'jeans').erro); // 1.200: falta dinheiro
+  c = loja.comprarEstilo(c, 'skatista').carteira;
+  assert.equal(c.moedas, 100);
+  assert.equal(c.estilo, 'skatista');
+  assert.ok(loja.comprarEstilo(c, 'skatista').erro);
+  assert.equal(loja.vestirEstilo(c, 'esportiva').carteira.estilo, 'esportiva');
+  assert.ok(loja.vestirEstilo(c, 'tiedye').erro);
+  // carteira antiga, sem estilos, ganha a esportiva; estilos desconhecidos são descartados
+  assert.deepEqual(loja.normalizar({ moedas: 5, estilos: ['xyz'] }).estilos, ['esportiva']);
+  assert.deepEqual([...loja.mesclarCarteiras(c, { ...loja.carteiraNova(), estilos: ['esportiva', 'street'] }).estilos].sort(), ['esportiva', 'skatista', 'street']);
+});

@@ -15,6 +15,15 @@ export const SKATES_LOJA = [
   { id: 'voador', preco: 2000, texto: 'Protege de uma batida e flutua: pulos mais altos e mais longos.' },
   { id: 'supersonico', preco: 5000, texto: 'Protege de uma batida, corre mais rápido e vale moedas em dobro.' },
 ];
+// Estilos de roupa da menina: comprados uma vez, usados quando quiser.
+export const ESTILOS = [
+  { id: 'esportiva', nome: 'Esportiva', icone: '🏃‍♀️', preco: 0, texto: 'Camiseta com recortes, short e faixa no cabelo.' },
+  { id: 'street', nome: 'Street', icone: '🧥', preco: 600, texto: 'Moletom com capuz, calça jogger e tênis de cano alto.' },
+  { id: 'skatista', nome: 'Skatista', icone: '🛹', preco: 900, texto: 'Camiseta larga estampada, bermuda xadrez, meião e boné virado.' },
+  { id: 'jeans', nome: 'Jeans', icone: '👖', preco: 1200, texto: 'Jaqueta jeans com patches, saia xadrez, meia 3/4 e gorro.' },
+  { id: 'tiedye', nome: 'Tie-dye', icone: '🌈', preco: 1500, texto: 'Camiseta tie-dye, legging colorida e viseira.' },
+];
+
 export const PRECO_CARGA = 250;
 export const PRECO_ARRANCADA = 400; // bônus de largada: decolar com a mochila a jato
 
@@ -23,6 +32,8 @@ export function carteiraNova() {
     moedas: 0,
     skates: ['classico'],
     skate: 'classico',
+    estilos: ['esportiva'],
+    estilo: 'esportiva',
     cargas: 2,
     arrancadas: 1,
     poderes: { ima: 0, pulo: 0, maleta: 0, supercarga: 0 },
@@ -41,6 +52,7 @@ export function normalizar(c) {
     ...c,
     poderes: { ...base.poderes, ...(c.poderes ?? {}) },
     skates: Array.from(new Set(['classico', ...(c.skates ?? [])])),
+    estilos: Array.from(new Set(['esportiva', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
     missoes: Array.isArray(c.missoes) ? c.missoes : [],
   };
 }
@@ -53,6 +65,19 @@ export function comprarSkate(c, id) {
   if (c.skates.includes(id)) return erro('Você já tem este skate.');
   if (c.moedas < item.preco) return erro(`Faltam ${item.preco - c.moedas} moedas.`);
   return { carteira: { ...c, moedas: c.moedas - item.preco, skates: [...c.skates, id], skate: id } };
+}
+
+export function comprarEstilo(c, id) {
+  const item = ESTILOS.find((e) => e.id === id);
+  if (!item) return erro('Estilo desconhecido.');
+  if (c.estilos.includes(id)) return erro('Você já tem este estilo.');
+  if (c.moedas < item.preco) return erro(`Faltam ${item.preco - c.moedas} moedas.`);
+  return { carteira: { ...c, moedas: c.moedas - item.preco, estilos: [...c.estilos, id], estilo: id } };
+}
+
+export function vestirEstilo(c, id) {
+  if (!c.estilos.includes(id)) return erro('Compre este estilo primeiro.');
+  return { carteira: { ...c, estilo: id } };
 }
 
 export function equipar(c, id) {
@@ -156,6 +181,7 @@ export function mesclarCarteiras(a, b) {
     cargas: Math.max(x.cargas, y.cargas),
     arrancadas: Math.max(x.arrancadas, y.arrancadas),
     skates: [...x.skates, ...y.skates],
+    estilos: [...x.estilos, ...y.estilos],
     poderes: Object.fromEntries(Object.keys(PODERES).map((k) => [k, Math.max(x.poderes[k], y.poderes[k])])),
     feitas: Math.max(x.feitas, y.feitas),
   });

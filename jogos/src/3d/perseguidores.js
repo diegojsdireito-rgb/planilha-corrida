@@ -10,6 +10,36 @@ const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
 const bola = (r, m, seg = 16) => peca(new THREE.SphereGeometry(r, seg, Math.max(8, seg * 0.7)), m);
 const capsula = (r, l, m) => peca(new THREE.CapsuleGeometry(r, l, 6, 14), m);
 
+// ---------- Acessórios estilosos ----------
+function bandana(pescoco, cor) {
+  const m = mat(cor);
+  const anel = peca(new THREE.TorusGeometry(0.2, 0.045, 8, 24), m); anel.rotation.x = Math.PI / 2; anel.position.set(0, -0.2, -0.05); pescoco.add(anel);
+  const no = peca(new THREE.ConeGeometry(0.1, 0.2, 3), m); no.rotation.x = -Math.PI / 2 - 0.4; no.position.set(0, -0.24, -0.26); no.scale.z = 0.4; pescoco.add(no);
+  for (let k = 0; k < 8; k++) { const b = bola(0.015, mat(0xffffff)); const a = (k / 8) * Math.PI * 2; b.position.set(Math.cos(a) * 0.2, -0.2, Math.sin(a) * 0.2 - 0.05); pescoco.add(b); }
+}
+
+function boneVirado(cabeca, cor, raio = 0.27, y = 0.1) {
+  const g = new THREE.Group(); g.position.y = y; cabeca.add(g);
+  const copa = peca(new THREE.SphereGeometry(raio, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(cor)); copa.scale.y = 0.75; g.add(copa);
+  const aba = peca(new THREE.CylinderGeometry(raio * 0.7, raio * 0.7, 0.025, 20, 1, false, Math.PI * 0.5, Math.PI), mat(0xffffff)); aba.position.set(0, 0, -raio * 0.78); g.add(aba);
+  return g;
+}
+
+function gorroComPompom(cabeca, cor, raio = 0.27, y = 0.08) {
+  const g = new THREE.Group(); g.position.y = y; cabeca.add(g);
+  const malha = peca(new THREE.SphereGeometry(raio, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(cor)); g.add(malha);
+  const dobra = peca(new THREE.TorusGeometry(raio * 0.95, raio * 0.17, 8, 24), mat(0xffffff)); dobra.rotation.x = Math.PI / 2; g.add(dobra);
+  const pompom = bola(raio * 0.3, mat(0xffffff)); pompom.position.y = raio * 1.1; g.add(pompom);
+  return g;
+}
+
+function oculosEscuros(cabeca, largura, y, z, raio = 0.05) {
+  const lente = mat(0x111418, { roughness: 0.1, metalness: 0.6 });
+  for (const lado of [-1, 1]) { const l = peca(new THREE.CylinderGeometry(raio, raio, 0.015, 16), lente); l.rotation.x = Math.PI / 2; l.position.set(lado * largura, y, z); cabeca.add(l); }
+  const ponte = peca(new THREE.BoxGeometry(largura, 0.012, 0.012), lente); ponte.position.set(0, y + raio * 0.3, z); cabeca.add(ponte);
+  for (const lado of [-1, 1]) { const haste = peca(new THREE.BoxGeometry(0.012, 0.012, 0.18), lente); haste.position.set(lado * (largura + raio), y + raio * 0.3, z - 0.09); cabeca.add(haste); }
+}
+
 // ---------- Bicho de quatro patas (leão, panda, urso) ----------
 function quadrupede({ corpo, barriga, patas, cabeca, focinho, orelhas, nariz = 0x222222, escala = 1, extras }) {
   const raiz = new THREE.Group();
@@ -64,6 +94,8 @@ function leao() {
       const fundo = bola(0.3, juba, 18); fundo.scale.set(1, 1, 0.6); fundo.position.z = -0.12; pescoco.add(fundo);
       const rabo = capsula(0.03, 0.5, mat(0xd29a45)); rabo.position.y = -0.28; cauda.add(rabo);
       const tufo = bola(0.08, juba); tufo.position.y = -0.58; cauda.add(tufo);
+      bandana(pescoco, 0xe5484d); // bandana vermelha de bolinhas
+      oculosEscuros(pescoco, 0.1, 0.07, 0.24);
     },
   });
 }
@@ -75,6 +107,7 @@ function panda() {
       const faixa = peca(new THREE.CylinderGeometry(0.305, 0.305, 0.28, 20), mat(0x1f1f22)); faixa.rotation.x = Math.PI / 2; faixa.position.z = 0.32; tronco.add(faixa);
       for (const lado of [-1, 1]) { const mancha = bola(0.07, mat(0x1f1f22)); mancha.scale.set(1, 1.3, 0.5); mancha.position.set(lado * 0.1, 0.06, 0.2); pescoco.add(mancha); }
       const rabo = bola(0.08, mat(0xf5f5f2)); cauda.add(rabo);
+      boneVirado(pescoco, 0x3fb6a8); // boné virado para trás
     },
   });
 }
@@ -86,6 +119,13 @@ function urso() {
       const rabo = bola(0.07, mat(0xf2efe6)); cauda.add(rabo);
       // urso-polar tem a cabeça mais comprida
       pescoco.scale.set(0.9, 0.9, 1.15);
+      gorroComPompom(pescoco, 0xe5484d);
+      // cachecol listrado com as pontas voando para trás
+      const listra = (k) => mat(k % 2 ? 0xffffff : 0x3e8bff);
+      const anel = peca(new THREE.TorusGeometry(0.22, 0.06, 8, 24), listra(0)); anel.rotation.x = Math.PI / 2; anel.position.set(0, -0.2, -0.04); pescoco.add(anel);
+      for (const [dx, comp] of [[-0.06, 0.32], [0.06, 0.26]]) {
+        for (let k = 0; k < 4; k++) { const seg = peca(new THREE.BoxGeometry(0.09, 0.025, comp / 4), listra(k)); seg.position.set(dx, -0.22 + k * 0.02, -0.28 - k * (comp / 4)); seg.rotation.x = 0.25; pescoco.add(seg); }
+      }
     },
   });
 }
@@ -113,6 +153,7 @@ function caranguejo() {
     const haste = capsula(0.02, 0.16, vermelho); haste.position.set(lado * 0.12, 0.85, 0.3); raiz.add(haste);
     const olho = bola(0.05, mat(0xffffff, { roughness: 0.2 })); olho.position.set(lado * 0.12, 0.97, 0.3); raiz.add(olho);
   }
+  oculosEscuros(raiz, 0.12, 0.98, 0.35, 0.06); // óculos de sol na ponta das antenas
   return {
     raiz,
     animar(fase) {
@@ -161,6 +202,7 @@ function policial() {
   const topoQuepe = peca(new THREE.CylinderGeometry(0.19, 0.17, 0.04, 20), farda); topoQuepe.position.y = 0.2; cabeca.add(topoQuepe);
   const aba = peca(new THREE.CylinderGeometry(0.16, 0.16, 0.02, 20, 1, false, -Math.PI / 2, Math.PI), mat(0x111111, { roughness: 0.3 })); aba.position.set(0, 0.08, 0.05); cabeca.add(aba);
   const fita = peca(new THREE.CylinderGeometry(0.158, 0.158, 0.03, 20), mat(0xd9b44a, { metalness: 0.6, roughness: 0.3 })); fita.position.y = 0.09; cabeca.add(fita);
+  oculosEscuros(cabeca, 0.055, 0.02, 0.145, 0.035); // óculos escuros de aviador
   return {
     raiz,
     animar(fase) {

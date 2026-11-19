@@ -603,3 +603,4 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .dica-gestos[hidden] { display: none; }
 .dica-gestos.some { animation: some-dica 4.2s ease-in forwards; }
 @keyframes some-dica { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+.retrato-mini svg { width: 52px; height: 52px; display: block; border-radius: 12px; background: var(--preenchido); }

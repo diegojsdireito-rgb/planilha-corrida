@@ -313,7 +313,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, prefs.personagem, tema, prefs.perseguidorFloresta);
+      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -577,7 +577,7 @@ export function montar(area, ctl) {
       const r = recorde();
       const presente = loja.presenteDisponivel(c, hoje());
       corpo = `
-        <div class="retrato">${retrato(prefs.personagem)}</div>
+        <div class="retrato">${retrato({ ...prefs.personagem, estilo: prefs.carteira.estilo })}</div>
         <small>${r ? `Recorde: ${fmt(r)} pontos` : 'Pegue moedas, desvie dos obstáculos e use os poderes!'}</small>
         ${presente ? '<button class="botao presente" data-presente>🎁 Abrir o presente do dia</button>' : ''}
         <div class="escolha"><span>Pele</span>${PELES.map((cor_, k) => `<button class="amostra${prefs.personagem.pele === k ? ' sel' : ''}" data-pele="${k}" style="background:${cor_}" aria-label="Tom de pele ${k + 1}"></button>`).join('')}</div>
@@ -585,11 +585,19 @@ export function montar(area, ctl) {
         <div class="cenarios velocidade"><span>Velocidade</span>${[['facil', 'Fácil', '🐢'], ['medio', 'Médio', '🏃‍♀️'], ['dificil', 'Difícil', '⚡']].map(([id, nome, ic]) => `<button data-velocidade="${id}" aria-pressed="${prefs.nivel === id}"><b>${ic}</b>${nome}</button>`).join('')}</div>
         <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
         ${['floresta', 'passeio'].includes(prefs.cenario ?? 'passeio') ? `<div class="cenarios bichos"><span>Na floresta, quem corre atrás?</span>${OPCOES_FLORESTA.map((o) => `<button data-bicho="${o.id}" aria-pressed="${prefs.perseguidorFloresta === o.id}"><b>${o.icone}</b>${o.nome}</button>`).join('')}</div>` : ''}
+        <small class="equipado">${loja.ESTILOS.find((e) => e.id === c.estilo)?.icone ?? ''} Estilo ${loja.ESTILOS.find((e) => e.id === c.estilo)?.nome ?? ''}: troque na Loja</small>
         <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque duas vezes na tela para subir</small>
         ${c.arrancadas ? `<small class="equipado">🎒 ${c.arrancadas} mochila${c.arrancadas > 1 ? 's' : ''} a jato: toque em "Decolar" no começo</small>` : ''}
         <button class="botao grande" data-correr>Correr!</button>`;
     } else if (aba === 'loja') {
       corpo = `
+        <h4>Estilos de roupa</h4>
+        ${loja.ESTILOS.map((it) => {
+          const tem = c.estilos.includes(it.id);
+          const usando = c.estilo === it.id;
+          const botao = usando ? '<span class="usando">Vestindo</span>' : tem ? `<button class="botao secundario" data-vestir="${it.id}">Vestir</button>` : `<button class="botao" data-estilo="${it.id}" ${c.moedas < it.preco ? 'disabled' : ''}>🪙 ${fmt(it.preco)}</button>`;
+          return `<div class="item-loja"><span class="retrato-mini">${retrato({ ...prefs.personagem, estilo: it.id })}</span><div><b>${it.icone} ${it.nome}</b><small>${it.texto}</small></div>${botao}</div>`;
+        }).join('')}
         <h4>Skates</h4>
         ${loja.SKATES_LOJA.map((it) => {
           const tem = c.skates.includes(it.id);
@@ -665,6 +673,8 @@ export function montar(area, ctl) {
       ctl.som('premio');
       telaInicial(aba, ok);
     };
+    q('[data-estilo]').forEach((b) => { b.onclick = () => resultado(loja.comprarEstilo(prefs.carteira, b.dataset.estilo), `Estilo ${loja.ESTILOS.find((e) => e.id === b.dataset.estilo).nome} é seu!`); });
+    q('[data-vestir]').forEach((b) => { b.onclick = () => resultado(loja.vestirEstilo(prefs.carteira, b.dataset.vestir), `Vestindo o estilo ${loja.ESTILOS.find((e) => e.id === b.dataset.vestir).nome}.`); });
     q('[data-skate]').forEach((b) => { b.onclick = () => resultado(loja.comprarSkate(prefs.carteira, b.dataset.skate), `${cor.SKATES[b.dataset.skate].nome} é seu!`); });
     q('[data-equipar]').forEach((b) => { b.onclick = () => resultado(loja.equipar(prefs.carteira, b.dataset.equipar), `Usando o ${cor.SKATES[b.dataset.equipar].nome}.`); });
     q('[data-cargas]').forEach((b) => { b.onclick = () => resultado(loja.comprarCargas(prefs.carteira, Number(b.dataset.cargas)), `+${b.dataset.cargas} ${b.dataset.cargas === '1' ? 'carga' : 'cargas'} de skate.`); });
@@ -691,7 +701,7 @@ export function montar(area, ctl) {
     pausaEl.hidden = true;
     camada.hidden = false;
     camada.innerHTML = `<div class="cartao-corrida">
-      <div class="retrato pequeno">${retrato({ ...prefs.personagem, sorriso: 'uau' })}</div>
+      <div class="retrato pequeno">${retrato({ ...prefs.personagem, estilo: prefs.carteira.estilo, sorriso: 'uau' })}</div>
       <strong>${novo ? 'Novo recorde! 🎉' : 'Ops, bateu!'}</strong>
       <small class="alcancou">${EMOJI[perseguidorAgora()]} ${NOMES[perseguidorAgora()].replace(/^./, (l) => l.toUpperCase())} te alcançou!</small>
       <span class="grande-num">${fmt(res.pontos)}</span>
