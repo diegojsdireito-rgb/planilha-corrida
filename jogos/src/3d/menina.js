@@ -446,7 +446,7 @@ export function criarMenina() {
   const matEscuro = new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.4 });
   const matBoca = new THREE.MeshStandardMaterial({ color: 0xb0434f, roughness: 0.45 });
   const matBochecha = new THREE.MeshStandardMaterial({ color: 0xff8a8a, roughness: 0.6, transparent: true, opacity: 0.35, depthWrite: false });
-  const olhos = [];
+  const olhos = []; const sobrancelhas = [];
   for (const lado of [-1, 1]) {
     const x = lado * 0.045; const y = -0.005; const z = superficie(x, y);
     // o olho fica num grupo próprio: achatando o grupo ela pisca; a íris e a pupila se mexem juntas (olhar)
@@ -458,7 +458,7 @@ export function criarMenina() {
     const brilho = peca(new THREE.SphereGeometry(0.0038, 8, 6), matOlho); brilho.position.set(0.005, 0.005, 0.0105); olho.add(brilho);
     const cilios = peca(new THREE.TorusGeometry(0.024, 0.0032, 4, 14, Math.PI), matEscuro); cilios.position.set(x, y + 0.001, z - 0.001); cilios.rotation.x = -0.15; rosto.add(cilios);
     const pontinha = peca(new THREE.CapsuleGeometry(0.0025, 0.008, 2, 4), matEscuro); pontinha.position.set(x + lado * 0.027, y + 0.006, z - 0.006); pontinha.rotation.z = lado * 0.9; rosto.add(pontinha);
-    const sobrancelha = peca(new THREE.CapsuleGeometry(0.0042, 0.03, 3, 6), matEscuro); sobrancelha.rotation.z = Math.PI / 2 + lado * 0.15; sobrancelha.position.set(x + lado * 0.002, 0.038, superficie(x, 0.038) + 0.001); rosto.add(sobrancelha);
+    const sobrancelha = peca(new THREE.CapsuleGeometry(0.0042, 0.03, 3, 6), matEscuro); sobrancelha.rotation.z = Math.PI / 2 + lado * 0.15; sobrancelha.position.set(x + lado * 0.002, 0.038, superficie(x, 0.038) + 0.001); rosto.add(sobrancelha); sobrancelhas.push({ sobrancelha, lado, z0: sobrancelha.rotation.z, y0: sobrancelha.position.y });
     const bochecha = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8), matBochecha); bochecha.scale.set(1.3, 0.8, 0.3); bochecha.position.set(lado * 0.072, -0.045, superficie(lado * 0.072, -0.045) - 0.001); rosto.add(bochecha);
     olhos.push({ olho, mira, brilho });
   }
@@ -470,6 +470,14 @@ export function criarMenina() {
   const zBoca = superficie(0, -0.07);
   sorriso.position.set(0, -0.066, zBoca + 0.002); sorriso.rotation.x = -0.45; rosto.add(sorriso);
   const labio = peca(new THREE.TorusGeometry(0.0265, 0.0042, 6, 18, Math.PI), matBoca); labio.rotation.z = Math.PI; labio.scale.set(1, 1.05, 1); labio.position.set(0, -0.066, zBoca + 0.0); labio.rotation.x = -0.45; rosto.add(labio);
+  // rosto triste: boca para baixo, sobrancelhas levantadas no meio e lágrimas escorrendo
+  const bocaTriste = peca(new THREE.TorusGeometry(0.019, 0.0045, 6, 18, Math.PI), matBoca);
+  bocaTriste.position.set(0, -0.082, zBoca - 0.001); bocaTriste.rotation.x = -0.45; bocaTriste.visible = false; rosto.add(bocaTriste);
+  const matLagrima = new THREE.MeshStandardMaterial({ color: 0x8fd3ff, roughness: 0.05, transparent: true, opacity: 0.85 });
+  const lagrimas = [-1, 1].map((l) => {
+    const g = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 10, 8), matLagrima); g.scale.set(0.8, 1.3, 0.6); g.visible = false; rosto.add(g);
+    return { g, l, x: l * 0.055, z: superficie(l * 0.055, -0.03) + 0.004 };
+  });
   const nuca = peca(new THREE.SphereGeometry(0.148, 28, 18, Math.PI * 0.1, Math.PI * 0.8, Math.PI * 0.35, Math.PI * 0.35), mat.cabeloLiso);
   nuca.rotation.y = Math.PI; cabeca.add(nuca);
   const mechas = [];
@@ -644,7 +652,7 @@ export function criarMenina() {
   // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
   const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'cabecaZ', 'vento', 'balanco',
     'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1', 'm0', 'm1', 'olhar', 'palpebra'];
-  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0 };
+  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0, capturada: 0 };
   // ombro: primeiro torce o braço no próprio eixo (y), depois leva à frente (x) e abre para o lado (z).
   // A torção é o que permite pôr a mão na cintura com o cotovelo para fora.
   for (const b of bracos) b.ombro.rotation.order = 'ZXY';
@@ -789,6 +797,16 @@ export function criarMenina() {
         cx0: -0.05, j0: 0.15 + 0.2 * pulo, cx1: -0.3, j1: 0.5 + 0.2 * pulo, p1: 0.3, cz0: -0.06, cz1: 0.08, vento: 0.15, balanco: 0.05,
       };
     },
+    capturada: (s, t) => {
+      // presa por quem a perseguia: de frente para a tela, ombros caídos, mãos juntas na frente,
+      // cabeça um pouco baixa e soluçando de leve
+      const solu = Math.max(0, Math.sin(t * 7)) * (0.5 + 0.5 * Math.sin(t * 1.3));
+      return {
+        posY: -0.01, troncoX: 0.16 + 0.03 * solu, cabecaX: 0.16 + 0.03 * solu, cabecaZ: 0.08, cabecaY: 0.06 * Math.sin(t * 0.8),
+        ox0: -0.42, oy0: 0.25, oz0: 0.02, c0: -1.05, m0: -0.2, ox1: -0.42, oy1: -0.25, oz1: -0.02, c1: -1.05, m1: -0.2,
+        cz0: -0.02, cz1: 0.02, cx1: -0.04, j0: 0.06, j1: 0.14, p1: 0.08, vento: 0.04, balanco: 0.02, palpebra: 0.3, olhar: 0,
+      };
+    },
     triste: (s, t) => ({
       // não foi dessa vez: ombros caídos e cabeça baixa
       troncoX: 0.22, cabecaX: 0.32, cabecaY: 0.1 * Math.sin(t * 0.6), posY: -0.01,
@@ -847,6 +865,21 @@ export function criarMenina() {
     if (t >= proximaPiscada) { piscada = 0.14; proximaPiscada = t + (Math.random() < 0.2 ? 0.3 : 2 + Math.random() * 3); }
     piscada = Math.max(0, piscada - dtp);
     const fechado = Math.max(a.palpebra, piscada > 0 ? Math.sin((piscada / 0.14) * Math.PI) : 0);
+    // expressão: triste quando perde (tela de fim e captura); sorrindo no resto do tempo
+    const tristeza = Math.min(1, pesos.triste + pesos.capturada);
+    sorriso.visible = tristeza < 0.5; labio.visible = tristeza < 0.5; bocaTriste.visible = tristeza >= 0.5;
+    for (const b of sobrancelhas) {
+      b.sobrancelha.rotation.z = b.z0 - b.lado * 0.45 * tristeza; // a ponta de dentro sobe
+      b.sobrancelha.position.y = b.y0 + 0.004 * tristeza;
+    }
+    for (const l of lagrimas) {
+      l.g.visible = pesos.capturada > 0.5;
+      if (l.g.visible) {
+        const ciclo = ((t * 0.7 + (l.l > 0 ? 0.45 : 0)) % 1);
+        l.g.position.set(l.x + l.l * 0.004 * ciclo, -0.022 - ciclo * 0.06, l.z - ciclo * 0.004);
+        l.g.scale.setScalar(ciclo > 0.9 ? (1 - ciclo) * 10 : 1); l.g.scale.y *= 1.3;
+      }
+    }
     for (const o of olhos) {
       o.olho.scale.y = 1 - 0.92 * fechado;
       o.brilho.visible = fechado < 0.5;

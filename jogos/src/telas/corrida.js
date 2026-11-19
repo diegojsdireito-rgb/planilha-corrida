@@ -58,6 +58,7 @@ export function montar(area, ctl) {
 
   const ctx = tela.getContext('2d');
   let vitrinePose = 'vitrine'; let vitrineAnimando = false;
+  let capturada = null; // segundos desde que quem persegue a alcançou (cena da captura)
   let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
 
@@ -314,7 +315,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose);
+      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose, capturada);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -461,6 +462,7 @@ export function montar(area, ctl) {
     somEl.hidden = emCorrida;
     pausaEl.hidden = !emCorrida;
     if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; return; }
+    if (capturada !== null) { hud.innerHTML = ''; decolarEl.hidden = true; pausaEl.hidden = true; dicaGestos.hidden = true; return; } // a cena da captura fica limpa
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
     hud.innerHTML = `<span class="pts">${cor.pontos(s).toLocaleString('pt-BR')}</span><span class="est">🪙 ${s.moedas}</span>${
       s.dobro > 0 ? `<span class="poder dobro">✖2 ${Math.ceil(s.dobro)}s</span>` : ''}${
@@ -494,12 +496,22 @@ export function montar(area, ctl) {
     if (!s.vivo) {
       // a batida: quem persegue alcança a menina antes da tela de fim
       pegando += dt;
-      if (cor.alcancar(s, dt) || pegando > 1.4) {
-        desenhar(agora / 1000);
-        rodando = false;
+      if (capturada === null && (cor.alcancar(s, dt) || pegando > 1.4)) {
+        // pegou! ela se vira para a tela, triste, presa por quem a perseguia
+        capturada = 0;
         desenharHud();
         ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
-        return setTimeout(fimDeJogo, 350);
+        setTimeout(() => ctl.som('derrota'), 700);
+      }
+      if (capturada !== null) {
+        capturada += dt;
+        if (capturada > 2.8) {
+          desenhar(agora / 1000);
+          rodando = false;
+          capturada = null;
+          desenharHud();
+          return fimDeJogo();
+        }
       }
     }
     desenhar(agora / 1000);
@@ -528,6 +540,7 @@ export function montar(area, ctl) {
     s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
     temaVisto = null;
     pegando = 0;
+    capturada = null;
     camada.innerHTML = '';
     camada.hidden = true;
     pausado = false;

@@ -40,6 +40,7 @@ function prepararComuns() {
   };
 }
 
+const suave = (x) => x * x * (3 - 2 * x);
 const COMUNS = () => new Set([GEO_MOEDA, ...MAT_MOEDA, ...Object.values(TEX_PODER), texBrilho()]);
 
 function criarObjeto(o, tema) {
@@ -174,21 +175,34 @@ export function criarMundo(canvas) {
 
   // vitrine: no saguão e na tela de fim ela fica de frente para a câmera, à esquerda da tela,
   // com a rua do cenário ao fundo ('vitrine', 'comemora' ou 'triste')
-  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao', vitrine = null) {
+  // captura: segundos desde que quem persegue a alcançou; ela se vira para a tela, triste, e ele a segura
+  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao', vitrine = null, captura = null) {
     trocarCenario(tema);
     trocarPerseguidor(quemPersegue(tema, escolhaFloresta));
     const dt = Math.min(0.05, Math.max(0, t - ultimoT));
     ultimoT = t;
     const dist = s.dist;
     menina.vestir(visual.pele, visual.roupa, visual.estilo);
-    menina.posar(s, t, vitrine);
+    const kc = captura === null ? 0 : suave(Math.min(1, captura / 0.8)); // vira para a tela aos poucos
+    menina.posar(s, t, vitrine ?? (captura !== null ? 'capturada' : null));
     if (vitrine) menina.raiz.rotation.set(0, Math.PI + 0.28 + Math.sin(t * 0.4) * 0.05, 0);
+    else if (captura !== null) menina.raiz.rotation.set(0, Math.PI * kc - 0.12 * kc, 0);
 
     // quem persegue: logo atrás dela, um pouco de lado para não tapar a menina
     const dp = s.perseguidor?.dist ?? 99;
     // mais longe que isso ele já estaria em cima da câmera: some de vista
-    perseguidor.raiz.visible = dp < 1.9 && !vitrine;
-    if (perseguidor.raiz.visible) {
+    perseguidor.raiz.visible = (dp < 1.9 || captura !== null) && !vitrine;
+    if (captura !== null) {
+      // ele dá a volta e fica ao lado dela, de frente para a tela, segurando-a
+      const quadrupede = ['leao', 'panda', 'urso'].includes(perseguidorId);
+      const alvoX = xDe(s.x) + (quadrupede ? 0.45 : 0.5); const alvoZ = quadrupede ? 0.5 : 0.18;
+      const de = { x: perX + 0.18, z: -dp };
+      perseguidor.raiz.position.set(de.x + (alvoX - de.x) * kc, 0, de.z + (alvoZ - de.z) * kc);
+      perseguidor.raiz.rotation.y = Math.PI * kc;
+      perseguidor.raiz.scale.setScalar(0.8);
+      if (kc < 1) perseguidor.animar(t * 9); else perseguidor.segurar(t);
+    } else if (perseguidor.raiz.visible) {
+      perseguidor.raiz.rotation.y = 0;
       perX += (xDe(s.x) - perX) * 0.08;
       const lado = s.faixa === 0 ? -1 : 1; // fica do lado de dentro da pista
       perseguidor.raiz.position.set(perX + lado * (dp > 0.5 ? 0.32 : 0.18), 0, -dp);
@@ -203,6 +217,7 @@ export function criarMundo(canvas) {
     const vistos = new Set();
     for (const o of s.objetos) {
       if (o.pego || o.quebrado || o.z > LONGE + 2) continue;
+      if (captura !== null && kc > 0.5 && o.z < 4) continue; // na cena da captura, nada na frente deles
       let m = objetos.get(o);
       if (!m) { m = criarObjeto(o, tema); objetos.set(o, m); cena.add(m); }
       vistos.add(o);
@@ -219,7 +234,12 @@ export function criarMundo(canvas) {
     }
 
     const px = xDe(s.x);
-    if (vitrine) {
+    if (captura !== null && !vitrine) {
+      // a câmera desce e chega perto, com os dois no meio da tela
+      const cx = px + 0.22; const k2 = kc;
+      camera.position.set(camX + (cx - camX) * k2, camY + (1.2 - camY) * k2, -2.9 + 0.5 * k2);
+      camera.lookAt((px * 0.85) + (cx - px * 0.85) * k2, (0.95 + s.y * 0.6) + (0.82 - 0.95 - s.y * 0.6) * k2, 6 - 6 * k2);
+    } else if (vitrine) {
       // de frente para ela; olhando um pouco para a direita da tela (−x), ela fica à esquerda
       camX = px - 0.62; camY = 2.35;
       camera.position.set(px - 0.62, 1.05, -2.75);

@@ -78,6 +78,16 @@ function quadrupede({ corpo, barriga, patas, cabeca, focinho, orelhas, nariz = 0
       cauda.rotation.x = 0.6 + Math.sin(fase * 2) * 0.3;
       cauda.rotation.y = Math.sin(fase) * 0.4;
     },
+    segurar(t) {
+      // pegou: parado, com uma pata da frente apoiada no ombro dela e o rabo abanando, todo contente
+      for (const p of pernas) p.piv.rotation.set(0, 0, 0);
+      // a pata do lado dela vai para o lado, por cima do ombro dela (sem tapar a própria cara)
+      const pataNoOmbro = pernas.find((p) => p.frente && p.lado > 0);
+      pataNoOmbro.piv.rotation.set(-0.35, 0, 1.75 + Math.sin(t * 3) * 0.05);
+      tronco.position.y = 0.72; tronco.rotation.x = -0.12;
+      pescoco.rotation.x = 0.25 + Math.sin(t * 1.5) * 0.05;
+      cauda.rotation.x = 0.9; cauda.rotation.y = Math.sin(t * 8) * 0.6;
+    },
   };
 }
 
@@ -164,6 +174,14 @@ function caranguejo() {
       raiz.position.y = Math.abs(Math.sin(fase * 2)) * 0.05;
       raiz.rotation.z = Math.sin(fase * 2) * 0.05;
     },
+    segurar(t) {
+      // pegou: as pinças erguidas, fechando e abrindo, prendendo a menina
+      for (const p of pernas) {
+        if (p.pinca) { p.pinca.rotation.x = -0.6 + Math.sin(t * 6 + p.lado) * 0.25; continue; }
+        p.piv.rotation.z = 0;
+      }
+      raiz.position.y = 0; raiz.rotation.z = Math.sin(t * 2) * 0.04;
+    },
   };
 }
 
@@ -228,6 +246,14 @@ function policial() {
       tronco.rotation.x = 0.16;
       corpo.position.y = 0.02 + Math.abs(Math.sin(fase)) * 0.05;
     },
+    segurar(t) {
+      // pegou: em pé, a mão no ombro dela e a outra com o apito
+      pernas.forEach((p) => { p.coxa.rotation.x = 0; p.joelho.rotation.x = 0.05; });
+      corpo.rotation.y = 0; corpo.position.y = 0; tronco.rotation.set(0.12, 0, 0); cabeca.rotation.set(0.25, 0.1 * Math.sin(t), 0);
+      // (ele fica de frente para a tela, à direita dela: o braço direito dele, de índice 1, é o do lado dela)
+      bracos[1].ombro.rotation.set(-0.7, 0, 0.55); bracos[1].cotovelo.rotation.x = -0.45; // mão no ombro dela
+      bracos[0].ombro.rotation.set(-0.55 + Math.sin(t * 4) * 0.04, 0, -0.08); bracos[0].cotovelo.rotation.x = -2.35; // apito na boca
+    },
   };
 }
 
@@ -239,5 +265,5 @@ export function criarPerseguidor(id) {
   const modelo = (CRIAR[id] ?? policial)();
   const raiz = new THREE.Group();
   raiz.add(modelo.raiz);
-  return { raiz, animar: modelo.animar };
+  return { raiz, animar: modelo.animar, segurar: modelo.segurar };
 }
