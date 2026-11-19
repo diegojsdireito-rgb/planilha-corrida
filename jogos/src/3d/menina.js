@@ -291,6 +291,8 @@ export function criarMenina() {
     const joelho = new THREE.Group(); joelho.position.y = -0.285; coxa.add(joelho);
     const mCanela = peca(torneada([[0, 0.035], [0.024, 0.032], [0.04, 0.02], [0.046, 0], [0.05, -0.05], [0.048, -0.1], [0.038, -0.19], [0.031, -0.25], [0, -0.26]]), mat.pele);
     mCanela.scale.z = 0.95; joelho.add(mCanela);
+    // enchimento do joelho, do mesmo tecido: quando a perna dobra não aparece emenda
+    const bolaJoelho = peca(new THREE.SphereGeometry(0.045, 16, 12), mat.pele); bolaJoelho.scale.z = 0.93; joelho.add(bolaJoelho);
     const meia = peca(new THREE.CylinderGeometry(0.036, 0.034, 0.06, 14), mat.branco); meia.position.y = -0.245; joelho.add(meia);
     // tênis: cabedal arredondado, biqueira, solado colorido, cadarços e calcanhar
     const tenis = new THREE.Group(); tenis.position.set(0, -0.3, 0.035); joelho.add(tenis);
@@ -311,7 +313,7 @@ export function criarMenina() {
     const bordaCano = peca(new THREE.TorusGeometry(0.047, 0.008, 6, 16), mat.detalhe); bordaCano.rotation.x = Math.PI / 2; bordaCano.position.set(0, 0.1, -0.035); tenis.add(bordaCano);
     const barraCalca = peca(new THREE.CylinderGeometry(0.05, 0.046, 0.05, 16), mat.perna); barraCalca.position.y = -0.24; joelho.add(barraCalca);
     quadril.add(coxa);
-    return { coxa, joelho, tenis, lado, mCoxa, mCanela, barra, meia, cano: [cano, bordaCano], barraCalca };
+    return { coxa, joelho, tenis, lado, mCoxa, mCanela, bolaJoelho, barra, meia, cano: [cano, bordaCano], barraCalca };
   });
 
   // ---- tronco ----
@@ -331,6 +333,22 @@ export function criarMenina() {
   const mCapuz = peca(new THREE.SphereGeometry(0.12, 22, 16, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), mat.camiseta);
   mCapuz.material = mat.mangaLonga; mCapuz.scale.set(1.1, 0.75, 0.75); mCapuz.rotation.x = -0.5; capuz.add(mCapuz);
   const bordaCapuz = peca(new THREE.TorusGeometry(0.1, 0.014, 8, 24), mat.mangaLonga); bordaCapuz.rotation.x = Math.PI / 2 - 0.6; bordaCapuz.position.set(0, 0.03, 0.01); bordaCapuz.scale.set(1.1, 0.9, 1); capuz.add(bordaCapuz);
+  // capuz vestido na cabeça (estilo street): uma casca em volta da cabeça com a abertura do rosto
+  // virada para a frente e um pouco para baixo; o cabelo comprido sai por baixo, nas costas
+  const capuzCabeca = new THREE.Group(); capuzCabeca.position.set(0, 0.012, -0.012); // vai para a cabeça logo abaixo
+  const cordoes = new THREE.Group(); tronco.add(cordoes);
+  const ABERTURA = 1.18;
+  const cascaCapuz = peca(new THREE.SphereGeometry(0.178, 32, 20, 0, Math.PI * 2, ABERTURA, Math.PI - ABERTURA), mat.mangaLonga);
+  cascaCapuz.rotation.x = Math.PI / 2 + 0.38; cascaCapuz.scale.set(0.98, 1.04, 1.04); capuzCabeca.add(cascaCapuz);
+  const bainhaCapuz = peca(new THREE.TorusGeometry(0.178 * Math.sin(ABERTURA), 0.016, 8, 32), mat.mangaLonga);
+  const eixo = new THREE.Vector3(0, Math.cos(Math.PI / 2 + 0.38), Math.sin(Math.PI / 2 + 0.38));
+  bainhaCapuz.position.copy(eixo).multiplyScalar(0.178 * Math.cos(ABERTURA)); bainhaCapuz.position.y *= 1.04; bainhaCapuz.position.z *= 1.04;
+  bainhaCapuz.lookAt(eixo.clone().multiplyScalar(2)); capuzCabeca.add(bainhaCapuz);
+  // cordões do capuz
+  for (const l of [-1, 1]) {
+    const cordao = peca(new THREE.CylinderGeometry(0.004, 0.004, 0.11, 6), mat.branco); cordao.position.set(l * 0.035, 0.38, 0.105); cordao.rotation.set(0.25, 0, -l * 0.08); cordoes.add(cordao);
+    const ponta = peca(new THREE.CylinderGeometry(0.006, 0.006, 0.016, 6), mat.detalhe); ponta.position.set(l * 0.039, 0.32, 0.118); ponta.rotation.x = 0.25; cordoes.add(ponta);
+  }
   // saia xadrez rodada (estilo jeans)
   const saia = peca(new THREE.CylinderGeometry(0.152, 0.245, 0.22, 32, 1, true), mat.saia); saia.position.y = -0.03; saia.scale.z = 0.82; quadril.add(saia);
   const gola = peca(new THREE.TorusGeometry(0.058, 0.012, 8, 20), mat.branco); gola.rotation.x = Math.PI / 2; gola.position.y = 0.45; tronco.add(gola);
@@ -339,18 +357,18 @@ export function criarMenina() {
   const bracos = [-1, 1].map((lado) => {
     const ombro = new THREE.Group(); ombro.position.set(lado * 0.175, 0.385, 0); tronco.add(ombro);
     const manga = peca(torneada([[0, 0.035], [0.035, 0.034], [0.05, 0.015], [0.052, -0.03], [0.048, -0.075], [0.047, -0.08], [0, -0.08]], 18), mat.camiseta); ombro.add(manga);
-    const mBraco = peca(torneada([[0, 0.02], [0.04, 0.01], [0.043, -0.05], [0.038, -0.14], [0.034, -0.195], [0.024, -0.21], [0, -0.215]]), mat.pele); ombro.add(mBraco);
+    const mBraco = peca(torneada([[0, 0.02], [0.04, 0.01], [0.043, -0.05], [0.038, -0.14], [0.034, -0.2], [0.03, -0.222], [0, -0.232]]), mat.pele); ombro.add(mBraco);
     const cotovelo = new THREE.Group(); cotovelo.position.y = -0.2; ombro.add(cotovelo);
-    const mAnte = peca(torneada([[0, 0.03], [0.02, 0.028], [0.031, 0.015], [0.034, 0], [0.034, -0.05], [0.028, -0.15], [0.025, -0.17], [0, -0.175]]), mat.pele); cotovelo.add(mAnte);
+    const mAnte = peca(torneada([[0, 0.034], [0.024, 0.031], [0.032, 0.016], [0.034, 0], [0.034, -0.05], [0.028, -0.15], [0.025, -0.17], [0, -0.175]]), mat.pele); cotovelo.add(mAnte);
     const mao = new THREE.Group(); mao.position.y = -0.19; cotovelo.add(mao);
     const palma = peca(new THREE.SphereGeometry(0.036, 14, 10), mat.pele); palma.scale.set(0.8, 1.1, 0.6); mao.add(palma);
     const polegar = peca(new THREE.CapsuleGeometry(0.011, 0.03, 4, 8), mat.pele); polegar.position.set(-lado * 0.022, 0.005, 0.015); polegar.rotation.z = lado * 0.6; mao.add(polegar);
     const punho = peca(new THREE.CylinderGeometry(0.031, 0.033, 0.035, 14), mat.mangaLonga); punho.position.y = -0.165; cotovelo.add(punho);
-    return { ombro, cotovelo, manga, mBraco, mAnte, punho };
+    return { ombro, cotovelo, mao, manga, mBraco, mAnte, punho };
   });
 
   // ---- cabeça e cabelo ----
-  const cabeca = new THREE.Group(); cabeca.position.y = 0.6; tronco.add(cabeca);
+  const cabeca = new THREE.Group(); cabeca.position.y = 0.6; tronco.add(cabeca); cabeca.add(capuzCabeca);
   const cranio = peca(new THREE.SphereGeometry(0.142, 32, 24), mat.pele); cranio.scale.set(0.92, 1.04, 0.98); cabeca.add(cranio);
   for (const lado of [-1, 1]) {
     const orelha = peca(new THREE.SphereGeometry(0.028, 12, 10), mat.pele); orelha.scale.set(0.5, 1, 0.8); orelha.position.set(lado * 0.13, -0.01, -0.005); cabeca.add(orelha);
@@ -373,15 +391,18 @@ export function criarMenina() {
   const olhos = [];
   for (const lado of [-1, 1]) {
     const x = lado * 0.045; const y = -0.005; const z = superficie(x, y);
-    const branco = peca(new THREE.SphereGeometry(0.022, 18, 12), matOlho); branco.scale.set(1.15, 0.95, 0.55); branco.position.set(x, y, z - 0.004); rosto.add(branco);
-    const iris = peca(new THREE.SphereGeometry(0.0145, 16, 12), matIris); iris.scale.set(1, 1, 0.45); iris.position.set(x + lado * 0.002, y - 0.002, z + 0.006); rosto.add(iris);
-    const pupila = peca(new THREE.SphereGeometry(0.0072, 12, 8), matEscuro); pupila.scale.set(1, 1, 0.45); pupila.position.set(x + lado * 0.002, y - 0.002, z + 0.0088); rosto.add(pupila);
-    const brilho = peca(new THREE.SphereGeometry(0.0038, 8, 6), matOlho); brilho.position.set(x + 0.005, y + 0.005, z + 0.0105); rosto.add(brilho);
+    // o olho fica num grupo próprio: achatando o grupo ela pisca; a íris e a pupila se mexem juntas (olhar)
+    const olho = new THREE.Group(); olho.position.set(x, y, z); rosto.add(olho);
+    const branco = peca(new THREE.SphereGeometry(0.022, 18, 12), matOlho); branco.scale.set(1.15, 0.95, 0.55); branco.position.set(0, 0, -0.004); olho.add(branco);
+    const mira = new THREE.Group(); olho.add(mira);
+    const iris = peca(new THREE.SphereGeometry(0.0145, 16, 12), matIris); iris.scale.set(1, 1, 0.45); iris.position.set(lado * 0.002, -0.002, 0.006); mira.add(iris);
+    const pupila = peca(new THREE.SphereGeometry(0.0072, 12, 8), matEscuro); pupila.scale.set(1, 1, 0.45); pupila.position.set(lado * 0.002, -0.002, 0.0088); mira.add(pupila);
+    const brilho = peca(new THREE.SphereGeometry(0.0038, 8, 6), matOlho); brilho.position.set(0.005, 0.005, 0.0105); olho.add(brilho);
     const cilios = peca(new THREE.TorusGeometry(0.024, 0.0032, 4, 14, Math.PI), matEscuro); cilios.position.set(x, y + 0.001, z - 0.001); cilios.rotation.x = -0.15; rosto.add(cilios);
     const pontinha = peca(new THREE.CapsuleGeometry(0.0025, 0.008, 2, 4), matEscuro); pontinha.position.set(x + lado * 0.027, y + 0.006, z - 0.006); pontinha.rotation.z = lado * 0.9; rosto.add(pontinha);
     const sobrancelha = peca(new THREE.CapsuleGeometry(0.0042, 0.03, 3, 6), matEscuro); sobrancelha.rotation.z = Math.PI / 2 + lado * 0.15; sobrancelha.position.set(x + lado * 0.002, 0.038, superficie(x, 0.038) + 0.001); rosto.add(sobrancelha);
     const bochecha = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8), matBochecha); bochecha.scale.set(1.3, 0.8, 0.3); bochecha.position.set(lado * 0.072, -0.045, superficie(lado * 0.072, -0.045) - 0.001); rosto.add(bochecha);
-    olhos.push({ branco, iris, pupila, brilho });
+    olhos.push({ olho, mira, brilho });
   }
   const nariz = peca(new THREE.SphereGeometry(0.011, 12, 8), mat.pele); nariz.scale.set(1, 0.85, 0.9); nariz.position.set(0, -0.036, superficie(0, -0.036) + 0.003); rosto.add(nariz);
   // sorriso: dentes brancos em forma de meia-lua com o contorno dos lábios
@@ -508,7 +529,7 @@ export function criarMenina() {
     // partes de cima
     faixa.visible = Boolean(e.faixa);
     barraCamiseta.material = estilo === 'moletom' ? mat.branco : mat.roupa; // barra do moletom é off-white, como na foto
-    capuz.visible = Boolean(e.capuz);
+    capuz.visible = false; capuzCabeca.visible = Boolean(e.capuz); cordoes.visible = Boolean(e.capuz);
     jaqueta.visible = Boolean(e.jaqueta); golaJaqueta.visible = Boolean(e.jaqueta);
     camiseta.scale.set(e.largo ? 1.07 : 1, 1, e.largo ? 0.78 : 0.72);
     for (const b of bracos) {
@@ -529,6 +550,7 @@ export function criarMenina() {
       p2.barra.position.y = e.bermuda ? -0.1 : -0.035;
       p2.meia.visible = !e.calca && !e.meiao;
       p2.barraCalca.visible = Boolean(e.calca);
+      p2.bolaJoelho.material = p2.mCoxa.material;
       for (const c of p2.cano) c.visible = Boolean(e.cano);
     }
     // cabeça
@@ -544,13 +566,14 @@ export function criarMenina() {
   // pos/rot = corpo inteiro; quadril e tronco giram ao contrário um do outro; cx/cz = coxa,
   // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
   const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'cabecaZ', 'vento', 'balanco',
-    'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1'];
+    'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1', 'm0', 'm1', 'olhar', 'palpebra'];
   const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0 };
   // ombro: primeiro torce o braço no próprio eixo (y), depois leva à frente (x) e abre para o lado (z).
   // A torção é o que permite pôr a mão na cintura com o cotovelo para fora.
   for (const b of bracos) b.ombro.rotation.order = 'ZXY';
   const maoNaCintura = (k) => ({ [`ox${k}`]: 0.25, [`oy${k}`]: -lado(k) * 1.45, [`oz${k}`]: lado(k) * 0.75, [`c${k}`]: -1.75 });
   const lado = (k) => (k ? 1 : -1);
+  const suave = (x) => x * x * (3 - 2 * x);
   const POSES = {
     parado: (s, t) => {
       const w = Math.sin(t * 1.1); // passa o peso de uma perna para a outra
@@ -562,7 +585,9 @@ export function criarMenina() {
         r[`ox${k}`] = -0.05 + 0.04 * Math.sin(t * 1.3 + k);
         r[`oz${k}`] = lado(k) * 0.12;
         r[`c${k}`] = -0.22;
+        r[`m${k}`] = -0.12; // a mão relaxada, levemente dobrada
       }
+      r.olhar = 0.6 * Math.sin(t * 0.45 + 0.5); // os olhos chegam antes da cabeça
       return r;
     },
     corrida: (s, t, f) => {
@@ -584,7 +609,9 @@ export function criarMenina() {
         r[`ox${k}`] = -0.15 - 0.75 * aw;
         r[`oz${k}`] = lado(k) * (0.16 - 0.08 * Math.max(0, aw));
         r[`c${k}`] = -1.25 - 0.3 * Math.max(0, aw);
+        r[`m${k}`] = -0.1 - 0.18 * Math.sin(f + (k ? 0 : Math.PI) - 0.6); // o pulso vem atrasado em relação ao braço
       }
+      r.troncoZ = 0.035 * Math.sin(f);
       return r;
     },
     ar: (s) => {
@@ -636,15 +663,26 @@ export function criarMenina() {
       };
     },
     vitrine: (s, t) => {
-      // no saguão: mão na cintura, peso numa perna, cabeça inclinada, respirando
+      // no saguão: mão na cintura, peso numa perna, cabeça inclinada, respirando;
+      // de tempos em tempos ela acena para quem está jogando e troca o peso de perna
       const r = POSES.parado(s, t);
       const resp = Math.sin(t * 2.2);
-      return {
-        ...r, ...maoNaCintura(1), posX: 0.02, quadrilZ: 0.09, troncoZ: -0.07, troncoX: 0.02 + 0.012 * resp, troncoY: 0.12,
-        cabecaZ: 0.1 + 0.02 * Math.sin(t * 0.9), cabecaY: -0.1 + 0.12 * Math.sin(t * 0.5), cabecaX: 0.02,
-        cx0: 0, cz0: -0.06, j0: 0.03, p0: 0, cx1: -0.12, cz1: 0.12, j1: 0.32, p1: 0.25,
-        ox0: 0.05 + 0.03 * resp, oy0: 0, oz0: -0.18, c0: -0.25, vento: 0.05, balanco: 0.02,
+      const ciclo = (t + 3) % 9; // a cada 9 s, um aceno de quase 2 s
+      const aceno = suave(Math.min(1, ciclo / 0.35)) * suave(Math.min(1, Math.max(0, (2.1 - ciclo) / 0.35)));
+      const peso = suave(0.5 + 0.5 * Math.sin(t * 0.35)); // passa o peso de uma perna para a outra, devagar
+      const v = {
+        ...r, ...maoNaCintura(1), posX: 0.02 - 0.02 * peso, quadrilZ: 0.09 - 0.05 * peso, troncoZ: -0.07 + 0.03 * peso, troncoX: 0.02 + 0.012 * resp, troncoY: 0.12,
+        cabecaZ: 0.1 + 0.02 * Math.sin(t * 0.9) - 0.06 * aceno, cabecaY: -0.1 + 0.12 * Math.sin(t * 0.5), cabecaX: 0.02 - 0.04 * aceno,
+        cx0: -0.04 * peso, cz0: -0.06, j0: 0.03 + 0.12 * peso, p0: 0.1 * peso, cx1: -0.12 + 0.08 * peso, cz1: 0.12, j1: 0.32 - 0.22 * peso, p1: 0.25 - 0.2 * peso,
+        ox0: 0.05 + 0.03 * resp, oy0: 0, oz0: -0.18, c0: -0.25, m0: -0.12, m1: 0.3, vento: 0.05, balanco: 0.02,
       };
+      if (aceno > 0) {
+        // braço levantado ao lado do rosto, o antebraço balançando de um lado para o outro
+        const alvo = { ox0: -0.25, oy0: -1.45, oz0: -1.35, c0: -1.55 + 0.38 * Math.sin(t * 11), m0: 0.1 };
+        for (const [j, x] of Object.entries(alvo)) v[j] = v[j] * (1 - aceno) + x * aceno;
+        v.olhar *= 1 - aceno;
+      }
+      return v;
     },
     comemora: (s, t) => {
       // recorde: braço para cima, a outra mão na cintura, pulinhos
@@ -659,7 +697,7 @@ export function criarMenina() {
       // não foi dessa vez: ombros caídos e cabeça baixa
       troncoX: 0.22, cabecaX: 0.32, cabecaY: 0.1 * Math.sin(t * 0.6), posY: -0.01,
       ox0: 0.12, oz0: -0.06, c0: -0.15, ox1: 0.12, oz1: 0.06, c1: -0.15,
-      cz0: -0.03, cz1: 0.03, j0: 0.08, j1: 0.12, vento: 0.04, balanco: 0.02,
+      cz0: -0.03, cz1: 0.03, j0: 0.08, j1: 0.12, vento: 0.04, balanco: 0.02, palpebra: 0.35, m0: -0.05, m1: -0.05,
     }),
     batida: () => ({
       // o susto da batida: tronco para trás e braços para cima
@@ -668,6 +706,9 @@ export function criarMenina() {
     }),
   };
   let ultimoTPose = null; let yAntes = 0; let pouso = 0;
+  // a cabeça segue o corpo com um pouquinho de atraso e de sobra (como uma mola), o que tira o ar de boneco
+  const mola = { cabecaX: [0, 0], cabecaY: [0, 0], cabecaZ: [0, 0] };
+  let proximaPiscada = 1.5; let piscada = 0;
 
   function posar(s, t, poseForcada = null) {
     const dtp = ultimoTPose === null ? 1 : Math.min(0.05, Math.max(0, t - ultimoTPose));
@@ -698,6 +739,23 @@ export function criarMenina() {
       total += w;
     }
     for (const j of JUNTAS) a[j] /= total;
+    for (const [j, m] of Object.entries(mola)) {
+      if (dtp >= 1) { m[0] = a[j]; m[1] = 0; } else {
+        // mola amortecida: frequência ~16 rad/s, amortecimento 0,6
+        m[1] += ((a[j] - m[0]) * 256 - m[1] * 19) * dtp;
+        m[0] += m[1] * dtp;
+      }
+      a[j] = m[0];
+    }
+    // piscar: a cada 2 a 5 s, rápido; às vezes duas vezes seguidas
+    if (t >= proximaPiscada) { piscada = 0.14; proximaPiscada = t + (Math.random() < 0.2 ? 0.3 : 2 + Math.random() * 3); }
+    piscada = Math.max(0, piscada - dtp);
+    const fechado = Math.max(a.palpebra, piscada > 0 ? Math.sin((piscada / 0.14) * Math.PI) : 0);
+    for (const o of olhos) {
+      o.olho.scale.y = 1 - 0.92 * fechado;
+      o.brilho.visible = fechado < 0.5;
+      o.mira.position.x = 0.0045 * a.olhar;
+    }
 
     // troca de faixa: inclina para dentro da curva e vira um pouco o corpo para o lado
     const desvio = s.x - s.faixa;
@@ -716,6 +774,7 @@ export function criarMenina() {
     bracos.forEach((b, i) => {
       b.ombro.rotation.set(a[`ox${i}`], a[`oy${i}`], a[`oz${i}`]);
       b.cotovelo.rotation.x = a[`c${i}`];
+      b.mao.rotation.set(a[`m${i}`], 0, -lado(i) * 0.08);
     });
     // cada mecha balança com um pouco de atraso em relação às outras
     for (const m of mechas) {
