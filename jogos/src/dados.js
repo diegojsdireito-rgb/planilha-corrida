@@ -1,4 +1,5 @@
 // Tudo fica no aparelho (localStorage): preferências, histórico e partidas em andamento.
+import { normalizar, mesclarCarteiras } from './loja.js';
 
 const CHAVE = 'mesa-de-jogos';
 const SALVO = `${CHAVE}:salvo:`;
@@ -17,6 +18,7 @@ export const prefs = {
   som: inicial.som ?? true,
   historico: inicial.historico ?? [],
   personagem: inicial.personagem ?? { pele: 1, roupa: 0 },
+  carteira: normalizar(inicial.carteira),
 };
 
 // Migra o placar da primeira versão, que não guardava histórico.
@@ -70,7 +72,7 @@ export function montarCopia(jogos) {
     const s = lerSalvo(id);
     if (s) salvos[id] = s;
   }
-  return { app: MARCA, versao: 1, criada: Date.now(), nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, historico: prefs.historico, salvos };
+  return { app: MARCA, versao: 1, criada: Date.now(), nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, historico: prefs.historico, salvos };
 }
 
 const chaveDoRegistro = (h) => `${h.j}|${h.r}|${h.t}|${h.tempo ?? ''}`;
@@ -108,6 +110,7 @@ export function restaurarCopia(texto, jogos) {
   const r = mesclar(prefs.historico, salvosAtuais, copia);
   prefs.historico = r.historico;
   if (copia.personagem) prefs.personagem = copia.personagem;
+  if (copia.carteira) prefs.carteira = mesclarCarteiras(prefs.carteira, copia.carteira);
   guardar();
   for (const [id, s] of Object.entries(r.salvos)) {
     try { localStorage.setItem(SALVO + id, JSON.stringify(s)); } catch { /* sem armazenamento */ }

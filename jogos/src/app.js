@@ -68,7 +68,7 @@ const JOGOS = [
     'No nível difícil, o robô não erra: o melhor resultado possível é o empate.',
     'Quem começa alterna a cada partida.',
   ] },
-  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Pule, deslize e pegue estrelas', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
+  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Moedas, skates e poderes', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
     resumo() {
       const n = prefs.historico.filter((h) => h.j === 'corrida').length;
       const r = telaCorrida.recorde();
@@ -79,10 +79,13 @@ const JOGOS = [
       };
     },
     regras: [
-      'Deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. Também dá para usar os botões embaixo ou as setas do teclado.',
+      'Deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. Os botões embaixo e as setas do teclado também funcionam.',
       'Pule as cercas, deslize por baixo das bandeirinhas e troque de faixa para fugir dos carrinhos de sorvete.',
-      'Cada estrela vale 10 pontos. O ímã puxa as estrelas por alguns segundos; a bolha protege de uma batida.',
-      'A corrida fica mais rápida com o tempo. O nível escolhe a velocidade.',
+      'Pegue moedas: elas ficam guardadas e compram skates, cargas de skate e melhorias na Loja.',
+      'Na pista aparecem poderes: 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🎒 maleta voadora e 🛡️ escudo.',
+      'Os raios ⚡ enchem a supercarga. Cheia, toque no botão ⚡: corre mais rápido, pula mais alto e atravessa os obstáculos.',
+      'Toque em 🛹 para subir no skate: ele aguenta uma batida. O voador pula mais alto; o supersônico é mais rápido e dá moedas em dobro.',
+      'Cumpra missões e abra o presente do dia na aba Prêmios para ganhar mais moedas.',
     ] },
   { id: 'docinhos', nome: 'Docinhos', descricao: 'Junte 3 doces iguais', solo: true, semNivel: true, tela: telaDocinhos,
     resumo() {
