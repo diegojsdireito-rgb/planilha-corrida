@@ -4,7 +4,7 @@
 import { THREE, xDe, textura, ruido, sombrear, texBrilho } from './base.js';
 import { PELES, ROUPAS } from '../personagem.js';
 
-const CABELO = ['#69361d', '#733c21', '#7d4526', '#86492a', '#8f502e'];
+const CABELO = ['#2c1a10', '#331e12', '#3b2316', '#46291a', '#52301f']; // castanho-escuro, com pontas um pouco mais claras
 
 // Peça torneada: perfil (raio, altura) girado em volta do eixo vertical.
 function torneada(perfil, segmentos = 20) {
@@ -77,7 +77,20 @@ function tieDye(ctx, w, h, cor) {
 // Parte de cima de cada estilo.
 function texParteDeCima(estilo, cor) {
   return textura(512, 256, (ctx, w, h) => {
-    if (estilo === 'street') {
+    if (estilo === 'moletom') {
+      // moletom branco com raglan azul-marinho (faixas que descem do pescoço para as axilas) e o número na frente e nas costas
+      const marinho = '#1f2a52';
+      ctx.fillStyle = '#f6f4ee'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = marinho;
+      for (const u of [0.25, 0.75]) {
+        ctx.beginPath(); ctx.moveTo(w * u - 70, 0); ctx.lineTo(w * u + 70, 0); ctx.lineTo(w * u + 26, h * 0.42); ctx.lineTo(w * u - 26, h * 0.42); ctx.fill();
+      }
+      ctx.fillStyle = '#e8e5dc'; ctx.fillRect(0, h - 22, w, 22); // barra canelada
+      ctx.fillStyle = 'rgba(0,0,0,.06)'; for (let x = 0; x < w; x += 5) ctx.fillRect(x, h - 22, 2, 22);
+      texto(ctx, '9', w * 0.5, h * 0.6, 120, marinho);
+      texto(ctx, '9', 0, h * 0.6, 120, marinho); texto(ctx, '9', w, h * 0.6, 120, marinho);
+      malhaFina(ctx, w, h);
+    } else if (estilo === 'street') {
       ctx.fillStyle = cor; ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = escurecer(cor, 0.15); ctx.fillRect(0, h - 26, w, 26); // barra canelada
       ctx.fillStyle = 'rgba(0,0,0,.1)'; for (let x = 0; x < w; x += 6) ctx.fillRect(x, h - 26, 2, 26);
@@ -112,7 +125,11 @@ function texParteDeCima(estilo, cor) {
 // Parte de baixo de cada estilo (short, calça, bermuda ou legging).
 function texParteDeBaixo(estilo, cor) {
   return textura(256, 128, (ctx, w, h) => {
-    if (estilo === 'street') {
+    if (estilo === 'moletom') {
+      ctx.fillStyle = '#1f2a52'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff'; for (const u of [0.25, 0.75]) { ctx.fillRect(w * u - 6, 0, 4, h); ctx.fillRect(w * u + 2, 0, 4, h); }
+      ruido(ctx, w, h, 500, 'rgba(255,255,255,.04)', 1);
+    } else if (estilo === 'street') {
       ctx.fillStyle = '#3a3f4f'; ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = '#ffffff'; for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 3, 0, 6, h);
     } else if (estilo === 'skatista') {
@@ -129,6 +146,15 @@ function texParteDeBaixo(estilo, cor) {
       ctx.fillStyle = cor; for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 4, 0, 8, h);
       ruido(ctx, w, h, 600, 'rgba(255,255,255,.04)', 1);
     }
+  });
+}
+
+// Manga azul-marinho com estrelas brancas.
+function texMangaEstrelas() {
+  return textura(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#1f2a52'; ctx.fillRect(0, 0, w, h);
+    texto(ctx, '★', w * 0.3, h * 0.35, 40, '#ffffff');
+    texto(ctx, '★', w * 0.8, h * 0.75, 30, '#ffffff');
   });
 }
 
@@ -327,6 +353,8 @@ export function criarMenina() {
   const cranio = peca(new THREE.SphereGeometry(0.142, 32, 24), mat.pele); cranio.scale.set(0.92, 1.04, 0.98); cabeca.add(cranio);
   for (const lado of [-1, 1]) {
     const orelha = peca(new THREE.SphereGeometry(0.028, 12, 10), mat.pele); orelha.scale.set(0.5, 1, 0.8); orelha.position.set(lado * 0.13, -0.01, -0.005); cabeca.add(orelha);
+    const argola = peca(new THREE.TorusGeometry(0.014, 0.003, 6, 16), new THREE.MeshStandardMaterial({ color: 0xe6b84a, metalness: 0.9, roughness: 0.25 }));
+    argola.position.set(lado * 0.137, -0.045, 0); argola.rotation.y = Math.PI / 2; cabeca.add(argola);
   }
   const touca = peca(new THREE.SphereGeometry(0.15, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.6), mat.cabeloLiso);
   touca.position.set(0, 0.012, -0.008); touca.scale.set(0.97, 1.03, 1.02); cabeca.add(touca);
@@ -335,7 +363,7 @@ export function criarMenina() {
   const mechas = [];
   // camada de baixo, contínua: não deixa a camiseta aparecer entre as mechas
   const base = new THREE.Group();
-  base.add(peca(mecha(0, 0.5, 0.36, 0.5), mat.cabelo[1]));
+  base.add(peca(mecha(0, 0.64, 0.36, 0.5), mat.cabelo[1]));
   base.scale.set(0.97, 1, 0.97);
   cabeca.add(base);
   mechas.push({ piv: base, fase: 0 });
@@ -343,7 +371,7 @@ export function criarMenina() {
   for (let k = 0; k < N; k++) {
     const t = k / (N - 1);
     const ang = (t - 0.5) * 2.5; // espalhadas por trás da cabeça
-    const comp = 0.5 + Math.sin(t * Math.PI) * 0.1 + (Math.random() - 0.5) * 0.05;
+    const comp = 0.62 + Math.sin(t * Math.PI) * 0.1 + (Math.random() - 0.5) * 0.06;
     const piv = new THREE.Group();
     piv.position.y = 0;
     const m = peca(mecha(ang, comp, 0.06 + Math.random() * 0.02, k * 1.7), mat.cabelo[(k * 3) % CABELO.length]);
@@ -405,7 +433,8 @@ export function criarMenina() {
   aura.scale.set(1.6, 2.2, 1); aura.position.y = 0.75; raiz.add(aura);
 
   let visual = '';
-  const trocarMapa = (m, t) => { m.map?.dispose(); m.map = t; m.color.set(0xffffff); m.needsUpdate = true; };
+  // troca o tecido de uma peça; a malha comum (tex.tecido) é usada por várias peças e não é descartada
+  const trocarMapa = (m, t) => { if (m.map && m.map !== tex.tecido) m.map.dispose(); m.map = t; m.color.set(0xffffff); m.needsUpdate = true; };
   function vestir(p, r, estilo = 'esportiva') {
     const chave = `${p}-${r}-${estilo}`;
     if (chave === visual) return;
@@ -415,17 +444,20 @@ export function criarMenina() {
     mat.roupa.color.set(cor);
     mat.detalhe.color.set(cor);
     trocarMapa(mat.camiseta, texParteDeCima(estilo === 'jeans' ? 'esportiva' : estilo, cor));
+    mat.mangaLonga.map = tex.tecido; mat.mangaLonga.needsUpdate = true;
     trocarMapa(mat.shortTorneado, texParteDeBaixo(estilo === 'jeans' ? 'esportiva' : estilo, cor));
     // o que cada estilo usa
     const e = {
+      moletom: { mangaLonga: true, calca: true },
       esportiva: { faixa: true },
       street: { capuz: true, mangaLonga: true, calca: true, cano: true },
       skatista: { bone: true, bermuda: true, meiao: true, largo: true },
       jeans: { jaqueta: true, mangaLonga: true, saia: true, meiao: true, cano: true, gorro: true },
       tiedye: { viseira: true, calca: true },
-    }[estilo] ?? { faixa: true };
+    }[estilo] ?? { mangaLonga: true, calca: true };
     // cores e tecidos das peças
-    if (estilo === 'street') { mat.mangaLonga.color.set(cor); trocarMapa(mat.perna, texParteDeBaixo('street', cor)); mat.tenis.color.set(0x2b2e38); }
+    if (estilo === 'moletom') { trocarMapa(mat.mangaLonga, texMangaEstrelas()); trocarMapa(mat.perna, texParteDeBaixo('moletom', cor)); mat.tenis.color.set(0xffffff); mat.detalhe.color.set(0x1f2a52); }
+    else if (estilo === 'street') { mat.mangaLonga.color.set(cor); trocarMapa(mat.perna, texParteDeBaixo('street', cor)); mat.tenis.color.set(0x2b2e38); }
     else if (estilo === 'jeans') {
       trocarMapa(mat.jeans, texParteDeCima('jeans', cor)); mat.mangaLonga.map = null; mat.mangaLonga.color.set(0x4a6fa5); mat.mangaLonga.needsUpdate = true;
       trocarMapa(mat.saia, texSaia(cor)); mat.chapeu.color.set(cor); mat.chapeu2.color.set(0xffffff); mat.tenis.color.set(0xffffff);
@@ -435,6 +467,7 @@ export function criarMenina() {
     if (e.meiao) trocarMapa(mat.meiao, texMeiao(cor));
     // partes de cima
     faixa.visible = Boolean(e.faixa);
+    barraCamiseta.material = estilo === 'moletom' ? mat.branco : mat.roupa; // barra do moletom é off-white, como na foto
     capuz.visible = Boolean(e.capuz);
     jaqueta.visible = Boolean(e.jaqueta); golaJaqueta.visible = Boolean(e.jaqueta);
     camiseta.scale.set(e.largo ? 1.07 : 1, 1, e.largo ? 0.78 : 0.72);

@@ -17,6 +17,7 @@ export const SKATES_LOJA = [
 ];
 // Estilos de roupa da menina: comprados uma vez, usados quando quiser.
 export const ESTILOS = [
+  { id: 'moletom', nome: 'Moletom Estrela', icone: '⭐', preco: 0, texto: 'Moletom branco com mangas azul-marinho, estrelas e número, e calça com listra.' },
   { id: 'esportiva', nome: 'Esportiva', icone: '🏃‍♀️', preco: 0, texto: 'Camiseta com recortes, short e faixa no cabelo.' },
   { id: 'street', nome: 'Street', icone: '🧥', preco: 600, texto: 'Moletom com capuz, calça jogger e tênis de cano alto.' },
   { id: 'skatista', nome: 'Skatista', icone: '🛹', preco: 900, texto: 'Camiseta larga estampada, bermuda xadrez, meião e boné virado.' },
@@ -32,8 +33,8 @@ export function carteiraNova() {
     moedas: 0,
     skates: ['classico'],
     skate: 'classico',
-    estilos: ['esportiva'],
-    estilo: 'esportiva',
+    estilos: ['moletom', 'esportiva'],
+    estilo: 'moletom',
     cargas: 2,
     arrancadas: 1,
     poderes: { ima: 0, pulo: 0, maleta: 0, supercarga: 0 },
@@ -52,7 +53,9 @@ export function normalizar(c) {
     ...c,
     poderes: { ...base.poderes, ...(c.poderes ?? {}) },
     skates: Array.from(new Set(['classico', ...(c.skates ?? [])])),
-    estilos: Array.from(new Set(['esportiva', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
+    estilos: Array.from(new Set(['moletom', 'esportiva', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
+    // quem já jogava antes do moletom passa a vestir ele uma vez; depois, vale a escolha da pessoa
+    estilo: !(c.estilos ?? []).includes('moletom') ? 'moletom' : (ESTILOS.some((x) => x.id === c.estilo) ? c.estilo : 'moletom'),
     missoes: Array.isArray(c.missoes) ? c.missoes : [],
   };
 }
