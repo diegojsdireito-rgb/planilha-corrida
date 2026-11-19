@@ -11,6 +11,29 @@ function torneada(perfil, segmentos = 20) {
   return new THREE.LatheGeometry(perfil.map(([r, y]) => new THREE.Vector2(r, y)), segmentos);
 }
 
+// Braço e perna "com pele": cada parte é uma malha que acompanha os dois ossos (de cima e de baixo).
+// Perto da junta, os vértices seguem um pouco de cada osso, então o cotovelo e o joelho dobram
+// como borracha, sem emenda nem bolinha. O perfil é dado nas coordenadas do osso de cima.
+function membro(perfil, material, ossoCima, ossoBaixo, yJunta, faixa, zEscala = 1, segmentos = 20) {
+  const geo = torneada(perfil, segmentos);
+  geo.scale(1, 1, zEscala);
+  const pos = geo.attributes.position;
+  const indices = []; const pesos = [];
+  for (let i = 0; i < pos.count; i++) {
+    const x = Math.min(1, Math.max(0, (yJunta + faixa - pos.getY(i)) / (2 * faixa)));
+    const w = x * x * (3 - 2 * x);
+    indices.push(0, 1, 0, 0); pesos.push(1 - w, w, 0, 0);
+  }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(indices, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(pesos, 4));
+  const malha = new THREE.SkinnedMesh(geo, material);
+  malha.frustumCulled = false;
+  ossoCima.add(malha);
+  ossoCima.updateMatrixWorld(true);
+  malha.bind(new THREE.Skeleton([ossoCima, ossoBaixo]));
+  return malha;
+}
+
 function pele(cor) { return new THREE.MeshStandardMaterial({ color: cor, roughness: 0.55, metalness: 0 }); }
 
 // ---------- Tecidos dos estilos (desenhados na hora) ----------
@@ -285,14 +308,11 @@ export function criarMenina() {
   const quadril = new THREE.Group(); quadril.position.y = 0.62; corpo.add(quadril);
   const pernas = [-1, 1].map((lado) => {
     const coxa = new THREE.Group(); coxa.position.set(lado * 0.082, 0, 0);
-    const mCoxa = peca(torneada([[0, 0.02], [0.058, 0.012], [0.067, -0.04], [0.064, -0.13], [0.054, -0.22], [0.047, -0.28], [0.04, -0.305], [0.022, -0.318], [0, -0.322]]), mat.pele);
-    mCoxa.scale.z = 0.92; coxa.add(mCoxa);
     const barra = peca(new THREE.CylinderGeometry(0.071, 0.074, 0.11, 18), mat.short); barra.position.y = -0.035; coxa.add(barra);
     const joelho = new THREE.Group(); joelho.position.y = -0.285; coxa.add(joelho);
-    const mCanela = peca(torneada([[0, 0.035], [0.024, 0.032], [0.04, 0.02], [0.046, 0], [0.05, -0.05], [0.048, -0.1], [0.038, -0.19], [0.031, -0.25], [0, -0.26]]), mat.pele);
-    mCanela.scale.z = 0.95; joelho.add(mCanela);
-    // enchimento do joelho, do mesmo tecido: quando a perna dobra não aparece emenda
-    const bolaJoelho = peca(new THREE.SphereGeometry(0.045, 16, 12), mat.pele); bolaJoelho.scale.z = 0.93; joelho.add(bolaJoelho);
+    // coxa e canela com pele: o joelho dobra sem emenda
+    const mCoxa = sombrear(membro([[0, 0.02], [0.058, 0.012], [0.067, -0.04], [0.064, -0.13], [0.054, -0.22], [0.048, -0.27], [0.047, -0.285]], mat.pele, coxa, joelho, -0.285, 0.045, 0.93));
+    const mCanela = sombrear(membro([[0.047, -0.285], [0.046, -0.3], [0.049, -0.34], [0.048, -0.385], [0.038, -0.475], [0.031, -0.535], [0, -0.545]], mat.pele, coxa, joelho, -0.285, 0.045, 0.93));
     const meia = peca(new THREE.CylinderGeometry(0.036, 0.034, 0.06, 14), mat.branco); meia.position.y = -0.245; joelho.add(meia);
     // tênis: cabedal arredondado, biqueira, solado colorido, cadarços e calcanhar
     const tenis = new THREE.Group(); tenis.position.set(0, -0.3, 0.035); joelho.add(tenis);
@@ -313,7 +333,7 @@ export function criarMenina() {
     const bordaCano = peca(new THREE.TorusGeometry(0.047, 0.008, 6, 16), mat.detalhe); bordaCano.rotation.x = Math.PI / 2; bordaCano.position.set(0, 0.1, -0.035); tenis.add(bordaCano);
     const barraCalca = peca(new THREE.CylinderGeometry(0.05, 0.046, 0.05, 16), mat.perna); barraCalca.position.y = -0.24; joelho.add(barraCalca);
     quadril.add(coxa);
-    return { coxa, joelho, tenis, lado, mCoxa, mCanela, bolaJoelho, barra, meia, cano: [cano, bordaCano], barraCalca };
+    return { coxa, joelho, tenis, lado, mCoxa, mCanela, barra, meia, cano: [cano, bordaCano], barraCalca };
   });
 
   // ---- tronco ----
@@ -357,9 +377,10 @@ export function criarMenina() {
   const bracos = [-1, 1].map((lado) => {
     const ombro = new THREE.Group(); ombro.position.set(lado * 0.175, 0.385, 0); tronco.add(ombro);
     const manga = peca(torneada([[0, 0.035], [0.035, 0.034], [0.05, 0.015], [0.052, -0.03], [0.048, -0.075], [0.047, -0.08], [0, -0.08]], 18), mat.camiseta); ombro.add(manga);
-    const mBraco = peca(torneada([[0, 0.02], [0.04, 0.01], [0.043, -0.05], [0.038, -0.14], [0.034, -0.2], [0.03, -0.222], [0, -0.232]]), mat.pele); ombro.add(mBraco);
     const cotovelo = new THREE.Group(); cotovelo.position.y = -0.2; ombro.add(cotovelo);
-    const mAnte = peca(torneada([[0, 0.034], [0.024, 0.031], [0.032, 0.016], [0.034, 0], [0.034, -0.05], [0.028, -0.15], [0.025, -0.17], [0, -0.175]]), mat.pele); cotovelo.add(mAnte);
+    // braço e antebraço com pele: o cotovelo dobra sem emenda
+    const mBraco = sombrear(membro([[0, 0.02], [0.04, 0.01], [0.043, -0.05], [0.038, -0.14], [0.035, -0.2]], mat.pele, ombro, cotovelo, -0.2, 0.035));
+    const mAnte = sombrear(membro([[0.035, -0.2], [0.0325, -0.25], [0.028, -0.35], [0.025, -0.37], [0, -0.375]], mat.pele, ombro, cotovelo, -0.2, 0.035));
     const mao = new THREE.Group(); mao.position.y = -0.19; cotovelo.add(mao);
     const palma = peca(new THREE.SphereGeometry(0.036, 14, 10), mat.pele); palma.scale.set(0.8, 1.1, 0.6); mao.add(palma);
     const polegar = peca(new THREE.CapsuleGeometry(0.011, 0.03, 4, 8), mat.pele); polegar.position.set(-lado * 0.022, 0.005, 0.015); polegar.rotation.z = lado * 0.6; mao.add(polegar);
@@ -550,7 +571,6 @@ export function criarMenina() {
       p2.barra.position.y = e.bermuda ? -0.1 : -0.035;
       p2.meia.visible = !e.calca && !e.meiao;
       p2.barraCalca.visible = Boolean(e.calca);
-      p2.bolaJoelho.material = p2.mCoxa.material;
       for (const c of p2.cano) c.visible = Boolean(e.cano);
     }
     // cabeça
