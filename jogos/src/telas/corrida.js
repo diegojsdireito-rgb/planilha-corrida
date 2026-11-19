@@ -1,6 +1,6 @@
 import * as cor from '../corrida.js';
 import { el } from '../comum.js';
-import { prefs, guardar } from '../dados.js';
+import { prefs, guardar, perfilAtual, temVariosPerfis } from '../dados.js';
 import * as loja from '../loja.js';
 import { ligarLaco, desligarLaco, desligarLacos } from '../som.js';
 import { quemPersegue, OPCOES_FLORESTA, NOMES, EMOJI, SOM as SOM_PERSEGUIDOR } from '../perseguidores.js';
@@ -601,7 +601,10 @@ export function montar(area, ctl) {
 
   const topoLobby = () => {
     const c = prefs.carteira;
-    return `<div class="lobby-topo"><span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
+    const eu = perfilAtual();
+    const nome = eu.nome.replace(/[&<>"]/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[x]);
+    const quem = temVariosPerfis() ? `<span class="pilula jogador">${eu.avatar} <b>${nome}</b></span>` : '';
+    return `<div class="lobby-topo">${quem}<span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
   };
   // Sem 3D, o retrato desenhado ocupa o lugar da menina.
   // (o retrato fica escondido pelo CSS quando o 3D carrega, mesmo que carregue depois de a tela abrir)

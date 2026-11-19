@@ -1,5 +1,5 @@
 import { el } from './comum.js';
-import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo, pedirPersistencia } from './dados.js';
+import { prefs, guardar, registrar, placarDe, melhorTempo, salvar, lerSalvo, apagarSalvo, pedirPersistencia, listaDePerfis, perfilAtual, temVariosPerfis, trocarPerfil, criarPerfil, editarPerfil, apagarPerfil, resumoDoPerfil, AVATARES, LIMITE_PERFIS } from './dados.js';
 import { montarCopiaCartao } from './copia.js';
 import { ligarPuxada } from '../../src/gestos.js';
 import { tocar, destravar } from './som.js';
@@ -191,6 +191,12 @@ function inicio() {
 
   const topo = el('header', 'banner');
   const textos = el('div', '', '<p class="sobre">Você contra o robô</p><h1>Mesa de Jogos</h1>');
+  const eu = perfilAtual();
+  const chip = el('button', 'chip-perfil', `<span class="avatar-perfil">${eu.avatar}</span><span><small>Jogando agora</small><b></b></span><span class="troca">Trocar</span>`);
+  chip.querySelector('b').textContent = eu.nome;
+  chip.setAttribute('aria-label', `Jogador: ${eu.nome}. Trocar de jogador`);
+  chip.onclick = () => { tocar('clique'); irPara('#jogadores'); };
+  textos.append(chip);
   topo.append(textos, botaoSom());
   app.append(topo);
 
@@ -225,6 +231,124 @@ function inicio() {
   app.append(el('p', 'rotulo', 'Seu painel'));
   montarPainel(app, JOGOS, abrir);
   montarCopiaCartao(app, JOGOS, inicio);
+}
+
+// ---------- Jogadores ----------
+// Várias pessoas no mesmo aparelho: cada uma escolhe o seu perfil e continua de onde parou.
+
+function irPara(hash) {
+  if (location.hash === hash) return rota();
+  history.pushState({ voltaParaInicio: true }, '', hash || location.pathname);
+  rota();
+}
+
+function telaJogadores({ abertura = false } = {}) {
+  sairDaTela?.();
+  sairDaTela = null;
+  naTelaInicial = false;
+  document.documentElement.classList.remove('jogo-tela-cheia');
+  document.title = 'Jogadores · Mesa de Jogos';
+  let editando = false;
+
+  const escolher = (id) => {
+    trocarPerfil(id);
+    tocar('clique');
+    if (!abertura && history.state?.voltaParaInicio) history.back();
+    else { history.replaceState(null, '', location.pathname); inicio(); }
+  };
+
+  function desenhar() {
+    app.replaceChildren();
+    const barra = el('div', 'barra');
+    if (!abertura) {
+      const voltar = el('button', 'botao-icone', '‹');
+      voltar.setAttribute('aria-label', 'Voltar');
+      voltar.onclick = () => {
+        if (history.state?.voltaParaInicio) history.back();
+        else { history.replaceState(null, '', location.pathname); inicio(); }
+      };
+      barra.append(voltar);
+    }
+    barra.append(el('h2', '', 'Quem vai jogar?'));
+    const editar = el('button', 'botao secundario pequeno', editando ? 'Pronto' : 'Editar');
+    editar.onclick = () => { editando = !editando; tocar('clique'); desenhar(); };
+    barra.append(editar);
+    app.append(barra);
+    app.append(el('p', 'sub-jogadores', editando
+      ? 'Toque num jogador para mudar o nome ou a figura, ou para apagar.'
+      : 'Cada jogador tem o próprio placar, moedas, personagem e jogos em andamento.'));
+
+    const atual = perfilAtual().id;
+    const grade = el('div', 'grade-jogadores');
+    for (const p of listaDePerfis()) {
+      const r = resumoDoPerfil(p.id);
+      const b = el('button', `cartao-jogador${p.id === atual ? ' atual' : ''}`,
+        `<span class="avatar-grande">${p.avatar}</span><strong></strong><small>${r.partidas} ${r.partidas === 1 ? 'partida' : 'partidas'} · ${r.moedas.toLocaleString('pt-BR')} 🪙</small>${p.id === atual ? '<span class="selo">jogando</span>' : ''}${editando ? '<span class="lapis">✏️</span>' : ''}`);
+      b.querySelector('strong').textContent = p.nome;
+      b.onclick = () => (editando ? formulario(p) : escolher(p.id));
+      grade.append(b);
+    }
+    if (listaDePerfis().length < LIMITE_PERFIS) {
+      const novo = el('button', 'cartao-jogador novo', '<span class="avatar-grande">＋</span><strong>Novo jogador</strong><small>Começa do zero</small>');
+      novo.onclick = () => formulario(null);
+      grade.append(novo);
+    }
+    app.append(grade);
+  }
+
+  function formulario(perfil) {
+    tocar('clique');
+    app.replaceChildren();
+    const barra = el('div', 'barra');
+    const voltar = el('button', 'botao-icone', '‹');
+    voltar.setAttribute('aria-label', 'Cancelar');
+    voltar.onclick = () => desenhar();
+    barra.append(voltar, el('h2', '', perfil ? 'Editar jogador' : 'Novo jogador'));
+    app.append(barra);
+
+    let avatar = perfil?.avatar ?? AVATARES.find((a) => !listaDePerfis().some((p) => p.avatar === a)) ?? AVATARES[0];
+    const form = el('form', 'grafico form-jogador');
+    form.innerHTML = `
+      <label class="campo"><span>Nome</span><input name="nome" maxlength="20" autocomplete="off" placeholder="Ex.: Ana"></label>
+      <span class="rot-avatar">Figura</span>
+      <div class="avatares">${AVATARES.map((a) => `<button type="button" data-avatar="${a}" aria-pressed="${a === avatar}">${a}</button>`).join('')}</div>
+      <p class="aviso-copia" role="status"></p>
+      <div class="acoes-solo"><button class="botao" type="submit">${perfil ? 'Salvar' : 'Criar e jogar'}</button></div>`;
+    const campo = form.querySelector('input');
+    campo.value = perfil?.nome ?? '';
+    const aviso = form.querySelector('.aviso-copia');
+    form.querySelectorAll('[data-avatar]').forEach((b) => {
+      b.onclick = () => {
+        avatar = b.dataset.avatar;
+        tocar('clique');
+        form.querySelectorAll('[data-avatar]').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      };
+    });
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      try {
+        if (perfil) { editarPerfil(perfil.id, { nome: campo.value, avatar }); tocar('acerto'); desenhar(); }
+        else { const novo = criarPerfil(campo.value, avatar); tocar('acerto'); escolher(novo.id); }
+      } catch (erro) { tocar('erro'); aviso.textContent = erro.message; }
+    };
+    app.append(form);
+
+    if (perfil && listaDePerfis().length > 1) {
+      const apagar = el('button', 'botao perigo');
+      apagar.textContent = `Apagar ${perfil.nome}`;
+      apagar.onclick = () => {
+        if (!confirm(`Apagar ${perfil.nome}? O placar, as moedas e os jogos em andamento desse jogador somem para sempre.`)) return;
+        apagarPerfil(perfil.id);
+        tocar('clique');
+        desenhar();
+      };
+      app.append(el('div', 'acoes-solo apagar-jogador'));
+      app.lastChild.append(apagar);
+    }
+    if (!perfil) campo.focus();
+  }
+
+  desenhar();
 }
 
 pedirPersistencia();
@@ -335,8 +459,11 @@ function abrir(jogo) {
 
 window.addEventListener('popstate', rota);
 function rota() {
+  if (location.hash === '#jogadores') return telaJogadores();
   const jogo = JOGOS.find((j) => `#${j.id}` === location.hash);
   if (jogo) abrir(jogo); else inicio();
 }
 
-rota();
+// Com mais de um jogador no aparelho, o app abre perguntando quem vai jogar.
+if (temVariosPerfis() && !location.hash) telaJogadores({ abertura: true });
+else rota();
