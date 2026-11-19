@@ -1,11 +1,11 @@
 // Tela do jogo de pintar: galeria de desenhos e a folha com canetinhas, pincéis e balde.
 import { el } from '../comum.js';
 import { salvar as salvarNoAparelho, lerSalvo, prefs } from '../dados.js';
-import { DESENHOS, urlDoDesenho } from '../pintar-desenhos.js';
-import { FERRAMENTAS, TIPOS_COR, TAMANHOS, CORES, corNoTraco, regiao, rgb, misturar, terminados } from '../pintar.js';
+import { DESENHOS, NIVEIS_DESENHO, urlDoDesenho } from '../pintar-desenhos.js';
+import { FERRAMENTAS, TIPOS_COR, TAMANHOS, CORES, CORES_NEON, CORES_METAL, TIPO_DA_FERRAMENTA, CONTINUAS, corNoTraco, regiao, rgb, misturar, terminados } from '../pintar.js';
 
-const N = 800; // resolução da folha
-const DESFAZER = 12;
+const N = 1000; // resolução da folha
+const DESFAZER = 10;
 const chave = (id) => `pintar-${id}`;
 
 export const desenhosTerminados = () => terminados(prefs.historico);
@@ -46,26 +46,38 @@ export function montar(area, ctl) {
   const opacidade = { pincel: 0.85, marcatexto: 0.42, lapis: 0.9, giz: 0.95 };
 
   // ---------- galeria ----------
+  let aba = 'facil';
   function galeria() {
     gravarAgora();
     desenho = null;
     area.replaceChildren();
     ctl.status('Escolha um desenho para pintar', 'voce');
-    const grade = el('div', 'pintar-galeria');
     const feitos = new Set(prefs.historico.filter((h) => h.j === 'pintar' && h.r === 'concluida').map((h) => h.desenho));
-    for (const d of DESENHOS) {
+    const abas = el('div', 'pintar-abas');
+    abas.setAttribute('role', 'tablist');
+    for (const [id, nome] of [...NIVEIS_DESENHO, ['todos', 'Todos']]) {
+      const lista = DESENHOS.filter((d) => id === 'todos' || d.nivel === id);
+      const b = el('button', '', `${nome} <small>${lista.length}</small>`);
+      b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(aba === id));
+      b.onclick = () => { aba = id; ctl.som('clique'); galeria(); };
+      abas.append(b);
+    }
+    const grade = el('div', 'pintar-galeria');
+    const lista = DESENHOS.filter((d) => aba === 'todos' || d.nivel === aba || (d.nivel === 'livre' && aba === 'facil'));
+    for (const d of lista) {
       const salvo = lerSalvo(chave(d.id));
       const b = el('button', 'pintar-cartao');
       const fundo = salvo?.img ? `<img class="tinta" src="${salvo.img}" alt="">` : '';
-      b.innerHTML = `<span class="miniatura">${fundo}<img class="linhas" src="${urlDoDesenho(d, 200)}" alt=""></span><strong>${d.icone} ${d.nome}</strong>${feitos.has(d.id) ? '<span class="selo">pronto ✓</span>' : salvo?.img ? '<span class="selo">pintando</span>' : ''}`;
+      b.innerHTML = `<span class="miniatura">${fundo}<img class="linhas" loading="lazy" src="${urlDoDesenho(d, 200)}" alt=""></span><strong>${d.icone} ${d.nome}</strong>${feitos.has(d.id) ? '<span class="selo">pronto ✓</span>' : salvo?.img ? '<span class="selo">pintando</span>' : ''}`;
       b.onclick = () => { ctl.som('clique'); abrir(d); };
       grade.append(b);
     }
-    area.append(grade);
+    area.append(abas, grade);
   }
 
   // ---------- folha ----------
-  let folha; let tinta; let traco; let linhas; let ctxT; let ctxR; let rotuloTam;
+  let folha; let papel; let tinta; let traco; let linhas; let ctxT; let ctxR; let rotuloTam; let lupa;
+  let zoom = 1; let tx = 0; let ty = 0; let mover = false;
 
   async function abrir(d) {
     gravarAgora();
@@ -75,8 +87,18 @@ export function montar(area, ctl) {
     ctl.status(`Pintando: ${d.nome}`, 'voce');
 
     folha = el('div', 'pintar-folha');
+    papel = el('div', 'pintar-papel');
+    folha.append(papel);
     tinta = el('canvas'); traco = el('canvas', 'traco'); linhas = el('canvas', 'linhas');
-    for (const c of [tinta, traco, linhas]) { c.width = N; c.height = N; folha.append(c); }
+    for (const c of [tinta, traco, linhas]) { c.width = N; c.height = N; papel.append(c); }
+    zoom = 1; tx = 0; ty = 0; mover = false;
+    lupa = el('div', 'pintar-lupa');
+    const bLupa = (rotulo, titulo, acao) => { const b = el('button', '', rotulo); b.title = titulo; b.setAttribute('aria-label', titulo); b.onclick = (e) => { e.stopPropagation(); acao(); }; b.addEventListener('pointerdown', (e) => e.stopPropagation()); lupa.append(b); return b; };
+    bLupa('➕', 'Aumentar (lupa)', () => ampliar(1.6));
+    bLupa('➖', 'Diminuir', () => ampliar(1 / 1.6));
+    bLupa('✋', 'Arrastar o desenho', () => { mover = !mover; ctl.som('clique'); aplicarZoom(); }).dataset.mover = '';
+    folha.append(lupa);
+    aplicarZoom();
     ctxT = tinta.getContext('2d', { willReadFrequently: true });
     ctxR = traco.getContext('2d');
     ctxT.fillStyle = '#fff'; ctxT.fillRect(0, 0, N, N);
@@ -116,12 +138,17 @@ export function montar(area, ctl) {
     const linhaTam = el('div', 'pintar-linha'); linhaTam.append(tams, rotuloTam);
 
     const cores = el('div', 'pintar-cores');
-    for (const c of CORES) {
-      const b = el('button');
-      b.dataset.cor = c; b.style.background = c; b.setAttribute('aria-label', `Cor ${c}`);
+    const botaoCor = (c, classe = '') => {
+      const b = el('button', classe);
+      b.dataset.cor = c; b.style.setProperty('--c', c); b.setAttribute('aria-label', `Cor ${c}`);
       b.onclick = () => { cor = c; ctl.som('clique'); if (ferramenta === 'borracha') ferramenta = 'canetinha'; marcar(); };
       cores.append(b);
-    }
+    };
+    CORES.forEach((c) => botaoCor(c));
+    cores.append(el('span', 'pintar-sub', '🌟 Neon'));
+    CORES_NEON.forEach((c) => botaoCor(c, 'neon'));
+    cores.append(el('span', 'pintar-sub', '✨ Metálicas'));
+    CORES_METAL.forEach((c) => botaoCor(c, 'metal'));
 
     area.append(folha, barra, ferr, cores, tipos, linhaTam);
     marcar();
@@ -183,17 +210,41 @@ export function montar(area, ctl) {
 
   let ultimo = null; let andado = 0; let marcaAte = 0;
 
+  // ---------- lupa: aumentar, diminuir e arrastar o desenho ----------
+  function limitar() {
+    const w = folha.clientWidth;
+    tx = Math.min(0, Math.max(w - w * zoom, tx));
+    ty = Math.min(0, Math.max(w - w * zoom, ty));
+  }
+  function aplicarZoom() {
+    if (zoom <= 1.01) { zoom = 1; tx = 0; ty = 0; mover = false; }
+    limitar();
+    papel.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
+    folha.classList.toggle('ampliada', zoom > 1);
+    folha.classList.toggle('movendo', mover);
+    lupa.querySelector('[data-mover]').setAttribute('aria-pressed', String(mover));
+  }
+  function ampliar(fator, cx = folha.clientWidth / 2, cy = folha.clientWidth / 2) {
+    const novo = Math.min(5, Math.max(1, zoom * fator));
+    const px = (cx - tx) / zoom; const py = (cy - ty) / zoom;
+    zoom = novo; tx = cx - px * zoom; ty = cy - py * zoom;
+    ctl.som('clique');
+    aplicarZoom();
+  }
+
   function pontoDe(e) {
-    const r = folha.getBoundingClientRect();
+    const r = papel.getBoundingClientRect();
     return { x: ((e.clientX - r.left) / r.width) * N, y: ((e.clientY - r.top) / r.height) * N };
   }
 
+  const tp = () => TIPO_DA_FERRAMENTA[ferramenta] ?? tipo;
+
   function carimbo(x, y) {
     const w = largura();
-    const c = ferramenta === 'borracha' ? '#ffffff' : corNoTraco(cor, tipo, andado);
+    const c = ferramenta === 'borracha' ? '#ffffff' : corNoTraco(cor, tp(), andado);
     const ctx = ctxR;
     ctx.fillStyle = c; ctx.strokeStyle = c;
-    if (tipo === 'neon' && ferramenta !== 'borracha') { ctx.shadowColor = cor; ctx.shadowBlur = w * 0.9; } else ctx.shadowBlur = 0;
+    if (tp() === 'neon' && ferramenta !== 'borracha') { ctx.shadowColor = cor; ctx.shadowBlur = w * 0.9; } else ctx.shadowBlur = 0;
     switch (ferramenta) {
       case 'pincel': {
         const g = ctx.createRadialGradient(x, y, 0, x, y, w / 2);
@@ -240,31 +291,44 @@ export function montar(area, ctl) {
       }
       default: break; // canetinha, marca-texto e borracha são traços contínuos (em linha)
     }
-    if (tipo === 'brilho' && ferramenta !== 'borracha' && Math.random() < 0.55) {
+    const glitter = ferramenta === 'caneta-glitter';
+    if (tp() === 'brilho' && ferramenta !== 'borracha' && (glitter || Math.random() < 0.55)) {
       ctx.shadowBlur = 0;
-      const n = Math.max(1, Math.round(w / 10));
+      const n = Math.max(glitter ? 4 : 1, Math.round(w / (glitter ? 2.5 : 10)));
       for (let k = 0; k < n; k++) {
         const a = Math.random() * Math.PI * 2; const d = Math.random() * w * 0.55;
-        ctx.fillStyle = Math.random() < 0.5 ? '#ffffff' : misturar(cor, '#ffffff', 0.6);
-        if (Math.random() < 0.25) brilhinho(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d, 3 + Math.random() * w * 0.18);
-        else { ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 1 + Math.random() * 2, 0, Math.PI * 2); ctx.fill(); }
+        const sorte = Math.random();
+        ctx.fillStyle = sorte < 0.4 ? '#ffffff' : sorte < 0.7 ? misturar(cor, '#ffffff', 0.6) : sorte < 0.85 ? misturar(cor, '#000000', 0.3) : '#ffe27a';
+        if (Math.random() < (glitter ? 0.3 : 0.25)) brilhinho(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d, 3 + Math.random() * w * (glitter ? 0.3 : 0.18));
+        else { ctx.beginPath(); ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 1 + Math.random() * (glitter ? 2.6 : 2), 0, Math.PI * 2); ctx.fill(); }
       }
     }
   }
 
   function linhaContinua(a, b) {
     const ctx = ctxR;
-    const c = ferramenta === 'borracha' ? '#ffffff' : corNoTraco(cor, tipo, andado);
-    ctx.strokeStyle = c; ctx.lineWidth = largura(); ctx.lineCap = ferramenta === 'marcatexto' ? 'square' : 'round'; ctx.lineJoin = 'round';
-    if (tipo === 'neon' && ferramenta !== 'borracha') { ctx.shadowColor = cor; ctx.shadowBlur = largura() * 0.9; } else ctx.shadowBlur = 0;
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-    if (tipo === 'neon' && ferramenta !== 'borracha') {
-      ctx.shadowBlur = 0; ctx.strokeStyle = misturar(cor, '#ffffff', 0.7); ctx.lineWidth = largura() * 0.35;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    const c = ferramenta === 'borracha' ? '#ffffff' : corNoTraco(cor, tp(), andado);
+    const w = largura();
+    const segmento = (cor_, larg) => { ctx.strokeStyle = cor_; ctx.lineWidth = larg; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+    ctx.lineCap = ferramenta === 'marcatexto' ? 'square' : 'round'; ctx.lineJoin = 'round';
+    if (tp() === 'neon' && ferramenta !== 'borracha') {
+      // o brilho vai por baixo do que já foi riscado, para não apagar o miolo claro
+      const forte = ferramenta === 'caneta-neon';
+      const brilho = tp() === 'arcoiris' ? c : cor;
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.shadowColor = brilho; ctx.shadowBlur = w * (forte ? 1.8 : 1);
+      segmento(c, w * (forte ? 1.1 : 1));
+      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = 'source-over';
+      segmento(c, w * 0.8);
+      segmento(misturar(cor, '#ffffff', forte ? 0.85 : 0.7), w * (forte ? 0.38 : 0.3));
+      return;
     }
+    ctx.shadowBlur = 0;
+    segmento(c, w);
   }
 
-  const continuo = () => ['canetinha', 'marcatexto', 'borracha'].includes(ferramenta);
+  const continuo = () => CONTINUAS.includes(ferramenta);
 
   function seguir(p) {
     const passo = Math.max(1.5, largura() * (ferramenta === 'spray' || ferramenta === 'giz' || ferramenta === 'lapis' ? 0.3 : 0.18));
@@ -273,13 +337,13 @@ export function montar(area, ctl) {
     if (continuo()) {
       if (dist < 0.5) return;
       // em pedaços, para o arco-íris e o degradê mudarem de cor ao longo do traço
-      const partes = tipo === 'normal' || tipo === 'brilho' ? 1 : Math.ceil(dist / 6);
+      const partes = tp() === 'normal' || tp() === 'brilho' ? 1 : Math.ceil(dist / 6);
       let a = ultimo;
       for (let k = 1; k <= partes; k++) {
         const b = { x: ultimo.x + (dx * k) / partes, y: ultimo.y + (dy * k) / partes };
         andado += dist / partes;
         linhaContinua(a, b);
-        if (tipo === 'brilho') carimbo(b.x, b.y);
+        if (tp() === 'brilho') carimbo(b.x, b.y);
         a = b;
       }
       ultimo = p;
@@ -346,14 +410,30 @@ export function montar(area, ctl) {
   }
 
   let dedo = null;
+  const dedos = new Map(); let pinca = null; let arrasto = null;
+  const local = (e) => { const r = folha.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  function cancelarTraco() {
+    if (!ultimo) return;
+    ultimo = null; dedo = null;
+    ctxR.clearRect(0, 0, N, N);
+    pilha.pop(); // o passo guardado no começo do traço não vale mais
+  }
+  function comecarPinca() {
+    const [a, b] = [...dedos.values()];
+    pinca = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom, tx, ty };
+  }
   function ligarToque() {
     folha.addEventListener('pointerdown', (e) => {
-      if (dedo !== null || !paredes) return;
+      if (!paredes) return;
       e.preventDefault();
+      dedos.set(e.pointerId, local(e));
+      folha.setPointerCapture(e.pointerId);
+      if (dedos.size === 2) { cancelarTraco(); arrasto = null; comecarPinca(); return; }
+      if (dedos.size > 2) return;
+      if (mover && zoom > 1) { arrasto = { ...local(e), tx, ty }; return; }
       const p = pontoDe(e);
       if (ferramenta === 'balde') { balde(p); return; }
       dedo = e.pointerId;
-      folha.setPointerCapture(e.pointerId);
       guardarPasso();
       ctxR.clearRect(0, 0, N, N);
       traco.style.opacity = ferramenta === 'borracha' ? '1' : String(opacidade[ferramenta] ?? 1);
@@ -362,11 +442,33 @@ export function montar(area, ctl) {
       carimbo(p.x, p.y);
     });
     folha.addEventListener('pointermove', (e) => {
+      if (dedos.has(e.pointerId)) dedos.set(e.pointerId, local(e));
+      if (pinca && dedos.size >= 2) {
+        const [a, b] = [...dedos.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y); const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        zoom = Math.min(5, Math.max(1, pinca.zoom * (d / pinca.d)));
+        const px = (pinca.m.x - pinca.tx) / pinca.zoom; const py = (pinca.m.y - pinca.ty) / pinca.zoom;
+        tx = m.x - px * zoom; ty = m.y - py * zoom;
+        aplicarZoom();
+        return;
+      }
+      if (arrasto) {
+        const p = local(e);
+        tx = arrasto.tx + (p.x - arrasto.x); ty = arrasto.ty + (p.y - arrasto.y);
+        aplicarZoom();
+        return;
+      }
       if (e.pointerId !== dedo || !ultimo) return;
       const eventos = e.getCoalescedEvents?.() ?? [e];
       for (const ev of eventos.length ? eventos : [e]) seguir(pontoDe(ev));
     });
-    const soltar = (e) => { if (e.pointerId !== dedo) return; dedo = null; terminarTraco(); };
+    const soltar = (e) => {
+      dedos.delete(e.pointerId);
+      if (dedos.size < 2) pinca = null;
+      if (!dedos.size) arrasto = null;
+      if (e.pointerId !== dedo) return;
+      dedo = null; terminarTraco();
+    };
     folha.addEventListener('pointerup', soltar);
     folha.addEventListener('pointercancel', soltar);
   }

@@ -2,6 +2,8 @@
 
 export const FERRAMENTAS = [
   { id: 'canetinha', nome: 'Canetinha', icone: '🖊️' },
+  { id: 'caneta-glitter', nome: 'Canetinha glitter', icone: '✨' },
+  { id: 'caneta-neon', nome: 'Canetinha neon', icone: '🌟' },
   { id: 'pincel', nome: 'Pincel', icone: '🖌️' },
   { id: 'giz', nome: 'Giz de cera', icone: '🖍️' },
   { id: 'lapis', nome: 'Lápis de cor', icone: '✏️' },
@@ -34,6 +36,14 @@ export const CORES = [
   '#29b6f6', '#1e63d6', '#3f3fb5', '#8e5bd6', '#c79bf2', '#6d3fa0',
   '#8d5a2b', '#c58a52', '#f2c9a0', '#ffe0c7', '#9e9e9e', '#1d1b18',
 ];
+
+// Cores especiais: neon (bem vivas, brilham com a canetinha neon) e metálicas (para o glitter).
+export const CORES_NEON = ['#39ff14', '#ccff00', '#fff01f', '#ff9933', '#ff073a', '#ff00a8', '#ff6ec7', '#bc13fe', '#7df9ff', '#00e5ff', '#1f51ff', '#00ff9f'];
+export const CORES_METAL = ['#d4af37', '#c0c4cc', '#e0a3a8', '#cd7f32', '#b8f2e6', '#ffd1f2'];
+
+// Algumas ferramentas já vêm com o tipo de cor: a canetinha glitter brilha e a neon acende.
+export const TIPO_DA_FERRAMENTA = { 'caneta-glitter': 'brilho', 'caneta-neon': 'neon' };
+export const CONTINUAS = ['canetinha', 'caneta-glitter', 'caneta-neon', 'marcatexto', 'borracha'];
 
 // "#rrggbb" → [r, g, b]
 export function rgb(cor) {

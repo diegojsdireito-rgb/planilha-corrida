@@ -2,22 +2,11 @@
 // esconder as linhas que ficam atrás; na tela, as linhas ficam por cima da tinta com
 // "multiplicar", então o branco some e só o contorno aparece.
 
-const estrela = (cx, cy, r, ri = r * 0.45, pontas = 5) => {
-  let d = '';
-  for (let k = 0; k < pontas * 2; k++) {
-    const a = -Math.PI / 2 + (k * Math.PI) / pontas;
-    const rr = k % 2 ? ri : r;
-    d += `${k ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)}`;
-  }
-  return `<path d="${d}Z"/>`;
-};
-const nuvem = (x, y, s = 1) => `<path transform="translate(${x} ${y}) scale(${s})" d="M-50 20 a22 22 0 0 1 8 -38 a30 30 0 0 1 52 -12 a24 24 0 0 1 40 22 a18 18 0 0 1 0 28 Z"/>`;
-const coracao = (x, y, s = 1) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 12 C-30 -8 -22 -32 -8 -30 C-3 -29 0 -25 0 -21 C0 -25 3 -29 8 -30 C22 -32 30 -8 0 12 Z"/>`;
-const flor = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="0" cy="-11" rx="7" ry="11" transform="rotate(${a})"/>`).join('')}<circle r="6"/></g>`;
-const sol = (x, y, r) => `<g fill="none">${Array.from({ length: 10 }, (_, k) => { const a = (k * Math.PI) / 5; return `<path d="M${(x + Math.cos(a) * (r + 8)).toFixed(1)} ${(y + Math.sin(a) * (r + 8)).toFixed(1)} L${(x + Math.cos(a) * (r + 22)).toFixed(1)} ${(y + Math.sin(a) * (r + 22)).toFixed(1)}"/>`; }).join('')}</g><circle cx="${x}" cy="${y}" r="${r}"/>`;
-const PRETO = 'fill="#1d1b18"';
+import { estrela, nuvem, coracao, flor, sol, PRETO } from './pintar-formas.js';
+import { MEDIOS } from './pintar-desenhos-medios.js';
+import { DIFICEIS } from './pintar-desenhos-dificeis.js';
 
-export const DESENHOS = [
+const FACEIS = [
   {
     id: 'gato', nome: 'Gatinho', icone: '🐱',
     svg: `
@@ -251,11 +240,19 @@ export const DESENHOS = [
       <circle cx="200" cy="200" r="22"/>
       ${Array.from({ length: 16 }, (_, k) => { const a = (k * Math.PI) / 8 + Math.PI / 16; return `<circle cx="${(200 + Math.cos(a) * 160).toFixed(1)}" cy="${(200 + Math.sin(a) * 160).toFixed(1)}" r="9"/>`; }).join('')}`,
   },
-  { id: 'branco', nome: 'Folha em branco', icone: '📄', svg: '' },
+];
+
+export const NIVEIS_DESENHO = [['facil', 'Fáceis'], ['medio', 'Médios'], ['dificil', 'Difíceis']];
+
+export const DESENHOS = [
+  ...FACEIS.map((d) => ({ nivel: 'facil', ...d })),
+  ...MEDIOS.map((d) => ({ nivel: 'medio', ...d })),
+  ...DIFICEIS.map((d) => ({ nivel: 'dificil', traco: 2.6, ...d })),
+  { id: 'branco', nome: 'Folha em branco', icone: '📄', svg: '', nivel: 'livre' },
 ];
 
 export function svgDoDesenho(d, tamanho = 400) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="${tamanho}" height="${tamanho}"><rect width="400" height="400" fill="#fff"/><g fill="#fff" stroke="#1d1b18" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">${d.svg}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="${tamanho}" height="${tamanho}"><rect width="400" height="400" fill="#fff"/><g fill="#fff" stroke="#1d1b18" stroke-width="${d.traco ?? 4}" stroke-linejoin="round" stroke-linecap="round">${d.svg}</g></svg>`;
 }
 
 export const urlDoDesenho = (d, tamanho) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgDoDesenho(d, tamanho))}`;
