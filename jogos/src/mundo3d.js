@@ -4,6 +4,7 @@ import { THREE, xDe, COMP_CENA, INICIO, textura, descartar } from './3d/base.js'
 import { criarMenina, criarMochilaJato } from './3d/menina.js';
 import { texBrilho } from './3d/base.js';
 import { montarCenario, criarObstaculo } from './3d/cenarios.js';
+import { criarPerseguidor, quemPersegue } from './3d/perseguidores.js';
 import { LONGE } from './corrida.js';
 
 let GEO_MOEDA; let MAT_MOEDA; let TEX_PODER;
@@ -118,6 +119,7 @@ export function criarMundo(canvas) {
   cena.add(menina.raiz);
 
   let cenario = null; let temaAtual = null;
+  let perseguidor = null; let perseguidorId = null; let perX = 0;
   const objetos = new Map();
   let camX = 0; let camY = 2.4; let ultimoT = 0;
 
@@ -149,13 +151,34 @@ export function criarMundo(canvas) {
     camera.updateProjectionMatrix();
   }
 
-  function desenhar(s, t, visual, tema = 'cidade') {
+  function trocarPerseguidor(id) {
+    if (id === perseguidorId) return;
+    if (perseguidor) { cena.remove(perseguidor.raiz); descartar(perseguidor.raiz); }
+    perseguidorId = id;
+    perseguidor = criarPerseguidor(id);
+    cena.add(perseguidor.raiz);
+  }
+
+  function desenhar(s, t, visual, tema = 'cidade', escolhaFloresta = 'leao') {
     trocarCenario(tema);
+    trocarPerseguidor(quemPersegue(tema, escolhaFloresta));
     const dt = Math.min(0.05, Math.max(0, t - ultimoT));
     ultimoT = t;
     const dist = s.dist;
     menina.vestir(visual.pele, visual.roupa);
     menina.posar(s, t);
+
+    // quem persegue: logo atrás dela, um pouco de lado para não tapar a menina
+    const dp = s.perseguidor?.dist ?? 99;
+    // mais longe que isso ele já estaria em cima da câmera: some de vista
+    perseguidor.raiz.visible = dp < 1.9;
+    if (perseguidor.raiz.visible) {
+      perX += (xDe(s.x) - perX) * 0.08;
+      const lado = s.faixa === 0 ? -1 : 1; // fica do lado de dentro da pista
+      perseguidor.raiz.position.set(perX + lado * (dp > 0.5 ? 0.32 : 0.18), 0, -dp);
+      perseguidor.raiz.scale.setScalar(0.8);
+      perseguidor.animar(s.vivo ? s.dist * 1.4 : t * 9);
+    }
 
     for (const { t: tex, escala } of cenario.rolar) tex.offset.y = (dist / escala) % 1;
     for (const it of cenario.itens) it.mesh.position.z = ((it.z0 - INICIO - dist) % COMP_CENA + COMP_CENA) % COMP_CENA + INICIO;
@@ -196,6 +219,7 @@ export function criarMundo(canvas) {
   function destruir() {
     limparObjetos();
     if (cenario) descartar(cenario.grupo);
+    if (perseguidor) descartar(perseguidor.raiz);
     renderer.dispose();
     renderer.forceContextLoss?.();
   }

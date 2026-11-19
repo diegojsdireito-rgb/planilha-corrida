@@ -3,6 +3,7 @@ import { el } from '../comum.js';
 import { prefs, guardar } from '../dados.js';
 import * as loja from '../loja.js';
 import { ligarLaco, desligarLaco, desligarLacos } from '../som.js';
+import { quemPersegue, OPCOES_FLORESTA, NOMES, EMOJI, SOM as SOM_PERSEGUIDOR } from '../perseguidores.js';
 import { retrato, desenharDeCostas, PELES, ROUPAS } from '../personagem.js';
 
 const C = 5; // distância da câmera: controla a perspectiva
@@ -307,7 +308,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, prefs.personagem, tema);
+      mundo.desenhar(s ?? parado, t, prefs.personagem, tema, prefs.perseguidorFloresta);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -351,6 +352,14 @@ export function montar(area, ctl) {
     });
     if ((s?.voo ?? 0) > 0) desenharMaleta(x, y - altura * u, u, t);
     for (const o of perto) (o.enfeite ? desenharEnfeite(o) : desenharObjeto(o, t));
+    const dp = s?.perseguidor?.dist ?? 99;
+    if (dp < 1.9) {
+      const id = quemPersegue(cenarioDaCorrida(prefs.cenario ?? 'passeio', s.dist), prefs.perseguidorFloresta);
+      const tam = u * (1.6 - dp * 0.25);
+      ctx.font = `${Math.round(tam)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(EMOJI[id], x + u * 0.5, H - camera + dp * u * 0.4 + Math.abs(Math.sin(t * 9)) * u * 0.1);
+      ctx.textBaseline = 'alphabetic';
+    }
     ctx.restore();
   }
 
@@ -464,18 +473,34 @@ export function montar(area, ctl) {
     anterior = agora;
     if (!pausado) {
       cor.avancar(s, dt);
-      for (const e of s.eventos) if (SOM[e]) ctl.som(SOM[e]);
+      for (const e of s.eventos) {
+        if (e === 'perseguidor') ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
+        else if (SOM[e]) ctl.som(SOM[e]);
+      }
       s.eventos.length = 0;
       if (quadro % 10 === 0) sonsContinuos();
       if (++quadro % 6 === 0) desenharHud();
     }
+    if (!s.vivo) {
+      // a batida: quem persegue alcança a menina antes da tela de fim
+      pegando += dt;
+      if (cor.alcancar(s, dt) || pegando > 1.4) {
+        desenhar(agora / 1000);
+        rodando = false;
+        desenharHud();
+        ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
+        return setTimeout(fimDeJogo, 350);
+      }
+    }
     desenhar(agora / 1000);
-    if (!s.vivo) { rodando = false; desenharHud(); return fimDeJogo(); }
     requestAnimationFrame(laco);
   }
 
   // Ronco da mochila enquanto voa e o som ambiente do cenário em que ela está.
   let ambiente = null;
+  const perseguidorAgora = () => quemPersegue(cenarioDaCorrida(prefs.cenario ?? 'passeio', s?.dist ?? 0), prefs.perseguidorFloresta);
+  let pegando = 0;
+
   function sonsContinuos() {
     if (!prefs.som || !s || pausado || !rodando) { desligarLacos(); ambiente = null; return; }
     if (s.voo > 0) ligarLaco('jato'); else desligarLaco('jato');
@@ -490,6 +515,7 @@ export function montar(area, ctl) {
     const c = prefs.carteira;
     s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
     temaVisto = null;
+    pegando = 0;
     camada.innerHTML = '';
     camada.hidden = true;
     pausaEl.hidden = false;
@@ -552,6 +578,7 @@ export function montar(area, ctl) {
         <div class="escolha"><span>Pele</span>${PELES.map((cor_, k) => `<button class="amostra${prefs.personagem.pele === k ? ' sel' : ''}" data-pele="${k}" style="background:${cor_}" aria-label="Tom de pele ${k + 1}"></button>`).join('')}</div>
         <div class="escolha"><span>Roupa</span>${ROUPAS.map((cor_, k) => `<button class="amostra${prefs.personagem.roupa === k ? ' sel' : ''}" data-roupa="${k}" style="background:${cor_}" aria-label="Cor da roupa ${k + 1}"></button>`).join('')}</div>
         <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
+        ${['floresta', 'passeio'].includes(prefs.cenario ?? 'passeio') ? `<div class="cenarios bichos"><span>Na floresta, quem corre atrás?</span>${OPCOES_FLORESTA.map((o) => `<button data-bicho="${o.id}" aria-pressed="${prefs.perseguidorFloresta === o.id}"><b>${o.icone}</b>${o.nome}</button>`).join('')}</div>` : ''}
         <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque em 🛹 durante a corrida</small>
         ${c.arrancadas ? `<small class="equipado">🎒 ${c.arrancadas} mochila${c.arrancadas > 1 ? 's' : ''} a jato: toque em "Decolar" no começo</small>` : ''}
         <button class="botao grande" data-correr>Correr!</button>`;
@@ -604,6 +631,13 @@ export function montar(area, ctl) {
     const q = (sel) => camada.querySelectorAll(sel);
     q('[data-aba]').forEach((b) => { b.onclick = () => { ctl.som('clique'); telaInicial(b.dataset.aba); }; });
     q('[data-correr]').forEach((b) => { b.onclick = comecar; });
+    q('[data-bicho]').forEach((b) => {
+      b.onclick = () => {
+        prefs.perseguidorFloresta = b.dataset.bicho; guardar();
+        ctl.som(SOM_PERSEGUIDOR[b.dataset.bicho]);
+        telaInicial(aba);
+      };
+    });
     q('[data-cenario]').forEach((b) => {
       b.onclick = () => { prefs.cenario = b.dataset.cenario; guardar(); ctl.som('clique'); telaInicial(aba); };
     });
@@ -649,7 +683,8 @@ export function montar(area, ctl) {
     camada.hidden = false;
     camada.innerHTML = `<div class="cartao-corrida">
       <div class="retrato pequeno">${retrato({ ...prefs.personagem, sorriso: 'uau' })}</div>
-      <strong>${novo ? 'Novo recorde! 🎉' : 'Opa, bateu!'}</strong>
+      <strong>${novo ? 'Novo recorde! 🎉' : 'Ops, bateu!'}</strong>
+      <small class="alcancou">${EMOJI[perseguidorAgora()]} ${NOMES[perseguidorAgora()].replace(/^./, (l) => l.toUpperCase())} te alcançou!</small>
       <span class="grande-num">${fmt(res.pontos)}</span>
       <small>${res.metros} m${novo || !antes ? '' : ` · recorde ${fmt(antes)}`}</small>
       <div class="ganhos"><span>🪙 +${fmt(res.moedas)} moedas pegas</span>

@@ -575,3 +575,5 @@ h2 { font-size: 20px; }
 .acao-decolar i { position: absolute; left: 0; bottom: 0; height: 4px; background: #ffe066; }
 .corrida-hud .dobro { background: #ff4f81; color: #fff; }
 @keyframes pulso-decolar { to { transform: translateX(-50%) scale(1.07); box-shadow: 0 0 0 6px rgba(255, 160, 40, .4), 0 6px 16px rgba(0, 0, 0, .3); } }
+.cenarios.bichos { grid-template-columns: repeat(2, 1fr); }
+.cenarios.bichos button { flex-direction: row; justify-content: center; gap: 8px; font-size: 14px; padding: 8px; }

@@ -20,6 +20,7 @@ export const prefs = {
   personagem: inicial.personagem ?? { pele: 1, roupa: 0 },
   carteira: normalizar(inicial.carteira),
   cenario: inicial.cenario ?? 'passeio',
+  perseguidorFloresta: inicial.perseguidorFloresta ?? 'leao',
 };
 
 // Migra o placar da primeira versão, que não guardava histórico.
@@ -73,7 +74,7 @@ export function montarCopia(jogos) {
     const s = lerSalvo(id);
     if (s) salvos[id] = s;
   }
-  return { app: MARCA, versao: 1, criada: Date.now(), nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, historico: prefs.historico, salvos };
+  return { app: MARCA, versao: 1, criada: Date.now(), nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, perseguidorFloresta: prefs.perseguidorFloresta, historico: prefs.historico, salvos };
 }
 
 const chaveDoRegistro = (h) => `${h.j}|${h.r}|${h.t}|${h.tempo ?? ''}`;
