@@ -61,6 +61,14 @@ export function texRosto() {
       g.addColorStop(0, 'rgba(255,120,125,.3)'); g.addColorStop(1, 'rgba(255,120,125,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     }
+    // sardas no nariz e nas bochechas (sorteio fixo: sempre no mesmo lugar)
+    ctx.fillStyle = 'rgba(130,70,40,.42)';
+    let s = 7;
+    const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let k = 0; k < 64; k++) {
+      const u = 0.25 + (r() - 0.5) * 0.17; const vv = 0.565 + (r() - 0.5) * 0.06 + Math.abs(u - 0.25) * 0.2;
+      ctx.beginPath(); ctx.arc(u * w, vv * h, 0.9 + r() * 0.9, 0, 7); ctx.fill();
+    }
   });
 }
 
@@ -71,10 +79,10 @@ export function texIris(cor = '#6b4423') {
     const c = new THREE.Color(cor);
     const tom = (t) => `#${c.clone().lerp(new THREE.Color(t > 0 ? 0xffd9a0 : 0x000000), Math.abs(t)).getHexString()}`;
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, '#060303'); g.addColorStop(0.36, '#060303'); g.addColorStop(0.4, tom(0.45)); g.addColorStop(0.62, tom(0.12)); g.addColorStop(0.86, tom(-0.25)); g.addColorStop(0.93, tom(-0.75)); g.addColorStop(1, tom(-0.85));
+    g.addColorStop(0, '#060303'); g.addColorStop(0.36, '#060303'); g.addColorStop(0.4, tom(0.16)); g.addColorStop(0.62, tom(0.03)); g.addColorStop(0.86, tom(-0.25)); g.addColorStop(0.93, tom(-0.75)); g.addColorStop(1, tom(-0.85));
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     for (let k = 0; k < 90; k++) { // fibras da íris
-      ctx.strokeStyle = k % 2 ? 'rgba(255,225,170,.16)' : 'rgba(30,12,4,.2)';
+      ctx.strokeStyle = k % 2 ? 'rgba(255,225,170,.08)' : 'rgba(30,12,4,.2)';
       ctx.lineWidth = 0.6 + (k % 3) * 0.4;
       const x = (k * 37) % w;
       ctx.beginPath(); ctx.moveTo(x, h * 0.4); ctx.lineTo(x + ((k * 13) % 5) - 2, h * 0.92); ctx.stroke();
@@ -331,7 +339,7 @@ export function criarTenis({ cabedal, sola, detalhe, cadarco, borracha }) {
   const corpoTenis = p(geo, cabedal); t.add(corpoTenis);
   // biqueira de borracha
   const bico = p(new THREE.SphereGeometry(0.036, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), borracha);
-  bico.scale.set(1.02, 0.62, 0.8); bico.position.set(0, -0.026, 0.083); bico.rotation.x = 0.35; t.add(bico);
+  bico.scale.set(1.1, 0.78, 0.98); bico.position.set(0, -0.026, 0.08); bico.rotation.x = 0.35; t.add(bico);
   // colarinho acolchoado e língua
   const colar = p(new THREE.TorusGeometry(0.034, 0.011, 8, 20), cabedal); colar.rotation.x = Math.PI / 2 + 0.12; colar.scale.set(1, 1.18, 1); colar.position.set(0, 0.036, -0.04); t.add(colar);
   const lingua = p(new THREE.SphereGeometry(0.024, 12, 10), cabedal); lingua.scale.set(0.95, 1.25, 0.42); lingua.position.set(0, 0.036, 0.004); lingua.rotation.x = -0.5; t.add(lingua);
