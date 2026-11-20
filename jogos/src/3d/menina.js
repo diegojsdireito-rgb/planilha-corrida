@@ -4,7 +4,7 @@
 import { THREE, xDe, textura, ruido, sombrear, texBrilho, desenho } from './base.js';
 import { PELES, ROUPAS } from '../personagem.js';
 import { personagemDe, usa } from '../personagens.js';
-import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCabeleira, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
+import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCabeleira, texCabeleira, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
 
 const CABELO = ['#2c1a10', '#331e12', '#3b2316', '#46291a', '#52301f']; // castanho-escuro, com pontas um pouco mais claras
 
@@ -357,7 +357,7 @@ export function criarMenina() {
     detalhe: desenho({ color: ROUPAS[0], roughness: 0.6 }),
     cadarco: desenho({ color: 0xdddddd, roughness: 0.7 }),
     cabelo: CABELO.map((c) => desenho({ color: c, roughness: 0.5, map: tex.cabelo, side: THREE.DoubleSide })),
-    cabeleira: desenho({ color: CABELO[2], emissive: CABELO[2], emissiveIntensity: 0.3 }),
+    cabeleira: desenho({ color: CABELO[2], map: texCabeleira(7) }),
     cabeleiraDentro: new THREE.MeshBasicMaterial({ color: CABELO[0], side: THREE.BackSide }), // o lado de dentro do cabelo, na sombra
     cabeloLiso: desenho({ color: CABELO[2], roughness: 0.45, side: THREE.DoubleSide }),
     perna: desenho({ color: 0xffffff, roughness: 0.85 }), // calça, legging ou meião
@@ -761,7 +761,7 @@ export function criarMenina() {
       const base = new THREE.Color(pers.corCabelo);
       mat.cachos.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k % 3) * 0.008));
       mat.cabelo.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k - 2) * 0.02));
-      mat.cabeloLiso.color.copy(base); mat.cabeleira.color.copy(base); mat.cabeleiraDentro.color.copy(base).multiplyScalar(0.8);
+      mat.cabeloLiso.color.copy(base); mat.cabeleira.color.copy(base); mat.cabeleiraDentro.color.copy(base).multiplyScalar(0.8); mat.cabeleira.color.multiplyScalar(2.1); // a pintura das mechas escurece: compensa na cor
       for (const m of [mat.cabeleira, mat.cabeloLiso, ...mat.cachos]) { m.emissive.copy(m.color); m.emissiveIntensity = 0.16; } // as sombras do cabelo ficam castanhas, não pretas
       matSobrancelha.color.copy(base).offsetHSL(0, -0.1, -0.06);
       matIris.map?.dispose(); matIris.map = texIris(pers.olhos); matIris.needsUpdate = true;

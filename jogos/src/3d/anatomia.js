@@ -180,9 +180,9 @@ export function geoCabelo(R = 0.142, folga = 1.05, colunas = 72, linhas = 18) {
 // terminam cada uma numa ponta arredondada — e, na ponta de cada gomo, um cacho em espiral.
 // az = 0 é o meio da nuca. Sem ruído miúdo: só curvas largas, que a luz em faixas desenha.
 export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7, colunas = 98, linhas = 24, volume = 0.036, sulco = 0.034, onda = 0.085, cachosNasPontas = true } = {}) {
-  const pos = []; const ind = [];
+  const pos = []; const ind = []; const uv = [];
   const gomoDe = (az) => { const q = ((az + abertura) / (2 * abertura)) * gomos; return Math.sin(Math.PI * (q - Math.floor(q))); };
-  const compDe = (az) => comp * (1 - 0.2 * (az / abertura) ** 2) + 0.045 * gomoDe(az) ** 0.7;
+  const compDe = (az) => comp * (1 - 0.2 * (az / abertura) ** 2) + 0.07 * gomoDe(az) ** 0.6; // cada mecha termina numa ponta arredondada
   const raioDe = (az, t, y) => {
     let r;
     if (y > -0.1) r = Math.sqrt(Math.max(0.0001, R * R - y * y * 0.85)) + 0.004 + 0.03 * suave(0, 0.3, t);
@@ -199,12 +199,14 @@ export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7,
       const r = raioDe(az, t, y);
       const a = az + onda * Math.sin(t * 6.2 + az * 0.7) * suave(0.35, 0.85, t); // todas descem no mesmo S, mais ondulado para as pontas
       pos.push(Math.sin(a) * r, y, -Math.cos(a) * r);
+      uv.push(c / colunas, 1 - t);
     }
   }
   const L = linhas + 1;
   for (let c = 0; c < colunas; c++) for (let l = 0; l < linhas; l++) { const i = c * L + l; ind.push(i, i + L, i + 1, i + 1, i + L, i + L + 1); }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(ind); geo.computeVertexNormals();
   // um cacho na ponta de cada gomo: espiral gorda que afina
   const cachos = [];
@@ -221,6 +223,30 @@ export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7,
     cachos.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 26, (u) => 0.021 * (1 - 0.65 * u * u) + 0.002, 7));
   }
   return { massa: geo, cachos };
+}
+
+// Pintura da cabeleira (multiplica a cor do cabelo): sombra entre uma mecha e outra, fios finos
+// e a faixa de brilho que os desenhos animados põem no cabelo. O alto da imagem é a raiz.
+export function texCabeleira(gomos = 7) {
+  return textura(512, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#c8c8c8'; ctx.fillRect(0, 0, w, h);
+    let s = 31; const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let k = 0; k < 150; k++) { // fios
+      const x = r() * w; ctx.strokeStyle = r() < 0.5 ? `rgba(0,0,0,${0.06 + r() * 0.1})` : `rgba(255,255,255,${0.08 + r() * 0.14})`; ctx.lineWidth = 1 + r() * 2.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.bezierCurveTo(x + 6, h * 0.3, x - 6, h * 0.7, x + (r() - 0.5) * 10, h); ctx.stroke();
+    }
+    for (let g = 0; g <= gomos; g++) { // sombra no encontro das mechas, mais forte para as pontas
+      const x = (g / gomos) * w; const grad = ctx.createLinearGradient(x - 26, 0, x + 26, 0);
+      grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(0.5, 'rgba(0,0,0,.45)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad; ctx.globalAlpha = 1; ctx.fillRect(x - 26, h * 0.22, 52, h * 0.78);
+      const meio = ((g + 0.5) / gomos) * w; const luz = ctx.createLinearGradient(meio - 22, 0, meio + 22, 0);
+      luz.addColorStop(0, 'rgba(255,255,255,0)'); luz.addColorStop(0.5, 'rgba(255,255,255,.6)'); luz.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = luz; ctx.fillRect(meio - 22, h * 0.3, 44, h * 0.7); // o lombo de cada mecha pega luz
+    }
+    const brilho = ctx.createLinearGradient(0, h * 0.14, 0, h * 0.34); // faixa de brilho no alto
+    brilho.addColorStop(0, 'rgba(255,255,255,0)'); brilho.addColorStop(0.5, 'rgba(255,255,255,.75)'); brilho.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = brilho; ctx.fillRect(0, h * 0.14, w, h * 0.2);
+  });
 }
 
 // Um cacho: nasce no couro cabeludo, contorna a cabeça e cai em espiral, mais solto na ponta.
