@@ -167,9 +167,40 @@ export function geoCabelo(R = 0.142, folga = 1.05, colunas = 72, linhas = 18) {
   return geo;
 }
 
+// Cabeleira: o volume do cabelo comprido numa peça só, como nos desenhos — nasce debaixo da casca,
+// arma nos lados, cai pelas costas em ondas largas e termina em pontas recortadas, viradas para dentro.
+// az = 0 é o meio da nuca. As ondas são sulcos na própria malha, que a luz em faixas destaca.
+export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.3, colunas = 72, linhas = 26, ondas = 9 } = {}) {
+  const pos = []; const ind = [];
+  for (let c = 0; c <= colunas; c++) {
+    const az = (c / colunas - 0.5) * 2 * abertura;
+    const lado = Math.abs(az) / abertura; // 0 nas costas, 1 perto do rosto
+    const compAqui = comp * (1 - 0.22 * lado * lado) + 0.028 * Math.sin(az * ondas * 0.78 + 1);
+    for (let l = 0; l <= linhas; l++) {
+      const t = l / linhas;
+      const y = 0.125 - t * (compAqui + 0.125);
+      let r;
+      if (y > -0.1) r = Math.sqrt(Math.max(0.0001, R * R - y * y * 0.85)) + 0.004 + 0.03 * suave(0, 0.3, t);
+      else r = 0.126 + (-0.1 - y) * 0.1 + 0.028;
+      r += 0.034 * Math.sin(Math.PI * Math.min(1, t * 1.15)) ** 0.8 * (0.75 + 0.25 * lado); // arma no meio do comprimento
+      const onda = Math.sin(az * ondas + t * 11 + Math.sin(t * 4 + az) * 1.2);
+      r += 0.013 * onda * suave(0.12, 0.45, t);
+      r -= 0.05 * suave(0.82, 1, t); // as pontas viram para dentro
+      const a = az + 0.05 * Math.sin(t * 9 + az * 3) * suave(0.2, 0.7, t);
+      pos.push(Math.sin(a) * r, y, -Math.cos(a) * r);
+    }
+  }
+  const L = linhas + 1;
+  for (let c = 0; c < colunas; c++) for (let l = 0; l < linhas; l++) { const i = c * L + l; ind.push(i, i + L, i + 1, i + 1, i + L, i + L + 1); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(ind); geo.computeVertexNormals();
+  return geo;
+}
+
 // Um cacho: nasce no couro cabeludo, contorna a cabeça e cai em espiral, mais solto na ponta.
 // az = 0 é o meio da nuca; ±2 são os lados do rosto.
-export function geoCacho({ az, y0 = 0.03, comp = 0.55, fase = 0, amp = 0.016, voltas = 3.2, raio = 0.014, frente = false, R = 0.142, segmentos = 20 }) {
+export function geoCacho({ az, y0 = 0.03, comp = 0.55, fase = 0, amp = 0.016, voltas = 3.2, raio = 0.014, frente = false, R = 0.142, segmentos = 20, fora = 0 }) {
   const pts = [];
   const N = 22;
   for (let k = 0; k <= N; k++) {
@@ -181,7 +212,7 @@ export function geoCacho({ az, y0 = 0.03, comp = 0.55, fase = 0, amp = 0.016, vo
     const kk = suave(0.1, 0.55, t);
     const w = t * voltas * Math.PI * 2 + fase;
     const a = az + (Math.sin(w) * amp * kk) / r;
-    const rr = r + Math.cos(w) * amp * kk * 0.9 + kk * 0.012;
+    const rr = r + Math.cos(w) * amp * kk * 0.9 + kk * 0.012 + fora * suave(0.05, 0.35, t) * (1 - 0.6 * t);
     pts.push(new THREE.Vector3(Math.sin(a) * rr, y, -Math.cos(a) * rr));
   }
   return tuboAfinado(new THREE.CatmullRomCurve3(pts), segmentos, (t) => raio * suave(0, 0.1, t) * (1.2 - 0.75 * t * t) + 0.0008, 5);
