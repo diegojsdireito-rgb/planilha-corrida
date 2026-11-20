@@ -394,7 +394,7 @@ export function criarMenina() {
     // tênis: solado com formato de pé, cabedal, biqueira, língua, cadarço cruzado e faixas
     const tenis = new THREE.Group(); tenis.position.set(0, -0.3 * PERNA, 0.035); joelho.add(tenis);
     const sapato = criarTenis({ cabedal: mat.tenis, sola: mat.sola, detalhe: mat.detalhe, cadarco: mat.cadarco, borracha: mat.sola });
-    sapato.scale.setScalar(1.32); sapato.position.set(0, 0.031, -0.008); tenis.add(sapato);
+    sapato.scale.setScalar(1.5); sapato.position.set(0, 0.059, -0.004); tenis.add(sapato);
     // cano alto (estilos street e jeans): sobe pelo tornozelo
     const cano = peca(new THREE.CylinderGeometry(0.041, 0.045, 0.07, 18), mat.tenis); cano.position.set(0, 0.07, -0.04); tenis.add(cano);
     const bordaCano = peca(new THREE.TorusGeometry(0.041, 0.008, 6, 18), mat.detalhe); bordaCano.rotation.x = Math.PI / 2; bordaCano.position.set(0, 0.105, -0.04); tenis.add(bordaCano);
@@ -516,12 +516,14 @@ export function criarMenina() {
     const narina = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), desenho({ color: 0x6e3a2c, roughness: 0.9 })); narina.scale.set(1.25, 0.5, 0.8); narina.position.set(l * 0.006, -0.0092, -0.0075); nariz.add(narina);
   }
   // boca sorrindo: lábio de cima com o arco do cupido, lábio de baixo mais cheio e os dentes entre eles
-  const Y_BOCA = -0.09; const L_BOCA = 0.03;
-  const cima = (x) => Y_BOCA + 0.003 + 0.008 * (x / L_BOCA) ** 2 - 0.002 * Math.exp(-((x / 0.006) ** 2));
-  const baixo = (x) => Y_BOCA - 0.0015 + 0.0125 * (x / L_BOCA) ** 2; // lábios juntos: sorriso fechado
+  const Y_BOCA = -0.09; const L_BOCA = 0.038;
+  const cima = (x) => Y_BOCA + 0.0025 + 0.0135 * (x / L_BOCA) ** 2 - 0.0015 * Math.exp(-((x / 0.007) ** 2));
+  const baixo = (x) => Y_BOCA - 0.0035 + 0.0195 * (x / L_BOCA) ** 2; // lábios juntos: sorriso fechado, largo, com os cantos para cima
   const labio = new THREE.Group(); rosto.add(labio);
-  labio.add(noRosto(cima, -L_BOCA, L_BOCA, (t) => 0.003 * Math.sin(t * Math.PI) ** 0.6 + 0.0006, matBoca, { n: 16, folga: 0.0002 }));
-  labio.add(noRosto(baixo, -L_BOCA, L_BOCA, (t) => 0.0041 * Math.sin(t * Math.PI) ** 0.7 + 0.0006, matBoca, { n: 16, folga: 0 }));
+  labio.add(noRosto(cima, -L_BOCA, L_BOCA, (t) => 0.0028 * Math.sin(t * Math.PI) ** 0.6 + 0.0006, matBoca, { n: 16, folga: 0.0002 }));
+  // a linha escura entre os lábios é o que desenha o sorriso
+  labio.add(noRosto((x) => (cima(x) + baixo(x)) / 2 + 0.0004, -L_BOCA * 1.04, L_BOCA * 1.04, (t) => 0.0013 * Math.sin(t * Math.PI) ** 0.4 + 0.0007, desenho({ color: 0x5a2420 }), { n: 16, folga: 0.0026 }));
+  labio.add(noRosto(baixo, -L_BOCA, L_BOCA, (t) => 0.0046 * Math.sin(t * Math.PI) ** 0.8 + 0.0006, matBoca, { n: 16, folga: 0 }));
   // dentes de cima e o fundo da boca, em tiras que seguem a curva do rosto
   const tiraBoca = (yA, yB, material, fundo) => {
     const v = []; const ind = []; const N2 = 14;
@@ -765,7 +767,7 @@ export function criarMenina() {
       for (const m of [mat.cabeleira, mat.cabeloLiso, ...mat.cachos]) { m.emissive.copy(m.color); m.emissiveIntensity = 0.16; } // as sombras do cabelo ficam castanhas, não pretas
       matSobrancelha.color.copy(base).offsetHSL(0, -0.1, -0.06);
       matIris.map?.dispose(); matIris.map = texIris(pers.olhos); matIris.needsUpdate = true;
-      matBoca.color.set(pers.menino ? 0xb8705f : 0xc4616a);
+      matBoca.color.set(pers.menino ? 0xb8705f : 0xc0605a);
       for (const o of pecasCachos) o.visible = pers.cabelo === 'cachos';
       for (const [id, g] of Object.entries(penteados)) g.visible = pers.cabelo === id;
       mFranja.visible = ['cachos', 'rabo', 'coques', 'trancas'].includes(pers.cabelo);

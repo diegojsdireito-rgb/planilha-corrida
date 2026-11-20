@@ -350,8 +350,8 @@ export function criarTenis({ cabedal, sola, detalhe, cadarco, borracha }) {
   pegada.bezierCurveTo(-0.034, -0.05, -0.034, -0.108, 0, -0.108);
   const fatia = (alt, chanfro) => { const g = new THREE.ExtrudeGeometry(pegada, { depth: alt, bevelEnabled: true, bevelThickness: chanfro, bevelSize: chanfro, bevelSegments: 2, curveSegments: 10 }); g.rotateX(-Math.PI / 2); return g; };
   // a forma foi desenhada com a frente em +y; depois de deitar, a frente fica em -z: vira de novo
-  const entressola = p(fatia(0.02, 0.004), sola); entressola.rotation.y = Math.PI; entressola.position.y = -0.05; t.add(entressola);
-  const solado = p(fatia(0.006, 0.001), detalhe); solado.rotation.y = Math.PI; solado.position.y = -0.058; solado.scale.set(1.02, 1, 1.01); t.add(solado);
+  const entressola = p(fatia(0.03, 0.005), sola); entressola.rotation.y = Math.PI; entressola.position.y = -0.062; entressola.scale.set(1.08, 1, 1.04); t.add(entressola); // sola grossa e clara, aparecendo em volta do pé
+  const solado = p(fatia(0.006, 0.001), detalhe); solado.rotation.y = Math.PI; solado.position.y = -0.069; solado.scale.set(1.06, 1, 1.03); t.add(solado);
   // cabedal esculpido
   const geo = new THREE.SphereGeometry(1, 20, 14);
   const pos = geo.attributes.position;
@@ -365,7 +365,7 @@ export function criarTenis({ cabedal, sola, detalhe, cadarco, borracha }) {
   const corpoTenis = p(geo, cabedal); t.add(corpoTenis);
   // biqueira de borracha
   const bico = p(new THREE.SphereGeometry(0.036, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), borracha);
-  bico.scale.set(1.1, 0.78, 0.98); bico.position.set(0, -0.026, 0.08); bico.rotation.x = 0.35; t.add(bico);
+  bico.scale.set(1.16, 0.9, 1.05); bico.position.set(0, -0.028, 0.078); bico.rotation.x = 0.35; t.add(bico);
   // colarinho acolchoado e língua
   const colar = p(new THREE.TorusGeometry(0.034, 0.011, 8, 20), cabedal); colar.rotation.x = Math.PI / 2 + 0.12; colar.scale.set(1, 1.18, 1); colar.position.set(0, 0.036, -0.04); t.add(colar);
   const lingua = p(new THREE.SphereGeometry(0.024, 12, 10), cabedal); lingua.scale.set(0.95, 1.25, 0.42); lingua.position.set(0, 0.036, 0.004); lingua.rotation.x = -0.5; t.add(lingua);
