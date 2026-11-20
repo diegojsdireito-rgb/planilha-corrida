@@ -61,19 +61,6 @@ export function texRosto() {
       g.addColorStop(0, 'rgba(255,120,125,.3)'); g.addColorStop(1, 'rgba(255,120,125,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     }
-    // sombra leve em volta dos olhos e debaixo do lábio
-    for (const [u, vv, r, a] of [[0.196, 0.5, 0.03, 0.1], [0.304, 0.5, 0.03, 0.1], [0.25, 0.71, 0.022, 0.1]]) {
-      const g = ctx.createRadialGradient(u * w, vv * h, 0, u * w, vv * h, r * w);
-      g.addColorStop(0, `rgba(120,60,40,${a})`); g.addColorStop(1, 'rgba(120,60,40,0)');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-    }
-    ctx.fillStyle = 'rgba(120,70,40,.4)';
-    let s = 7;
-    const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    for (let k = 0; k < 46; k++) {
-      const u = 0.25 + (r() - 0.5) * 0.14; const vv = 0.555 + (r() - 0.5) * 0.06 + Math.abs(u - 0.25) * 0.2;
-      ctx.beginPath(); ctx.arc(u * w, vv * h, 0.7 + r() * 0.8, 0, 7); ctx.fill();
-    }
   });
 }
 
@@ -96,19 +83,21 @@ export function texIris(cor = '#6b4423') {
 }
 
 // Olho completo: globo, íris que gira para olhar, brilho e pálpebras (a de cima fecha para piscar).
-export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCilio, cilios = true }) {
+export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCilio, cilios = true, grande = false }) {
   const olho = new THREE.Group();
   olho.add(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), matBranco));
   const mira = new THREE.Group(); olho.add(mira);
-  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, 28, 8, 0, Math.PI * 2, 0, 0.56), matIris);
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, 28, 8, 0, Math.PI * 2, 0, grande ? 0.74 : 0.56), matIris);
   iris.rotation.x = Math.PI / 2; mira.add(iris);
   const brilho = new THREE.Mesh(new THREE.SphereGeometry(r * 0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-  brilho.position.set(r * 0.26, r * 0.3, r * 0.94); olho.add(brilho);
+  brilho.position.set(r * 0.26, r * 0.3, r * 0.94); if (grande) brilho.scale.setScalar(1.5); olho.add(brilho);
+  if (grande) { const b2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.09, 8, 6), brilho.material); b2.position.set(-r * 0.3, -r * 0.28, r * 0.93); brilho.add(b2); b2.position.sub(brilho.position).divideScalar(1.5); }
   const RL = r * 1.075;
   const sup = new THREE.Mesh(new THREE.SphereGeometry(RL, 24, 10, 0, Math.PI * 2, 0, 1.0), matPele);
-  sup.rotation.x = PALPEBRA_ABERTA; olho.add(sup);
+  const aberta = grande ? -0.4 : PALPEBRA_ABERTA; // olhos de desenho ficam bem abertos
+  sup.rotation.x = aberta; olho.add(sup);
   if (cilios) {
-    const c = new THREE.Mesh(new THREE.TorusGeometry(RL * Math.sin(1.0), r * 0.075, 5, 20, Math.PI * 0.9), matCilio);
+    const c = new THREE.Mesh(new THREE.TorusGeometry(RL * Math.sin(1.0), r * (grande ? 0.13 : 0.075), 5, 20, Math.PI * 0.9), matCilio);
     c.rotation.set(Math.PI / 2, 0, 0); c.rotation.z = Math.PI * 0.05 + (lado > 0 ? 0 : 0); c.position.y = RL * Math.cos(1.0); sup.add(c);
     // cílios do canto de fora, mais compridos
     for (let k = 0; k < 3; k++) {
@@ -118,9 +107,9 @@ export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCil
       p.rotation.set(Math.PI / 2 - 0.5, 0, -lado * (0.5 + k * 0.25)); sup.add(p);
     }
   }
-  const inf = new THREE.Mesh(new THREE.SphereGeometry(RL, 24, 8, 0, Math.PI * 2, Math.PI - 1.0, 1.0), matPele);
+  const inf = new THREE.Mesh(new THREE.SphereGeometry(RL, 24, 8, 0, Math.PI * 2, Math.PI - (grande ? 0.78 : 1.0), grande ? 0.78 : 1.0), matPele);
   olho.add(inf);
-  return { olho, mira, brilho, sup };
+  return { olho, mira, brilho, sup, aberta };
 }
 export const PALPEBRA_ABERTA = -0.06;
 export const PALPEBRA_FECHADA = 1.2;
@@ -178,9 +167,57 @@ export function geoCabelo(R = 0.142, folga = 1.05, colunas = 72, linhas = 18) {
   return geo;
 }
 
+// Cabeleira: o cabelo comprido em formas grandes, como se desenha cabelo de desenho animado.
+// Primeiro o volume (a silhueta), depois os gomos — mechas largas que descem juntas num S suave e
+// terminam cada uma numa ponta arredondada — e, na ponta de cada gomo, um cacho em espiral.
+// az = 0 é o meio da nuca. Sem ruído miúdo: só curvas largas, que a luz em faixas desenha.
+export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7, colunas = 98, linhas = 24 } = {}) {
+  const pos = []; const ind = [];
+  const gomoDe = (az) => { const q = ((az + abertura) / (2 * abertura)) * gomos; return Math.sin(Math.PI * (q - Math.floor(q))); };
+  const compDe = (az) => comp * (1 - 0.2 * (az / abertura) ** 2) + 0.045 * gomoDe(az) ** 0.7;
+  const raioDe = (az, t, y) => {
+    let r;
+    if (y > -0.1) r = Math.sqrt(Math.max(0.0001, R * R - y * y * 0.85)) + 0.004 + 0.03 * suave(0, 0.3, t);
+    else r = 0.126 + (-0.1 - y) * 0.1 + 0.028;
+    r += 0.036 * Math.sin(Math.PI * Math.min(1, t * 1.1)) ** 0.8; // arma no meio do comprimento
+    r += 0.034 * (gomoDe(az) ** 0.5 - 0.7) * suave(0.08, 0.4, t); // os gomos: cheios no meio, com um sulco entre um e outro
+    return r - 0.04 * suave(0.84, 1, t); // as pontas viram para dentro
+  };
+  for (let c = 0; c <= colunas; c++) {
+    const az = (c / colunas - 0.5) * 2 * abertura;
+    for (let l = 0; l <= linhas; l++) {
+      const t = l / linhas;
+      const y = 0.125 - t * (compDe(az) + 0.125);
+      const r = raioDe(az, t, y);
+      const a = az + 0.085 * Math.sin(t * 6.2 + az * 0.7) * suave(0.15, 0.6, t); // todas descem no mesmo S
+      pos.push(Math.sin(a) * r, y, -Math.cos(a) * r);
+    }
+  }
+  const L = linhas + 1;
+  for (let c = 0; c < colunas; c++) for (let l = 0; l < linhas; l++) { const i = c * L + l; ind.push(i, i + L, i + 1, i + 1, i + L, i + L + 1); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(ind); geo.computeVertexNormals();
+  // um cacho na ponta de cada gomo: espiral gorda que afina
+  const cachos = [];
+  for (let g = 0; g < gomos; g++) {
+    const az = ((g + 0.5) / gomos - 0.5) * 2 * abertura;
+    const yFim = -compDe(az); const rc = raioDe(az, 0.86, yFim) - 0.012;
+    const a0 = az + 0.085 * Math.sin(6.2 + az * 0.7);
+    const pts = [];
+    for (let k = 0; k <= 18; k++) {
+      const u = k / 18; const w = u * Math.PI * 2 * 1.7 + g * 2.1; const rr = 0.03 * (1 - 0.35 * u);
+      const a = a0 + (Math.sin(w) * rr) / rc; const r = rc + Math.cos(w) * rr;
+      pts.push(new THREE.Vector3(Math.sin(a) * r, yFim + 0.035 - u * 0.105, -Math.cos(a) * r));
+    }
+    cachos.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 26, (u) => 0.021 * (1 - 0.65 * u * u) + 0.002, 7));
+  }
+  return { massa: geo, cachos };
+}
+
 // Um cacho: nasce no couro cabeludo, contorna a cabeça e cai em espiral, mais solto na ponta.
 // az = 0 é o meio da nuca; ±2 são os lados do rosto.
-export function geoCacho({ az, y0 = 0.03, comp = 0.55, fase = 0, amp = 0.016, voltas = 3.2, raio = 0.014, frente = false, R = 0.142, segmentos = 20 }) {
+export function geoCacho({ az, y0 = 0.03, comp = 0.55, fase = 0, amp = 0.016, voltas = 3.2, raio = 0.014, frente = false, R = 0.142, segmentos = 20, fora = 0 }) {
   const pts = [];
   const N = 22;
   for (let k = 0; k <= N; k++) {
@@ -192,7 +229,7 @@ export function geoCacho({ az, y0 = 0.03, comp = 0.55, fase = 0, amp = 0.016, vo
     const kk = suave(0.1, 0.55, t);
     const w = t * voltas * Math.PI * 2 + fase;
     const a = az + (Math.sin(w) * amp * kk) / r;
-    const rr = r + Math.cos(w) * amp * kk * 0.9 + kk * 0.012;
+    const rr = r + Math.cos(w) * amp * kk * 0.9 + kk * 0.012 + fora * suave(0.05, 0.35, t) * (1 - 0.6 * t);
     pts.push(new THREE.Vector3(Math.sin(a) * rr, y, -Math.cos(a) * rr));
   }
   return tuboAfinado(new THREE.CatmullRomCurve3(pts), segmentos, (t) => raio * suave(0, 0.1, t) * (1.2 - 0.75 * t * t) + 0.0008, 5);

@@ -36,6 +36,17 @@ export function toon(cor, extra = {}) {
   return new THREE.MeshToonMaterial({ color: cor, gradientMap: GRADIENTE, ...extra });
 }
 
+// Material dos personagens: desenho animado de cores chapadas, com luz e sombra em três faixas suaves.
+let GRADIENTE_P = null;
+export function desenho({ roughness, metalness, ...params } = {}) {
+  if (!GRADIENTE_P) {
+    // rampa suave (sem degraus duros): sombra quente, meio-tom e luz, como numa ilustração de animação
+    GRADIENTE_P = new THREE.DataTexture(new Uint8Array([118, 150, 190, 225, 246, 255]), 6, 1, THREE.RedFormat);
+    GRADIENTE_P.minFilter = THREE.LinearFilter; GRADIENTE_P.magFilter = THREE.LinearFilter; GRADIENTE_P.needsUpdate = true;
+  }
+  return new THREE.MeshToonMaterial({ gradientMap: GRADIENTE_P, ...params });
+}
+
 export const sombrear = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
 
 let BRILHO = null;
