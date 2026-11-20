@@ -150,7 +150,8 @@ export function montar(area, ctl) {
     cores.append(el('span', 'pintar-sub', '✨ Metálicas'));
     CORES_METAL.forEach((c) => botaoCor(c, 'metal'));
 
-    area.append(folha, barra, ferr, cores, tipos, linhaTam);
+    const ajuda = el('p', 'pintar-ajuda', '☝️ Um dedo pinta · ✌️ Dois dedos aumentam, diminuem e arrastam, sem pintar');
+    area.append(folha, ajuda, barra, ferr, cores, tipos, linhaTam);
     marcar();
     ligarToque();
 
@@ -409,18 +410,40 @@ export function montar(area, ctl) {
     return [f(0), f(8), f(4)];
   }
 
+  // Toque com um dedo pinta; com dois dedos só aumenta, diminui e arrasta. Para o segundo
+  // dedo não deixar risco nem pingo de tinta, o traço espera um instante (ou o dedo andar
+  // um pouco) antes de começar, e o balde só pinta quando o dedo sai da tela.
+  const ESPERA_MS = 110; const ANDAR_PX = 7;
   let dedo = null;
   const dedos = new Map(); let pinca = null; let arrasto = null;
+  let espera = null; // primeiro dedo, ainda sem saber se vem outro
+  let gesto = false; // houve dois dedos: nada pinta até todos saírem da tela
   const local = (e) => { const r = folha.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   function cancelarTraco() {
     if (!ultimo) return;
     ultimo = null; dedo = null;
     ctxR.clearRect(0, 0, N, N);
+    traco.style.opacity = '';
     pilha.pop(); // o passo guardado no começo do traço não vale mais
   }
   function comecarPinca() {
     const [a, b] = [...dedos.values()];
     pinca = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom, tx, ty };
+  }
+  function comecarTraco() {
+    if (!espera) return;
+    const { id, pontos } = espera;
+    clearTimeout(espera.relogio);
+    espera = null;
+    dedo = id;
+    guardarPasso();
+    ctxR.clearRect(0, 0, N, N);
+    traco.style.opacity = ferramenta === 'borracha' ? '1' : String(opacidade[ferramenta] ?? 1);
+    const p = pontos[0];
+    ultimo = p; andado = 0; marcaAte = 0;
+    if (continuo()) linhaContinua(p, { x: p.x + 0.01, y: p.y });
+    carimbo(p.x, p.y);
+    for (const q of pontos.slice(1)) seguir(q); // o caminho feito durante a espera
   }
   function ligarToque() {
     folha.addEventListener('pointerdown', (e) => {
@@ -428,18 +451,19 @@ export function montar(area, ctl) {
       e.preventDefault();
       dedos.set(e.pointerId, local(e));
       folha.setPointerCapture(e.pointerId);
-      if (dedos.size === 2) { cancelarTraco(); arrasto = null; comecarPinca(); return; }
-      if (dedos.size > 2) return;
+      if (dedos.size >= 2) {
+        // segundo dedo: vira lupa, e o que o primeiro começou é desfeito
+        gesto = true;
+        if (espera) { clearTimeout(espera.relogio); espera = null; }
+        cancelarTraco(); arrasto = null;
+        if (dedos.size === 2) comecarPinca();
+        return;
+      }
+      if (gesto) return;
       if (mover && zoom > 1) { arrasto = { ...local(e), tx, ty }; return; }
-      const p = pontoDe(e);
-      if (ferramenta === 'balde') { balde(p); return; }
-      dedo = e.pointerId;
-      guardarPasso();
-      ctxR.clearRect(0, 0, N, N);
-      traco.style.opacity = ferramenta === 'borracha' ? '1' : String(opacidade[ferramenta] ?? 1);
-      ultimo = p; andado = 0; marcaAte = 0;
-      if (continuo()) linhaContinua(p, { x: p.x + 0.01, y: p.y });
-      carimbo(p.x, p.y);
+      const inicio = local(e);
+      espera = { id: e.pointerId, inicio, pontos: [pontoDe(e)], relogio: null };
+      if (ferramenta !== 'balde') espera.relogio = setTimeout(comecarTraco, ESPERA_MS);
     });
     folha.addEventListener('pointermove', (e) => {
       if (dedos.has(e.pointerId)) dedos.set(e.pointerId, local(e));
@@ -458,14 +482,28 @@ export function montar(area, ctl) {
         aplicarZoom();
         return;
       }
-      if (e.pointerId !== dedo || !ultimo) return;
       const eventos = e.getCoalescedEvents?.() ?? [e];
-      for (const ev of eventos.length ? eventos : [e]) seguir(pontoDe(ev));
+      const lista = eventos.length ? eventos : [e];
+      if (espera && e.pointerId === espera.id) {
+        for (const ev of lista) espera.pontos.push(pontoDe(ev));
+        const q = local(e);
+        if (ferramenta !== 'balde' && Math.hypot(q.x - espera.inicio.x, q.y - espera.inicio.y) > ANDAR_PX) comecarTraco();
+        return;
+      }
+      if (e.pointerId !== dedo || !ultimo) return;
+      for (const ev of lista) seguir(pontoDe(ev));
     });
     const soltar = (e) => {
       dedos.delete(e.pointerId);
       if (dedos.size < 2) pinca = null;
-      if (!dedos.size) arrasto = null;
+      if (!dedos.size) { arrasto = null; gesto = false; }
+      if (espera && e.pointerId === espera.id) {
+        // toque rápido de um dedo só: um pingo de tinta, ou o balde
+        const p = espera.pontos[0];
+        if (e.type === 'pointercancel') { clearTimeout(espera.relogio); espera = null; return; }
+        if (ferramenta === 'balde') { clearTimeout(espera.relogio); espera = null; balde(p); return; }
+        comecarTraco();
+      }
       if (e.pointerId !== dedo) return;
       dedo = null; terminarTraco();
     };
