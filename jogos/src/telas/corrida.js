@@ -545,7 +545,7 @@ export function montar(area, ctl) {
     ctl.som('clique');
     ativa = ctl.ativa();
     const c = prefs.carteira;
-    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
+    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas, dom: personagemDe(c.personagem).dom });
     temaVisto = null;
     pegando = 0;
     capturada = null;
@@ -737,17 +737,17 @@ export function montar(area, ctl) {
     const usando = c.personagem === p.id;
     const acao = usando ? '<span class="galeria-acao selecionado">Selecionado ✓</span>'
       : tem ? `<button class="galeria-acao" data-escolher="${p.id}">SELECIONAR</button>`
-        : `<button class="galeria-acao comprar" data-comprar="${p.id}" ${c.moedas < p.preco ? 'disabled' : ''}>🪙 ${fmt(p.preco)}</button>`;
+        : `<button class="galeria-acao comprar" data-comprar="${p.id}" ${c.moedas < p.preco ? 'disabled' : ''}>${p.preco ? `🪙 ${fmt(p.preco)}` : 'GRÁTIS'}</button>`;
     camada.className = 'corrida-camada modo-lobby';
     camada.innerHTML = `<div class="lobby galeria">
       ${topoLobby()}
-      <div class="galeria-titulo"><h3>${p.nome}</h3><span>${p.titulo}</span></div>
-      <div class="galeria-palco">${mundo ? '' : `<div class="galeria-2d">${miniatura(p)}</div>`}</div>
+      <div class="galeria-titulo"><h3>${p.nome}</h3><span class="galeria-dom">${p.iconeDom ?? ''} ${p.titulo}</span><small>${p.textoDom ?? ''}</small></div>
+      <div class="galeria-palco">${mundo ? (p.arteCorpo ? `<img class="galeria-arte" src="${p.arteCorpo}" alt="Ilustração de ${p.nome}">` : '') : `<div class="galeria-2d">${p.arteCorpo ? `<img src="${p.arteCorpo}" alt="">` : miniatura(p)}</div>`}</div>
       ${acao}
       ${!tem && c.moedas < p.preco ? `<p class="galeria-aviso">Faltam ${fmt(p.preco - c.moedas)} moedas</p>` : aviso ? `<p class="galeria-aviso">${aviso}</p>` : ''}
       <div class="galeria-grade">${PERSONAGENS.map((x) => {
         const meu = c.personagens.includes(x.id);
-        return `<button class="cartao-turma${x.id === p.id ? ' vendo' : ''}" data-ver="${x.id}" aria-pressed="${x.id === p.id}">${miniatura(x)}<b>${x.nome}</b>${c.personagem === x.id ? '<i class="marca usando">✓</i>' : meu ? '<i class="marca">✓</i>' : `<small>🪙 ${fmt(x.preco)}</small>`}</button>`;
+        return `<button class="cartao-turma${x.id === p.id ? ' vendo' : ''}" data-ver="${x.id}" aria-pressed="${x.id === p.id}">${miniatura(x)}<b>${x.nome}</b>${c.personagem === x.id ? '<i class="marca usando">✓</i>' : meu ? '<i class="marca">✓</i>' : `<small>${x.preco ? `🪙 ${fmt(x.preco)}` : 'Grátis'}</small>`}</button>`;
       }).join('')}</div>
       <div class="galeria-base"><button class="botao-lobby" data-ir="saguao"><b>✕</b>Voltar</button><button class="botao-jogar" data-correr>JOGAR</button></div>
     </div>`;
@@ -758,7 +758,9 @@ export function montar(area, ctl) {
     const aplicar = (r, texto) => {
       if (r.erro) { ctl.som('erro'); galeria(r.erro); return; }
       salvarCarteira(r.carteira);
-      prefs.personagem.pele = personagemDe(r.carteira.personagem).pele; guardar(); // cada um chega com o seu tom de pele (dá para mudar em Visual)
+      const escolhido = personagemDe(r.carteira.personagem);
+      if (escolhido.estilo) salvarCarteira({ ...r.carteira, estilos: Array.from(new Set([...r.carteira.estilos, escolhido.estilo])), estilo: escolhido.estilo }); // chega vestindo a roupa dele, que fica de brinde
+      prefs.personagem.pele = escolhido.pele; guardar(); // cada um chega com o seu tom de pele (dá para mudar em Visual)
       ctl.som('premio'); galeria(texto);
     };
     q('[data-escolher]').forEach((b) => { b.onclick = () => aplicar(loja.escolherPersonagem(prefs.carteira, b.dataset.escolher), `${p.nome} vai correr!`); });

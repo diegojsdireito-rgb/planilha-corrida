@@ -3,7 +3,7 @@
 // ondulado feito de várias mechas que balançam separadas.
 import { THREE, xDe, textura, ruido, sombrear, texBrilho, desenho } from './base.js';
 import { PELES, ROUPAS } from '../personagem.js';
-import { personagemDe } from '../personagens.js';
+import { personagemDe, usa } from '../personagens.js';
 import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCabeleira, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
 
 const CABELO = ['#2c1a10', '#331e12', '#3b2316', '#46291a', '#52301f']; // castanho-escuro, com pontas um pouco mais claras
@@ -117,8 +117,21 @@ function texParteDeCima(estilo, cor) {
       }
       ctx.fillStyle = '#e8e5dc'; ctx.fillRect(0, h - 22, w, 22); // barra canelada
       ctx.fillStyle = 'rgba(0,0,0,.06)'; for (let x = 0; x < w; x += 5) ctx.fillRect(x, h - 22, 2, 22);
-      texto(ctx, '9', w * 0.5, h * 0.6, 120, marinho);
-      texto(ctx, '9', 0, h * 0.6, 120, marinho); texto(ctx, '9', w, h * 0.6, 120, marinho);
+      texto(ctx, '91', w * 0.5, h * 0.6, 104, marinho);
+      texto(ctx, '91', 0, h * 0.6, 104, marinho); texto(ctx, '91', w, h * 0.6, 104, marinho);
+      malhaFina(ctx, w, h);
+    } else if (estilo === 'corredor') {
+      // moletom azul de manga curta, barra laranja e o bonequinho correndo no peito e nas costas
+      ctx.fillStyle = '#2748c4'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#f28a1e'; ctx.fillRect(0, h - 20, w, 20);
+      ctx.fillStyle = '#1f3aa6'; ctx.fillRect(w * 0.9, h * 0.6, w * 0.2, h * 0.2); ctx.fillRect(-w * 0.1, h * 0.6, w * 0.2, h * 0.2); // bolso canguru
+      const boneco = (x, y, t) => {
+        ctx.save(); ctx.translate(x, y); ctx.scale(t, t); ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.arc(8, -30, 7, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(4, -20); ctx.lineTo(-4, 2); ctx.lineTo(10, 14); ctx.lineTo(4, 32); ctx.moveTo(-4, 2); ctx.lineTo(-18, 12); ctx.lineTo(-28, 4); ctx.moveTo(2, -14); ctx.lineTo(18, -6); ctx.lineTo(24, -16); ctx.moveTo(2, -14); ctx.lineTo(-14, -12); ctx.lineTo(-20, 0); ctx.stroke();
+        ctx.restore();
+      };
+      boneco(0, h * 0.42, 0.9); boneco(w, h * 0.42, 0.9); boneco(w * 0.5, h * 0.45, 0.8);
       malhaFina(ctx, w, h);
     } else if (estilo === 'street') {
       ctx.fillStyle = cor; ctx.fillRect(0, 0, w, h);
@@ -166,6 +179,9 @@ function texParteDeBaixo(estilo, cor) {
       xadrez(ctx, w, h, escurecer(cor, 0.1));
     } else if (estilo === 'jeans') {
       jeans(ctx, w, h, false);
+    } else if (estilo === 'corredor') {
+      ctx.fillStyle = '#23242b'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#f28a1e'; for (const u of [0.25, 0.75]) ctx.fillRect(w * u - 7, 0, 14, h);
     } else if (estilo === 'tiedye') {
       ctx.fillStyle = '#1f1a33'; ctx.fillRect(0, 0, w, h);
       for (let k = 0; k < 160; k++) { ctx.fillStyle = Math.random() < 0.5 ? cor : '#ffffff'; ctx.globalAlpha = 0.3 + Math.random() * 0.6; ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h, 1 + Math.random() * 2.5, 0, 7); ctx.fill(); }
@@ -360,8 +376,8 @@ export function criarMenina() {
   // músculos da perna: a panturrilha salta para trás, a coxa é mais cheia na frente e a patela marca o joelho
   const formaPerna = (x, y, z) => {
     const tras = Math.max(0, -z) / 0.05; const frente = Math.max(0, z) / 0.05;
-    return [x * 0.88 * (1 + 0.06 * sinoM(y, -0.39, 0.06)),
-      z * 0.88 - 0.017 * sinoM(y, -0.385, 0.055) * tras + 0.007 * sinoM(y, -0.12, 0.09) * frente + 0.006 * sinoM(y, -0.285, 0.022) * frente - 0.004 * sinoM(y, -0.3, 0.03) * tras];
+    return [x * 1.04 * (1 + 0.06 * sinoM(y, -0.39, 0.06)),
+      z * 1.04 - 0.017 * sinoM(y, -0.385, 0.055) * tras + 0.007 * sinoM(y, -0.12, 0.09) * frente + 0.006 * sinoM(y, -0.285, 0.022) * frente - 0.004 * sinoM(y, -0.3, 0.03) * tras];
   };
   const pernas = [-1, 1].map((lado) => {
     const coxa = new THREE.Group(); coxa.position.set(lado * 0.076, 0, 0);
@@ -427,7 +443,7 @@ export function criarMenina() {
 
   // ---- braços: ombro -> cotovelo -> mão ----
   // músculos do braço: o antebraço é mais largo perto do cotovelo e achata no pulso
-  const formaBraco = (x, y, z) => [x * 0.9 * (1 + 0.07 * sinoM(y, -0.25, 0.05) - 0.12 * sinoM(y, -0.38, 0.03)), z * (1 - 0.14 * sinoM(y, -0.37, 0.05)) + 0.004 * sinoM(y, -0.08, 0.06) * Math.sign(z)];
+  const formaBraco = (x, y, z) => [x * 1.08 * (1 + 0.07 * sinoM(y, -0.25, 0.05) - 0.12 * sinoM(y, -0.38, 0.03)), z * 1.08 * (1 - 0.14 * sinoM(y, -0.37, 0.05)) + 0.004 * sinoM(y, -0.08, 0.06) * Math.sign(z)];
   const bracos = [-1, 1].map((lado) => {
     const ombro = new THREE.Group(); ombro.position.set(lado * 0.153, 0.392, 0); tronco.add(ombro);
     const manga = peca(torneada([[0, 0.034], [0.022, 0.032], [0.037, 0.018], [0.0425, -0.005], [0.0432, -0.045], [0.0428, -0.062], [0.04, -0.062]], 20), mat.manga); ombro.add(manga);
@@ -497,7 +513,7 @@ export function criarMenina() {
   // boca sorrindo: lábio de cima com o arco do cupido, lábio de baixo mais cheio e os dentes entre eles
   const Y_BOCA = -0.088; const L_BOCA = 0.024;
   const cima = (x) => Y_BOCA + 0.003 + 0.008 * (x / L_BOCA) ** 2 - 0.002 * Math.exp(-((x / 0.006) ** 2));
-  const baixo = (x) => Y_BOCA - 0.009 + 0.02 * (x / L_BOCA) ** 2;
+  const baixo = (x) => Y_BOCA - 0.0035 + 0.0145 * (x / L_BOCA) ** 2;
   const labio = new THREE.Group(); rosto.add(labio);
   labio.add(noRosto(cima, -L_BOCA, L_BOCA, (t) => 0.003 * Math.sin(t * Math.PI) ** 0.6 + 0.0006, matBoca, { n: 16, folga: 0.0002 }));
   labio.add(noRosto(baixo, -L_BOCA, L_BOCA, (t) => 0.0041 * Math.sin(t * Math.PI) ** 0.7 + 0.0006, matBoca, { n: 16, folga: 0 }));
@@ -530,7 +546,7 @@ export function criarMenina() {
   const inicioCachos = cabeca.children.length; // daqui em diante, as peças do penteado de cachos
   // camada de baixo, contínua: não deixa a camiseta aparecer entre os cachos
   const base = new THREE.Group();
-  const cabeleira = geoCabeleira({ comp: 0.34, abertura: 1.95 });
+  const cabeleira = geoCabeleira({ comp: 0.4, abertura: 1.98 });
   base.add(peca(cabeleira.massa, mat.cabeleira), new THREE.Mesh(cabeleira.massa, mat.cabeleiraDentro), peca(fundirGeos(cabeleira.cachos), mat.cachos[3]));
   cabeca.add(base);
   mechas.push({ piv: base, fase: 0 });
@@ -547,8 +563,8 @@ export function criarMenina() {
   }
   // cachos da frente: emolduram o rosto e caem na frente dos ombros
   const daFrente = [[], []];
-  [[2.12, 0.36, 0.3, 0.08], [-2.12, 0.38, 1.1, 0.08], [2.42, 0.29, 2.2, 0.09], [-2.4, 0.31, 2.9, 0.09]].forEach(([az, comp, fase, y0], k) => {
-    daFrente[k % 2].push(geoCacho({ az, y0, comp, fase, amp: 0.022, voltas: 2.1, raio: 0.024, frente: true, fora: 0.012 }));
+  [[2.1, 0.43, 0.3, 0.08], [-2.1, 0.45, 1.1, 0.08], [2.4, 0.38, 2.2, 0.09], [-2.38, 0.4, 2.9, 0.09]].forEach(([az, comp, fase, y0], k) => {
+    daFrente[k % 2].push(geoCacho({ az, y0, comp, fase, amp: 0.018, voltas: 1.5, raio: 0.027, frente: true, fora: 0.012 }));
   });
   [...porGrupo, ...daFrente].forEach((geos, k) => {
     const piv = new THREE.Group();
@@ -558,7 +574,7 @@ export function criarMenina() {
   });
   // franja de lado: sai da risca e desce pelas têmporas
   const franja = [];
-  for (const [x0, x1, y1, r] of [[-0.03, 0.118, 0.012, 0.026], [-0.03, -0.112, 0.035, 0.02], [-0.02, 0.075, 0.07, 0.016]]) {
+  for (const [x0, x1, y1, r] of [[0.004, 0.122, -0.005, 0.027], [-0.004, -0.122, -0.005, 0.027]]) { // risca no meio: uma mecha larga para cada lado
     const n = 10;
     const pts = Array.from({ length: n + 1 }, (_, k) => {
       const t = k / n; const x = x0 + (x1 - x0) * t; const y = 0.128 + (y1 - 0.128) * t ** 1.5 + 0.012 * Math.sin(t * Math.PI);
@@ -598,7 +614,42 @@ export function criarMenina() {
   // dois coques no alto, com elásticos
   const hCoques = penteado([girada(new THREE.SphereGeometry(0.068, 14, 10), [-0.092, 0.158, -0.03]), girada(new THREE.SphereGeometry(0.068, 14, 10), [0.092, 0.158, -0.03])]);
   for (const l of [-1, 1]) { const e2 = peca(new THREE.TorusGeometry(0.036, 0.011, 8, 16), mat.roupa); e2.position.set(l * 0.075, 0.118, -0.025); e2.rotation.set(Math.PI / 2 + 0.1, 0, l * 0.5); hCoques.add(e2); }
-  const penteados = { curto: hCurto, rabo: hRabo, afro: hAfro, moicano: hMoicano, coques: hCoques };
+  // topete bagunçado: mechas grossas e pontudas, jogadas para cima e para os lados
+  const tufo = (p0, p1, p2, r) => tuboAfinado(new THREE.QuadraticBezierCurve3(new THREE.Vector3(...p0), new THREE.Vector3(...p1), new THREE.Vector3(...p2)), 10, (t) => r * (1 - t) ** 0.7 * (0.75 + 0.5 * Math.sin(Math.min(1, t * 2.5) * Math.PI / 2)) + 0.001, 7, 0.75);
+  const tufos = [];
+  for (let k = 0; k < 7; k++) { // frente: topete que sobe e cai para um lado
+    const x = (k - 3) * 0.026; const viés = 0.045 + x * 0.5;
+    tufos.push(tufo([x, 0.118 - Math.abs(x) * 0.25, 0.08], [x + viés * 0.5, 0.185 - Math.abs(x) * 0.3, 0.13], [x + viés, 0.15 + (k % 2) * 0.025, 0.165 - Math.abs(x) * 0.5], 0.046));
+  }
+  for (let k = 0; k < 9; k++) { // alto e nuca: pontas para todos os lados
+    const a = (k / 9) * Math.PI * 2; const cx = Math.sin(a); const cz = Math.cos(a);
+    tufos.push(tufo([cx * 0.06, 0.145, cz * 0.06 - 0.02], [cx * 0.115, 0.195, cz * 0.115 - 0.02], [cx * 0.15, 0.165 + (k % 3) * 0.015, cz * 0.15 - 0.02], 0.048));
+  }
+  for (const l of [-1, 1]) for (let k = 0; k < 4; k++) { // lados e trás: mechas que descem e viram para fora
+    const a = l * (0.9 + k * 0.6);
+    tufos.push(tufo([Math.sin(a) * 0.12, 0.075, -Math.cos(a) * 0.12 - 0.01], [Math.sin(a) * 0.17, 0.03, -Math.cos(a) * 0.17], [Math.sin(a) * 0.168, -0.04 - (k % 2) * 0.02, -Math.cos(a) * 0.168], 0.044));
+  }
+  const hTopete = penteado(tufos);
+  // duas tranças caindo na frente dos ombros, com elásticos
+  const gomosT = [];
+  for (const l of [-1, 1]) for (let k = 0; k < 9; k++) gomosT.push(girada(new THREE.SphereGeometry(0.034 - k * 0.0014, 10, 8), [l * (0.128 - k * 0.002), -0.03 - k * 0.04, 0.035 + Math.sin(k * 0.5) * 0.012], [0, 0, l * 0.5 * (k % 2 ? 1 : -1)], [1, 0.82, 0.9]));
+  const hTrancas = penteado(gomosT);
+  for (const l of [-1, 1]) { const e3 = peca(new THREE.TorusGeometry(0.022, 0.009, 6, 14), mat.roupa); e3.position.set(l * 0.111, -0.375, 0.04); e3.rotation.x = Math.PI / 2; hTrancas.add(e3); }
+  mechas.push({ piv: hTrancas, fase: 2.1 });
+  // laço de fita no alto da cabeça
+  const matLaco = desenho({ color: 0xf2c21f });
+  const laco = new THREE.Group(); laco.visible = false; laco.position.set(0.02, 0.2, 0.06); laco.rotation.set(-0.35, 0, 0.12); cabeca.add(laco);
+  for (const l of [-1, 1]) { const asa = peca(new THREE.ConeGeometry(0.05, 0.1, 10), matLaco); asa.scale.set(1, 1, 0.45); asa.rotation.z = l * Math.PI / 2; asa.position.x = l * 0.055; laco.add(asa); }
+  laco.add(peca(new THREE.SphereGeometry(0.022, 10, 8), matLaco));
+  const penteados = { curto: hCurto, rabo: hRabo, afro: hAfro, moicano: hMoicano, coques: hCoques, topete: hTopete, trancas: hTrancas };
+  // mochila nas costas, com bolso e alças
+  const matMochila = desenho({ color: 0x26262b }); const matMochila2 = desenho({ color: 0x3a3a42 });
+  const mochilaCostas = new THREE.Group(); mochilaCostas.visible = false; tronco.add(mochilaCostas);
+  const bolsa = peca(new THREE.SphereGeometry(0.1, 18, 14), matMochila); bolsa.scale.set(1.02, 1.28, 0.62); bolsa.position.set(0, 0.26, -0.135); mochilaCostas.add(bolsa);
+  const bolsoM = peca(new THREE.SphereGeometry(0.065, 14, 10), matMochila2); bolsoM.scale.set(1.05, 0.85, 0.5); bolsoM.position.set(0, 0.215, -0.185); mochilaCostas.add(bolsoM);
+  for (const l of [-1, 1]) { const alca = peca(new THREE.TorusGeometry(0.105, 0.014, 6, 20, Math.PI * 1.15), matMochila2); alca.position.set(l * 0.085, 0.305, -0.005); alca.rotation.set(0, Math.PI / 2 + l * 0.12, 0); alca.rotation.z = -0.35; alca.scale.set(1, 1.15, 1); mochilaCostas.add(alca); }
+  const matPulseira = desenho({ color: 0x22242c });
+  const pulseiras = bracos.map((b) => { const m = peca(new THREE.CylinderGeometry(0.031, 0.032, 0.036, 16), matPulseira); m.position.y = -0.158; m.visible = false; b.cotovelo.add(m); return m; });
   // ---- acessórios da turma ----
   const matArmacao = desenho({ color: 0x22242c });
   const oculos = new THREE.Group(); oculos.visible = false; rosto.add(oculos);
@@ -607,10 +658,11 @@ export function criarMenina() {
     const haste = peca(new THREE.BoxGeometry(0.004, 0.006, 0.13), matArmacao); haste.position.set(lado * 0.108, Y_OLHO + 0.006, 0.06); haste.rotation.y = -lado * 0.22; oculos.add(haste);
   }
   const ponte = peca(new THREE.BoxGeometry(0.02, 0.005, 0.004), matArmacao); ponte.position.set(0, Y_OLHO + 0.004, superficie(0, Y_OLHO) + 0.016); oculos.add(ponte);
+  const matConcha = desenho({ color: 0xff8a1f }); const matArcoFone = desenho({ color: 0x22242c });
   const fones = new THREE.Group(); fones.visible = false; cabeca.add(fones);
-  const arco = peca(new THREE.TorusGeometry(0.168, 0.011, 8, 28, Math.PI), matArmacao); arco.position.set(0, -0.005, -0.012); arco.scale.set(0.88, 1.05, 1); fones.add(arco);
+  const arco = peca(new THREE.TorusGeometry(0.168, 0.011, 8, 28, Math.PI), matArcoFone); arco.position.set(0, -0.005, -0.012); arco.scale.set(0.88, 1.05, 1); fones.add(arco);
   for (const lado of [-1, 1]) {
-    const concha = peca(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 20), mat.detalhe); concha.rotation.z = Math.PI / 2; concha.position.set(lado * 0.145, -0.015, -0.012); fones.add(concha);
+    const concha = peca(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 20), matConcha); concha.rotation.z = Math.PI / 2; concha.position.set(lado * 0.145, -0.015, -0.012); fones.add(concha);
     const almofada = peca(new THREE.TorusGeometry(0.04, 0.012, 8, 18), matArmacao); almofada.rotation.y = Math.PI / 2; almofada.position.set(lado * 0.128, -0.015, -0.012); fones.add(almofada);
   }
   rosto.traverse((x) => { x.castShadow = false; }); // as peças miúdas do rosto não precisam fazer sombra
@@ -691,8 +743,8 @@ export function criarMenina() {
   let visual = '';
   // troca o tecido de uma peça; a malha comum (tex.tecido) é usada por várias peças e não é descartada
   const trocarMapa = (m, t) => { if (m.map && m.map !== tex.tecido) m.map.dispose(); m.map = t; m.color.set(0xffffff); m.needsUpdate = true; };
-  let quemAntes = '';
-  function vestir(p, r, estilo = 'esportiva', quem = 'cachinhos') {
+  let quemAntes = ''; let temMochila = false;
+  function vestir(p, r, estilo = 'esportiva', quem = 'antonella') {
     const chave = `${p}-${r}-${estilo}-${quem}`;
     if (chave === visual) return;
     visual = chave;
@@ -704,18 +756,23 @@ export function criarMenina() {
       mat.cachos.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, 0.02 + (k % 3) * 0.018));
       mat.cabelo.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k - 2) * 0.02));
       mat.cabeloLiso.color.copy(base); mat.cabeleira.color.copy(base); mat.cabeleiraDentro.color.copy(base).multiplyScalar(0.8);
-      for (const m of [mat.cabeleira, mat.cabeloLiso, ...mat.cachos]) { m.emissive.copy(m.color); m.emissiveIntensity = 0.3; } // as sombras do cabelo ficam castanhas, não pretas
+      for (const m of [mat.cabeleira, mat.cabeloLiso, ...mat.cachos]) { m.emissive.copy(m.color); m.emissiveIntensity = 0.16; } // as sombras do cabelo ficam castanhas, não pretas
       matSobrancelha.color.copy(base).offsetHSL(0, -0.1, -0.06);
       matIris.map?.dispose(); matIris.map = texIris(pers.olhos); matIris.needsUpdate = true;
       matBoca.color.set(pers.menino ? 0xb8705f : 0xd4526a);
       for (const o of pecasCachos) o.visible = pers.cabelo === 'cachos';
       for (const [id, g] of Object.entries(penteados)) g.visible = pers.cabelo === id;
-      mFranja.visible = ['cachos', 'rabo', 'coques'].includes(pers.cabelo);
-      oculos.visible = pers.acessorio === 'oculos'; fones.visible = pers.acessorio === 'fones';
+      mFranja.visible = ['cachos', 'rabo', 'coques', 'trancas'].includes(pers.cabelo);
+      oculos.visible = usa(pers, 'oculos'); fones.visible = usa(pers, 'fones'); laco.visible = usa(pers, 'laco');
+      matArmacao.color.set(pers.corOculos ?? 0x22242c); hAfro.scale.setScalar(pers.escalaCabelo ?? 1); hAfro.position.y = (1 - (pers.escalaCabelo ?? 1)) * 0.05;
+      matConcha.color.set(pers.corFone ?? ROUPAS[r] ?? 0xff8a1f); matArcoFone.color.set(pers.corFone ? 0xf2f2f4 : 0x22242c);
+      temMochila = usa(pers, 'mochila'); matMochila.color.set(pers.corMochila ?? 0x26262b); matMochila2.color.copy(matMochila.color).offsetHSL(0, 0, 0.07);
+      for (const m of pulseiras) m.visible = usa(pers, 'pulseiras');
     }
-    const cabeChapeu = ['cachos', 'curto'].includes(pers.cabelo) && !pers.acessorio; // penteados altos e fones não cabem debaixo de chapéu
+    const cabeChapeu = ['cachos', 'curto'].includes(pers.cabelo) && !pers.acessorio && !usa(pers, 'fones') && !usa(pers, 'laco');
+    const cabeFaixa = cabeChapeu || pers.cabelo === 'rabo'; // faixa e viseira também servem com rabo de cavalo // penteados altos e fones não cabem debaixo de chapéu
     mat.pele.color.set(PELES[p] ?? PELES[1]); mat.rosto.color.copy(mat.pele.color); mat.palpebra.color.copy(mat.pele.color);
-    const cor = ROUPAS[r] ?? ROUPAS[0];
+    const cor = pers.corRoupa ?? ROUPAS[r] ?? ROUPAS[0]; // alguns personagens têm a cor da própria roupa
     mat.roupa.color.set(cor);
     mat.detalhe.color.set(cor);
     mat.manga.color.set(estilo === 'skatista' ? clarear(cor, 0.75) : cor);
@@ -730,9 +787,11 @@ export function criarMenina() {
       skatista: { bone: true, bermuda: true, meiao: true, largo: true },
       jeans: { jaqueta: true, mangaLonga: true, saia: true, meiao: true, cano: true, gorro: true },
       tiedye: { viseira: true, calca: true },
+      corredor: { bermuda: true, capuzCostas: true },
     }[estilo] ?? { mangaLonga: true, calca: true };
     // cores e tecidos das peças
-    if (estilo === 'moletom') { trocarMapa(mat.mangaLonga, texMangaEstrelas()); trocarMapa(mat.perna, texParteDeBaixo('moletom', cor)); mat.tenis.color.set(0xffffff); mat.detalhe.color.set(0x1f2a52); }
+    if (estilo === 'moletom') { trocarMapa(mat.mangaLonga, texMangaEstrelas()); trocarMapa(mat.perna, texParteDeBaixo('moletom', cor)); mat.tenis.color.set(0x1f2a52); mat.detalhe.color.set(0xffffff); }
+    else if (estilo === 'corredor') { mat.manga.color.set(0x2748c4); mat.mangaLonga.map = null; mat.mangaLonga.color.set(0xf28a1e); mat.mangaLonga.needsUpdate = true; mat.roupa.color.set(0xf28a1e); mat.tenis.color.set(0x2748c4); mat.detalhe.color.set(0xf28a1e); }
     else if (estilo === 'street') { mat.mangaLonga.color.set(cor); trocarMapa(mat.perna, texParteDeBaixo('street', cor)); mat.tenis.color.set(0x2b2e38); }
     else if (estilo === 'jeans') {
       trocarMapa(mat.jeans, texParteDeCima('jeans', cor)); mat.mangaLonga.map = null; mat.mangaLonga.color.set(0x4a6fa5); mat.mangaLonga.needsUpdate = true;
@@ -742,9 +801,9 @@ export function criarMenina() {
     else mat.tenis.color.set(0xffffff);
     if (e.meiao) trocarMapa(mat.meiao, texMeiao(cor));
     // partes de cima
-    faixa.visible = Boolean(e.faixa) && cabeChapeu;
+    faixa.visible = Boolean(e.faixa) && cabeFaixa;
     barraCamiseta.material = estilo === 'moletom' ? mat.branco : mat.roupa; // barra do moletom é off-white, como na foto
-    capuz.visible = false; casca.visible = true; capuzCabeca.visible = Boolean(e.capuz) && cabeChapeu; cordoes.visible = Boolean(e.capuz);
+    capuz.visible = Boolean(e.capuzCostas); casca.visible = true; capuzCabeca.visible = Boolean(e.capuz) && cabeChapeu; cordoes.visible = Boolean(e.capuz);
     jaqueta.visible = Boolean(e.jaqueta); golaJaqueta.visible = Boolean(e.jaqueta);
     camiseta.scale.set(e.largo ? 1.07 : 1, 1, e.largo ? 1.08 : 1);
     for (const b of bracos) {
@@ -770,7 +829,7 @@ export function criarMenina() {
     // cabeça
     bone.visible = Boolean(e.bone) && cabeChapeu;
     gorro.visible = Boolean(e.gorro) && cabeChapeu;
-    viseira.visible = Boolean(e.viseira) && cabeChapeu;
+    viseira.visible = Boolean(e.viseira) && cabeFaixa;
   }
 
   const SKATE_COR = { classico: 0xd79a5b, voador: 0x29b7dc, supersonico: 0xd83a2c };
@@ -1066,6 +1125,7 @@ export function criarMenina() {
       skate.position.y = -0.1 + (s.skateTipo === 'voador' ? 0.05 + Math.sin(t * 5) * 0.025 : 0);
     }
     maleta.visible = s.voo > 0 && !naNave && !deCapa;
+    mochilaCostas.visible = temMochila && !maleta.visible && !deCapa; // a mochila a jato e a capa ocupam o lugar dela
     // capa tremulando: quanto mais longe do ombro, mais ela balança e se solta das costas
     for (const parte of partesCapa) parte.visible = deCapa;
     if (deCapa) {
@@ -1125,7 +1185,7 @@ export function criarMenina() {
     raiz.visible = !(s.invencivel > 0 && Math.floor(t * 12) % 2 === 0);
     if (poseForcada) {
       // no saguão e na tela de fim: só ela, sem skate, mochila nem auras
-      skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true;
+      skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true; mochilaCostas.visible = temMochila;
       nave.visible = false; teleFeixe.visible = false; for (const parte of partesCapa) parte.visible = false;
       for (const f of fumaca) f.sp.visible = false;
       raiz.position.y = 0;

@@ -815,3 +815,15 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .cartao-turma .marca.usando { background: #35b53a; }
 .galeria-base { display: grid; grid-template-columns: 1fr 2.2fr; gap: 8px; }
 @media (max-height: 700px) { .cartao-turma svg { width: 46px; height: 46px; } .galeria-titulo h3 { font-size: 24px; } }
+.cartao-turma img.arte { width: 62px; height: 62px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 60, .25); }
+.galeria-palco { position: relative; }
+.galeria-arte { position: absolute; right: 2px; bottom: 6px; width: 84px; border-radius: 12px; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0, 0, 40, .35); }
+.galeria-2d img { height: 210px; border-radius: 14px; }
+@media (max-height: 700px) { .cartao-turma img.arte { width: 46px; height: 46px; } .galeria-arte { width: 60px; } }
+.galeria-titulo .galeria-dom { display: inline-block; margin-top: 4px; padding: 3px 12px; border-radius: 999px; background: linear-gradient(#5a6cf0, #3a45c8); border: 2px solid #fff; text-shadow: none; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.galeria-titulo small { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; }
+.galeria-grade { grid-template-columns: repeat(5, 1fr); gap: 5px; padding: 7px; }
+.cartao-turma svg, .cartao-turma img.arte { width: 46px; height: 46px; }
+.cartao-turma b { font-size: 11px; }
+.cartao-turma small { font-size: 10px; }
+.cartao-turma .marca { width: 16px; height: 16px; font-size: 10px; right: 2px; bottom: 2px; }

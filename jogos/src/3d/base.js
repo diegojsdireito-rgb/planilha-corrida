@@ -40,8 +40,9 @@ export function toon(cor, extra = {}) {
 let GRADIENTE_P = null;
 export function desenho({ roughness, metalness, ...params } = {}) {
   if (!GRADIENTE_P) {
-    GRADIENTE_P = new THREE.DataTexture(new Uint8Array([150, 205, 255]), 3, 1, THREE.RedFormat);
-    GRADIENTE_P.minFilter = THREE.NearestFilter; GRADIENTE_P.magFilter = THREE.NearestFilter; GRADIENTE_P.needsUpdate = true;
+    // rampa suave (sem degraus duros): sombra quente, meio-tom e luz, como numa ilustração de animação
+    GRADIENTE_P = new THREE.DataTexture(new Uint8Array([118, 150, 190, 225, 246, 255]), 6, 1, THREE.RedFormat);
+    GRADIENTE_P.minFilter = THREE.LinearFilter; GRADIENTE_P.magFilter = THREE.LinearFilter; GRADIENTE_P.needsUpdate = true;
   }
   return new THREE.MeshToonMaterial({ gradientMap: GRADIENTE_P, ...params });
 }

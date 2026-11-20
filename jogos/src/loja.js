@@ -19,6 +19,7 @@ export const SKATES_LOJA = [
 // Estilos de roupa da menina: comprados uma vez, usados quando quiser.
 export const ESTILOS = [
   { id: 'moletom', nome: 'Moletom Estrela', icone: '⭐', preco: 0, texto: 'Moletom branco com mangas azul-marinho, estrelas e número, e calça com listra.' },
+  { id: 'corredor', nome: 'Corredor', icone: '🎧', preco: 0, texto: 'Moletom azul de manga curta com capuz laranja, bermuda preta com listra e tênis azul.' },
   { id: 'esportiva', nome: 'Esportiva', icone: '🏃‍♀️', preco: 0, texto: 'Camiseta com recortes, short e faixa no cabelo.' },
   { id: 'street', nome: 'Street', icone: '🧥', preco: 600, texto: 'Moletom com capuz, calça jogger e tênis de cano alto.' },
   { id: 'skatista', nome: 'Skatista', icone: '🛹', preco: 900, texto: 'Camiseta larga estampada, bermuda xadrez, meião e boné virado.' },
@@ -34,10 +35,10 @@ export function carteiraNova() {
     moedas: 0,
     skates: ['classico'],
     skate: 'classico',
-    estilos: ['moletom', 'esportiva'],
+    estilos: ['moletom', 'esportiva', 'corredor'],
     estilo: 'moletom',
-    personagens: ['cachinhos'],
-    personagem: 'cachinhos',
+    personagens: ['antonella'],
+    personagem: 'antonella',
     cargas: 2,
     arrancadas: 1,
     poderes: { ima: 0, pulo: 0, maleta: 0, supercarga: 0 },
@@ -56,11 +57,11 @@ export function normalizar(c) {
     ...c,
     poderes: { ...base.poderes, ...(c.poderes ?? {}) },
     skates: Array.from(new Set(['classico', ...(c.skates ?? [])])),
-    estilos: Array.from(new Set(['moletom', 'esportiva', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
+    estilos: Array.from(new Set(['moletom', 'esportiva', 'corredor', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
     // quem já jogava antes do moletom passa a vestir ele uma vez; depois, vale a escolha da pessoa
     estilo: !(c.estilos ?? []).includes('moletom') ? 'moletom' : (ESTILOS.some((x) => x.id === c.estilo) ? c.estilo : 'moletom'),
-    personagens: Array.from(new Set(['cachinhos', ...(c.personagens ?? [])])).filter((p) => PERSONAGENS.some((x) => x.id === p)),
-    personagem: (c.personagens ?? []).includes(c.personagem) && PERSONAGENS.some((x) => x.id === c.personagem) ? c.personagem : 'cachinhos',
+    personagens: Array.from(new Set(['antonella', ...(c.personagens ?? [])])).filter((p) => PERSONAGENS.some((x) => x.id === p)),
+    personagem: (c.personagens ?? []).includes(c.personagem) && PERSONAGENS.some((x) => x.id === c.personagem) ? c.personagem : 'antonella',
     missoes: Array.isArray(c.missoes) ? c.missoes : [],
   };
 }
