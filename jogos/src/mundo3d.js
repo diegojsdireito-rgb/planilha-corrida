@@ -164,10 +164,10 @@ export function criarMundo(canvas) {
     const dt = Math.min(0.05, Math.max(0, t - ultimoT));
     ultimoT = t;
     const dist = s.dist;
-    menina.vestir(visual.pele, visual.roupa, visual.estilo, visual.personagem);
+    menina.vestir(visual.pele, visual.roupa, visual.estilo);
     const kc = captura === null ? 0 : suave(Math.min(1, captura / 0.8)); // vira para a tela aos poucos
     menina.posar(s, t, vitrine ?? (captura !== null ? 'capturada' : null));
-    if (vitrine) menina.raiz.rotation.set(0, Math.PI + (visual.palco === 'galeria' ? 0.12 + Math.sin(t * 0.7) * 0.3 : 0.28 + Math.sin(t * 0.4) * 0.05), 0);
+    if (vitrine) menina.raiz.rotation.set(0, Math.PI + 0.28 + Math.sin(t * 0.4) * 0.05, 0);
     else if (captura !== null) menina.raiz.rotation.set(0, Math.PI * kc - 0.12 * kc, 0);
 
     // quem persegue: logo atrás dela, um pouco de lado para não tapar a menina
@@ -224,14 +224,8 @@ export function criarMundo(canvas) {
     } else if (vitrine) {
       // de frente para ela; olhando um pouco para a direita da tela (−x), ela fica à esquerda
       camX = px - 0.62; camY = 2.35;
-      if (visual.palco === 'galeria') {
-        // galeria de personagens: de corpo inteiro, no meio, na metade de cima da tela
-        camera.position.set(px, 1.1, -3.9);
-        camera.lookAt(px, -0.02, 0);
-      } else {
-        camera.position.set(px - 0.62, 1.05, -2.75);
-        camera.lookAt(px - 0.62, 0.84, 0);
-      }
+      camera.position.set(px - 0.62, 1.05, -2.75);
+      camera.lookAt(px - 0.62, 0.84, 0);
     } else {
       // na nave a câmera se afasta um pouco, para caber o disco voador inteiro
       afastar += ((s.voo > 0 && s.vooTipo === 'nave' ? 1 : 0) - afastar) * 0.06;

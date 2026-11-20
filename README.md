@@ -110,7 +110,6 @@ Com `npm run dev`, abre em http://localhost:4180/jogos/index.html. O ícone sai 
 | `jogos/src/docinhos.js` | Docinhos: trincas, doces especiais (listrado, bomba, arco-íris), cascatas, fases e jogada para a dica. |
 | `jogos/src/corrida.js` | Corrida dos Cachinhos: física, obstáculos sempre com passagem, colisões, moedas, poderes, skate e supercarga. |
 | `jogos/src/loja.js` | Carteira, loja (skates, cargas, poderes e estilos de roupa), missões, presente do dia e junção de carteiras na cópia de segurança. |
-| `jogos/src/personagens.js` | A turma da corrida: personagens que dá para desbloquear com moedas (penteado, cabelo, olhos, pele e acessório de cada um). |
 | `jogos/src/3d/anatomia.js` | Anatomia dos personagens humanos da corrida: cabeça esculpida, olhos com íris e pálpebras, mãos com dedos, tronco, cachos de cabelo e tênis. |
 | `jogos/src/mundo3d.js` | Motor da corrida em 3D: liga a menina, o cenário e os objetos da pista, com câmera atrás dela. Se o aparelho não tiver 3D, a corrida usa o desenho em 2D. |
 | `jogos/src/3d/cenarios.js` | Os 4 cenários (Cidade, Praia, Floresta e Vila da Neve), cada um com chão, céu, enfeites e a sua versão dos obstáculos. No modo Passeio, o cenário troca a cada 500 m. |

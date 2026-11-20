@@ -39,23 +39,17 @@ export const SKATES = {
 
 // Duração de cada poder pelo nível comprado na loja (0 a 5).
 export const duracao = (nivel = 0) => 8 + nivel * 2;
-// dons: o que cada um muda na corrida
-const maisTempo = (s) => (s.dom === 'tempo' ? 1.25 : 1);
-const maisEnergia = (s) => (s.dom === 'explosao' ? 1.4 : 1);
 
 export function nova(nivel = 'medio', cfg = {}) {
   const poderes = { ima: 0, pulo: 0, maleta: 0, supercarga: 0, ...(cfg.poderes ?? {}) };
-  const dom = cfg.dom ?? null;
   return {
     nivel, t: 0, dist: 0, vel: VELOCIDADE[nivel].base,
     faixa: 1, x: 1, y: 0, vy: 0, deslizando: 0,
     moedas: 0, objetos: [], ultimaLinha: 0,
-    ima: dom === 'ima' ? 10 : 0, superPulo: 0, voo: 0, vooTipo: 'mochila', supercarga: 0, energia: dom === 'turbo' ? 0.6 : 0, escudo: dom === 'escudo', invencivel: 0, dobro: 0, bonus: 0,
+    ima: 0, superPulo: 0, voo: 0, vooTipo: 'mochila', supercarga: 0, energia: 0, escudo: false, invencivel: 0, dobro: 0, bonus: 0,
     arrancadas: cfg.arrancadas ?? 0,
     skate: 0, skateTipo: SKATES[cfg.skate] ? cfg.skate : 'classico', cargas: cfg.cargas ?? 0,
     poderes,
-    // dom do personagem escolhido (cada um da turma tem o seu)
-    dom: cfg.dom ?? null, puloNoAr: false,
     vivo: true, eventos: ['perseguidor'],
     perseguidor: { dist: PERSEGUIDOR.perto, perto: PERSEGUIDOR.largada },
     contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0, capas: 0, naves: 0 },
@@ -119,11 +113,10 @@ export function comando(s, acao) {
   if (!s.vivo) return;
   if (acao === 'esquerda' && s.faixa > 0) { s.faixa--; s.eventos.push('troca'); }
   else if (acao === 'direita' && s.faixa < 2) { s.faixa++; s.eventos.push('troca'); }
-  else if (acao === 'pular' && s.voo <= 0 && (s.y <= 0.001 || (s.dom === 'saltoDuplo' && !s.puloNoAr))) {
-    if (s.y > 0.001) s.puloNoAr = true; // salto duplo: um pulo a mais no ar
+  else if (acao === 'pular' && s.y <= 0.001 && s.voo <= 0) {
     const sk = skateAtivo(s);
     const forte = s.superPulo > 0 || s.supercarga > 0;
-    s.vy = PULO * (forte ? SUPER_PULO : 1) * (sk?.pulo ?? 1) * (s.dom === 'superpulo' ? 1.15 : s.dom === 'agil' ? 1.05 : 1);
+    s.vy = PULO * (forte ? SUPER_PULO : 1) * (sk?.pulo ?? 1);
     s.deslizando = 0;
     s.contagem.pulos++;
     if (forte) s.contagem.superPulos++;
@@ -143,10 +136,10 @@ export function comando(s, acao) {
     // bônus de largada: começa voando com a mochila a jato, por mais tempo que a da pista
     s.arrancadas--;
     s.contagem.arrancadas++;
-    voar(s, duracao(s.poderes.maleta) * maisTempo(s) + 4);
+    voar(s, duracao(s.poderes.maleta) + 4);
   } else if (acao === 'supercarga' && s.energia >= 1 && s.supercarga <= 0) {
     s.energia = 0;
-    s.supercarga = duracao(s.poderes.supercarga) * 0.6 * maisTempo(s);
+    s.supercarga = duracao(s.poderes.supercarga) * 0.6;
     s.contagem.supercargas++;
     s.eventos.push('supercarga');
   }
@@ -175,7 +168,7 @@ export function avancar(s, dt, aleatorio = Math.random) {
   if (s.dobro > 0) s.bonus += dz;
 
   // personagem
-  const passo = TROCA_DE_FAIXA * dt * (s.dom === 'desvio' ? 1.6 : s.dom === 'agil' ? 1.25 : 1);
+  const passo = TROCA_DE_FAIXA * dt;
   s.x = Math.abs(s.faixa - s.x) <= passo ? s.faixa : s.x + Math.sign(s.faixa - s.x) * passo;
   if (s.voo > 0) {
     s.y += (ALTURA_VOO - s.y) * Math.min(1, dt * 4);
@@ -183,7 +176,7 @@ export function avancar(s, dt, aleatorio = Math.random) {
   } else if (s.y > 0 || s.vy > 0) {
     s.vy -= GRAVIDADE * (sk?.gravidade ?? 1) * dt;
     s.y = Math.max(0, s.y + s.vy * dt);
-    if (s.y === 0) { s.vy = 0; s.puloNoAr = false; s.eventos.push('pouso'); }
+    if (s.y === 0) { s.vy = 0; s.eventos.push('pouso'); }
   }
   const voava = s.voo > 0;
   s.deslizando = Math.max(0, s.deslizando - dt);
@@ -289,16 +282,16 @@ function voar(s, segundos, tipo = 'mochila') {
 
 function coletar(s, o) {
   const sk = skateAtivo(s);
-  const d = (nome) => duracao(s.poderes[nome]) * maisTempo(s);
+  const d = (nome) => duracao(s.poderes[nome]);
   if (o.tipo !== 'moeda') s.contagem.itens++;
   switch (o.tipo) {
     case 'moeda':
-      s.moedas += (sk?.moedas ?? 1) + (s.dom === 'coleta' && (s.moedasVistas = (s.moedasVistas ?? 0) + 1) % 4 === 0 ? 1 : 0); // coleta extra: uma moeda a mais a cada quatro
-      s.energia = Math.min(1, s.energia + 0.006 * maisEnergia(s));
+      s.moedas += sk?.moedas ?? 1;
+      s.energia = Math.min(1, s.energia + 0.006);
       s.eventos.push('moeda');
       break;
     case 'raio':
-      s.energia = Math.min(1, s.energia + 0.34 * maisEnergia(s));
+      s.energia = Math.min(1, s.energia + 0.34);
       s.eventos.push(s.energia >= 1 ? 'carga-cheia' : 'raio');
       break;
     case 'ima': s.ima = d('ima'); s.eventos.push('poder'); break;
