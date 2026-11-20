@@ -127,6 +127,7 @@ const JOGOS = [
       'Ferramentas: canetinha, pincel, giz de cera, lápis de cor, spray, marca-texto, carimbos de estrelinhas e coraçõezinhos, balde de tinta e borracha.',
       'O balde pinta de uma vez a parte do desenho em que você tocar. Os outros riscam por baixo das linhas, sem estragar o contorno.',
       'Tipos de cor: normal, arco-íris (muda de cor enquanto você risca), purpurina, neon e degradê. Escolha também a grossura.',
+      'Para aumentar, diminuir ou arrastar o desenho, use dois dedos (abrindo, fechando ou arrastando): com dois dedos nada é pintado. Também dá para usar os botões ➕ ➖ e ✋ da lupa.',
       'Use ↩️ para desfazer, 💾 para salvar a imagem em Fotos ou Arquivos e ✅ quando terminar.',
     ] },
   { id: 'mahjong', nome: 'Mahjong', descricao: 'Junte as peças iguais', solo: true, rotuloNivel: 'Tamanho da próxima mesa', tela: telaMahjong, regras: [
