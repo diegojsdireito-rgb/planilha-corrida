@@ -340,7 +340,7 @@ export function criarMenina() {
     detalhe: desenho({ color: ROUPAS[0], roughness: 0.6 }),
     cadarco: desenho({ color: 0xdddddd, roughness: 0.7 }),
     cabelo: CABELO.map((c) => desenho({ color: c, roughness: 0.5, map: tex.cabelo, side: THREE.DoubleSide })),
-    cabeleira: desenho({ color: CABELO[2] }),
+    cabeleira: desenho({ color: CABELO[2], emissive: CABELO[2], emissiveIntensity: 0.3 }),
     cabeleiraDentro: new THREE.MeshBasicMaterial({ color: CABELO[0], side: THREE.BackSide }), // o lado de dentro do cabelo, na sombra
     cabeloLiso: desenho({ color: CABELO[2], roughness: 0.45, side: THREE.DoubleSide }),
     perna: desenho({ color: 0xffffff, roughness: 0.85 }), // calça, legging ou meião
@@ -530,14 +530,14 @@ export function criarMenina() {
   const inicioCachos = cabeca.children.length; // daqui em diante, as peças do penteado de cachos
   // camada de baixo, contínua: não deixa a camiseta aparecer entre os cachos
   const base = new THREE.Group();
-  const geoMassa = geoCabeleira({ comp: 0.36, abertura: 1.95 });
-  base.add(peca(geoMassa, mat.cabeleira), new THREE.Mesh(geoMassa, mat.cabeleiraDentro));
+  const cabeleira = geoCabeleira({ comp: 0.34, abertura: 1.95 });
+  base.add(peca(cabeleira.massa, mat.cabeleira), new THREE.Mesh(cabeleira.massa, mat.cabeleiraDentro), peca(fundirGeos(cabeleira.cachos), mat.cachos[3]));
   cabeca.add(base);
   mechas.push({ piv: base, fase: 0 });
   let sem = 20240;
   const sorte = () => { sem = (sem * 16807) % 2147483647; return sem / 2147483647; };
   // os cachos são juntados em poucos grupos (cada grupo balança no seu tempo): leve para o celular
-  const NC = 13; const GRUPOS = 5;
+  const NC = 0; const GRUPOS = 0; // os cachos soltos saíram: a cabeleira já traz um cacho na ponta de cada gomo
   const porGrupo = Array.from({ length: GRUPOS }, () => []);
   for (let k = 0; k < NC; k++) {
     const t = k / (NC - 1);
@@ -547,8 +547,8 @@ export function criarMenina() {
   }
   // cachos da frente: emolduram o rosto e caem na frente dos ombros
   const daFrente = [[], []];
-  [[2.02, 0.36, 0.3, 0.08], [-2.02, 0.39, 1.1, 0.08], [2.3, 0.31, 2.2, 0.09], [-2.28, 0.33, 2.9, 0.09], [1.8, 0.4, 4.0, 0.07], [-1.82, 0.37, 5.1, 0.07]].forEach(([az, comp, fase, y0], k) => {
-    daFrente[k % 2].push(geoCacho({ az, y0, comp, fase, amp: 0.016, voltas: 2.3, raio: 0.02, frente: true, fora: 0.02 }));
+  [[2.12, 0.36, 0.3, 0.08], [-2.12, 0.38, 1.1, 0.08], [2.42, 0.29, 2.2, 0.09], [-2.4, 0.31, 2.9, 0.09]].forEach(([az, comp, fase, y0], k) => {
+    daFrente[k % 2].push(geoCacho({ az, y0, comp, fase, amp: 0.022, voltas: 2.1, raio: 0.024, frente: true, fora: 0.012 }));
   });
   [...porGrupo, ...daFrente].forEach((geos, k) => {
     const piv = new THREE.Group();
@@ -558,13 +558,13 @@ export function criarMenina() {
   });
   // franja de lado: sai da risca e desce pelas têmporas
   const franja = [];
-  for (const [x0, x1, y1, r] of [[-0.02, -0.105, 0.03, 0.013], [-0.02, 0.1, 0.045, 0.013], [0.0, 0.112, 0.0, 0.011], [-0.035, -0.115, -0.01, 0.011], [0.02, 0.085, 0.075, 0.01]]) {
+  for (const [x0, x1, y1, r] of [[-0.03, 0.118, 0.012, 0.026], [-0.03, -0.112, 0.035, 0.02], [-0.02, 0.075, 0.07, 0.016]]) {
     const n = 10;
     const pts = Array.from({ length: n + 1 }, (_, k) => {
       const t = k / n; const x = x0 + (x1 - x0) * t; const y = 0.128 + (y1 - 0.128) * t ** 1.5 + 0.012 * Math.sin(t * Math.PI);
       return new THREE.Vector3(x, y, Math.max(superficie(x, y), 0.02) + 0.012 - 0.004 * t);
     });
-    franja.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 14, (t) => r * 1.7 * (0.7 + 0.5 * Math.sin(t * Math.PI)) * (1 - 0.5 * t * t), 6, 0.6));
+    franja.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 14, (t) => r * 1.7 * (0.55 + 0.75 * Math.sin(t * Math.PI) ** 0.8) * (1 - 0.35 * t * t), 8, 0.42));
   }
   const pecasCachos = cabeca.children.slice(inicioCachos);
   const mFranja = peca(fundirGeos(franja), mat.cachos[3]); cabeca.add(mFranja);
@@ -701,9 +701,10 @@ export function criarMenina() {
       // cabelo, olhos e acessório de cada personagem da turma
       quemAntes = pers.id;
       const base = new THREE.Color(pers.corCabelo);
-      mat.cachos.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k - 2) * 0.022));
+      mat.cachos.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, 0.02 + (k % 3) * 0.018));
       mat.cabelo.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k - 2) * 0.02));
-      mat.cabeloLiso.color.copy(base); mat.cabeleira.color.copy(base).offsetHSL(0, 0, -0.015); mat.cabeleiraDentro.color.copy(base).multiplyScalar(0.8);
+      mat.cabeloLiso.color.copy(base); mat.cabeleira.color.copy(base); mat.cabeleiraDentro.color.copy(base).multiplyScalar(0.8);
+      for (const m of [mat.cabeleira, mat.cabeloLiso, ...mat.cachos]) { m.emissive.copy(m.color); m.emissiveIntensity = 0.3; } // as sombras do cabelo ficam castanhas, não pretas
       matSobrancelha.color.copy(base).offsetHSL(0, -0.1, -0.06);
       matIris.map?.dispose(); matIris.map = texIris(pers.olhos); matIris.needsUpdate = true;
       matBoca.color.set(pers.menino ? 0xb8705f : 0xd4526a);

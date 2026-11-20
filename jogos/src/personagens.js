@@ -3,7 +3,7 @@
 // (estilos da Loja) servem em todos. Sem DOM nem 3D: a loja e os testes usam só os dados.
 
 export const PERSONAGENS = [
-  { id: 'cachinhos', nome: 'Cachinhos', titulo: 'A corredora dos cachos', preco: 0, cabelo: 'cachos', corCabelo: '#3d2414', olhos: '#6a4222', pele: 1, menino: false },
+  { id: 'cachinhos', nome: 'Cachinhos', titulo: 'A corredora dos cachos', preco: 0, cabelo: 'cachos', corCabelo: '#5a3418', olhos: '#6a4222', pele: 1, menino: false },
   { id: 'leo', nome: 'Léo', titulo: 'O craque do bairro', preco: 400, cabelo: 'curto', corCabelo: '#1f1611', olhos: '#3f8a3a', pele: 2, menino: true },
   { id: 'bia', nome: 'Bia', titulo: 'A ginasta', preco: 700, cabelo: 'rabo', corCabelo: '#e3b23c', olhos: '#2f7fd0', pele: 0, menino: false },
   { id: 'duda', nome: 'Duda', titulo: 'A rainha da dança', preco: 1000, cabelo: 'afro', corCabelo: '#1a120d', olhos: '#4a2c18', pele: 3, menino: false },
