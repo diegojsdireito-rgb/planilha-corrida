@@ -12,17 +12,17 @@ export const suave = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / 
 // Ponto da cabeça esculpida na direção (nx, ny, nz).
 export function pontoCabeca(nx, ny, nz, R, alvo = new THREE.Vector3()) {
   const frente = suave(-0.15, 0.45, nz);
-  let x = nx * R * 0.9; let y = ny * R * 1.06; let z = nz * R * (nz < 0 ? 1.06 : 0.96);
+  let x = nx * R * 0.98; let y = ny * R * 1.02; let z = nz * R * (nz < 0 ? 1.06 : 0.98);
   if (ny < 0) {
     const k = suave(0, 1, -ny);
-    x *= 1 - 0.3 * k ** 1.5; // maxilar
+    x *= 1 - 0.2 * k ** 2.2; // maxilar largo: o rosto é redondo
     if (nz < 0) z *= 1 - 0.16 * k; // nuca entra no pescoço
   }
-  z += R * 0.17 * sino(ny, -0.8, 0.3) * frente * sino(nx, 0, 0.5); // queixo
+  z += R * 0.1 * sino(ny, -0.8, 0.3) * frente * sino(nx, 0, 0.5); // queixo pequeno
   let d = 0;
   d += 0.03 * sino(ny, 0.27, 0.11) * frente * (1 - 0.5 * sino(nx, 0, 0.12)); // arcada
   d -= 0.085 * sino(Math.abs(nx), 0.35, 0.16) * sino(ny, 0.02, 0.12) * frente; // órbitas
-  d += 0.05 * sino(Math.abs(nx), 0.52, 0.2) * sino(ny, -0.26, 0.2) * frente; // maçãs
+  d += 0.085 * sino(Math.abs(nx), 0.5, 0.24) * sino(ny, -0.34, 0.22) * frente; // bochechas cheias
   d += 0.045 * sino(nx, 0, 0.26) * sino(ny, -0.52, 0.15) * frente; // boca
   d += sino(nx, 0, 0.075) * frente * (0.03 + 0.1 * suave(0.12, -0.26, ny)) * suave(0.24, 0.12, ny) * suave(-0.38, -0.29, ny); // dorso do nariz
   return alvo.set(x + nx * R * d, Math.max(y + ny * R * d, -R), z + nz * R * d);
@@ -87,7 +87,7 @@ export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCil
   const olho = new THREE.Group();
   olho.add(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), matBranco));
   const mira = new THREE.Group(); olho.add(mira);
-  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, 28, 8, 0, Math.PI * 2, 0, grande ? 0.74 : 0.56), matIris);
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, 28, 8, 0, Math.PI * 2, 0, grande ? 0.92 : 0.56), matIris);
   iris.rotation.x = Math.PI / 2; mira.add(iris);
   const brilho = new THREE.Mesh(new THREE.SphereGeometry(r * 0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
   brilho.position.set(r * 0.26, r * 0.3, r * 0.94); if (grande) brilho.scale.setScalar(1.5); olho.add(brilho);
@@ -171,7 +171,7 @@ export function geoCabelo(R = 0.142, folga = 1.05, colunas = 72, linhas = 18) {
 // Primeiro o volume (a silhueta), depois os gomos — mechas largas que descem juntas num S suave e
 // terminam cada uma numa ponta arredondada — e, na ponta de cada gomo, um cacho em espiral.
 // az = 0 é o meio da nuca. Sem ruído miúdo: só curvas largas, que a luz em faixas desenha.
-export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7, colunas = 98, linhas = 24 } = {}) {
+export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7, colunas = 98, linhas = 24, volume = 0.036, sulco = 0.034, onda = 0.085, cachosNasPontas = true } = {}) {
   const pos = []; const ind = [];
   const gomoDe = (az) => { const q = ((az + abertura) / (2 * abertura)) * gomos; return Math.sin(Math.PI * (q - Math.floor(q))); };
   const compDe = (az) => comp * (1 - 0.2 * (az / abertura) ** 2) + 0.045 * gomoDe(az) ** 0.7;
@@ -179,8 +179,8 @@ export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7,
     let r;
     if (y > -0.1) r = Math.sqrt(Math.max(0.0001, R * R - y * y * 0.85)) + 0.004 + 0.03 * suave(0, 0.3, t);
     else r = 0.126 + (-0.1 - y) * 0.1 + 0.028;
-    r += 0.036 * Math.sin(Math.PI * Math.min(1, t * 1.1)) ** 0.8; // arma no meio do comprimento
-    r += 0.034 * (gomoDe(az) ** 0.5 - 0.7) * suave(0.08, 0.4, t); // os gomos: cheios no meio, com um sulco entre um e outro
+    r += volume * Math.sin(Math.PI * Math.min(1, t * 1.1)) ** 0.8; // arma no meio do comprimento
+    r += sulco * (gomoDe(az) ** 0.5 - 0.7) * suave(0.25, 0.7, t); // os gomos: cheios no meio, com um sulco entre um e outro
     return r - 0.04 * suave(0.84, 1, t); // as pontas viram para dentro
   };
   for (let c = 0; c <= colunas; c++) {
@@ -189,7 +189,7 @@ export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7,
       const t = l / linhas;
       const y = 0.125 - t * (compDe(az) + 0.125);
       const r = raioDe(az, t, y);
-      const a = az + 0.085 * Math.sin(t * 6.2 + az * 0.7) * suave(0.15, 0.6, t); // todas descem no mesmo S
+      const a = az + onda * Math.sin(t * 6.2 + az * 0.7) * suave(0.35, 0.85, t); // todas descem no mesmo S, mais ondulado para as pontas
       pos.push(Math.sin(a) * r, y, -Math.cos(a) * r);
     }
   }
@@ -200,7 +200,7 @@ export function geoCabeleira({ R = 0.142, comp = 0.4, abertura = 2.0, gomos = 7,
   geo.setIndex(ind); geo.computeVertexNormals();
   // um cacho na ponta de cada gomo: espiral gorda que afina
   const cachos = [];
-  for (let g = 0; g < gomos; g++) {
+  for (let g = 0; cachosNasPontas && g < gomos; g++) {
     const az = ((g + 0.5) / gomos - 0.5) * 2 * abertura;
     const yFim = -compDe(az); const rc = raioDe(az, 0.86, yFim) - 0.012;
     const a0 = az + 0.085 * Math.sin(6.2 + az * 0.7);
