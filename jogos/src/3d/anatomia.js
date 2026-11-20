@@ -61,19 +61,6 @@ export function texRosto() {
       g.addColorStop(0, 'rgba(255,120,125,.3)'); g.addColorStop(1, 'rgba(255,120,125,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     }
-    // sombra leve em volta dos olhos e debaixo do lábio
-    for (const [u, vv, r, a] of [[0.196, 0.5, 0.03, 0.1], [0.304, 0.5, 0.03, 0.1], [0.25, 0.71, 0.022, 0.1]]) {
-      const g = ctx.createRadialGradient(u * w, vv * h, 0, u * w, vv * h, r * w);
-      g.addColorStop(0, `rgba(120,60,40,${a})`); g.addColorStop(1, 'rgba(120,60,40,0)');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-    }
-    ctx.fillStyle = 'rgba(120,70,40,.4)';
-    let s = 7;
-    const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    for (let k = 0; k < 46; k++) {
-      const u = 0.25 + (r() - 0.5) * 0.14; const vv = 0.555 + (r() - 0.5) * 0.06 + Math.abs(u - 0.25) * 0.2;
-      ctx.beginPath(); ctx.arc(u * w, vv * h, 0.7 + r() * 0.8, 0, 7); ctx.fill();
-    }
   });
 }
 
@@ -96,19 +83,21 @@ export function texIris(cor = '#6b4423') {
 }
 
 // Olho completo: globo, íris que gira para olhar, brilho e pálpebras (a de cima fecha para piscar).
-export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCilio, cilios = true }) {
+export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCilio, cilios = true, grande = false }) {
   const olho = new THREE.Group();
   olho.add(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), matBranco));
   const mira = new THREE.Group(); olho.add(mira);
-  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, 28, 8, 0, Math.PI * 2, 0, 0.56), matIris);
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, 28, 8, 0, Math.PI * 2, 0, grande ? 0.74 : 0.56), matIris);
   iris.rotation.x = Math.PI / 2; mira.add(iris);
   const brilho = new THREE.Mesh(new THREE.SphereGeometry(r * 0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-  brilho.position.set(r * 0.26, r * 0.3, r * 0.94); olho.add(brilho);
+  brilho.position.set(r * 0.26, r * 0.3, r * 0.94); if (grande) brilho.scale.setScalar(1.5); olho.add(brilho);
+  if (grande) { const b2 = new THREE.Mesh(new THREE.SphereGeometry(r * 0.09, 8, 6), brilho.material); b2.position.set(-r * 0.3, -r * 0.28, r * 0.93); brilho.add(b2); b2.position.sub(brilho.position).divideScalar(1.5); }
   const RL = r * 1.075;
   const sup = new THREE.Mesh(new THREE.SphereGeometry(RL, 24, 10, 0, Math.PI * 2, 0, 1.0), matPele);
-  sup.rotation.x = PALPEBRA_ABERTA; olho.add(sup);
+  const aberta = grande ? -0.4 : PALPEBRA_ABERTA; // olhos de desenho ficam bem abertos
+  sup.rotation.x = aberta; olho.add(sup);
   if (cilios) {
-    const c = new THREE.Mesh(new THREE.TorusGeometry(RL * Math.sin(1.0), r * 0.075, 5, 20, Math.PI * 0.9), matCilio);
+    const c = new THREE.Mesh(new THREE.TorusGeometry(RL * Math.sin(1.0), r * (grande ? 0.13 : 0.075), 5, 20, Math.PI * 0.9), matCilio);
     c.rotation.set(Math.PI / 2, 0, 0); c.rotation.z = Math.PI * 0.05 + (lado > 0 ? 0 : 0); c.position.y = RL * Math.cos(1.0); sup.add(c);
     // cílios do canto de fora, mais compridos
     for (let k = 0; k < 3; k++) {
@@ -118,9 +107,9 @@ export function criarOlho(lado, { r = 0.025, matBranco, matIris, matPele, matCil
       p.rotation.set(Math.PI / 2 - 0.5, 0, -lado * (0.5 + k * 0.25)); sup.add(p);
     }
   }
-  const inf = new THREE.Mesh(new THREE.SphereGeometry(RL, 24, 8, 0, Math.PI * 2, Math.PI - 1.0, 1.0), matPele);
+  const inf = new THREE.Mesh(new THREE.SphereGeometry(RL, 24, 8, 0, Math.PI * 2, Math.PI - (grande ? 0.78 : 1.0), grande ? 0.78 : 1.0), matPele);
   olho.add(inf);
-  return { olho, mira, brilho, sup };
+  return { olho, mira, brilho, sup, aberta };
 }
 export const PALPEBRA_ABERTA = -0.06;
 export const PALPEBRA_FECHADA = 1.2;

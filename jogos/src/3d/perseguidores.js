@@ -1,12 +1,13 @@
 // Quem corre atrás da menina em cada cenário: policial (cidade), caranguejo (praia),
 // leão ou panda (floresta, à escolha) e urso-polar (neve). Todos olham para a frente (+z),
 // na mesma direção dela; a câmera vê as costas deles.
-import { THREE, sombrear, textura } from './base.js';
+import { THREE, sombrear, textura, desenho } from './base.js';
 import { geoCabeca, superficieDe, texIris, criarOlho, tuboAfinado, geoCabelo, geoCorpo, criarMao, criarTenis } from './anatomia.js';
 
 export { quemPersegue } from '../perseguidores.js';
 
-const mat = (cor, extra = {}) => new THREE.MeshStandardMaterial({ color: cor, roughness: 0.75, ...extra });
+// cores chapadas de desenho animado; só o que é metal continua brilhando como metal
+const mat = (cor, extra = {}) => (extra.metalness ? new THREE.MeshStandardMaterial({ color: cor, roughness: 0.75, ...extra }) : desenho({ color: cor, ...extra }));
 const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
 const bola = (r, m, seg = 16) => peca(new THREE.SphereGeometry(r, seg, Math.max(8, seg * 0.7)), m);
 const capsula = (r, l, m) => peca(new THREE.CapsuleGeometry(r, l, 6, 14), m);
@@ -27,7 +28,7 @@ function texPelo() {
   }, true);
   return TEX_PELO;
 }
-const pelo = (cor, rep = 3) => { const t = texPelo().clone(); t.repeat.set(rep, rep); t.needsUpdate = true; return new THREE.MeshStandardMaterial({ color: cor, roughness: 0.95, map: t }); };
+const pelo = (cor, rep = 3) => { const t = texPelo().clone(); t.repeat.set(rep, rep); t.needsUpdate = true; return desenho({ color: cor, map: t }); };
 
 // Junta várias peças numa malha só (uma chamada de desenho em vez de dezenas).
 function fundir(pecas, material) {
@@ -118,10 +119,11 @@ function quadrupede({ corpo, barriga, patas, cabeca, focinho, orelhas, nariz = 0
   for (const lado of [-1, 1]) {
     const orelha = bola(0.09, pelo(orelhas, 2)); orelha.scale.set(1, 1, 0.45); orelha.position.set(lado * 0.18, 0.2, -0.02); orelha.rotation.y = lado * 0.3; pescoco.add(orelha);
     const dentro = bola(0.055, mat(0xd9a08c)); dentro.scale.set(1, 1, 0.3); dentro.position.set(lado * 0.178, 0.195, 0.015); dentro.rotation.y = lado * 0.3; pescoco.add(dentro);
-    const o = criarOlho(lado, { r: 0.042, ...MAT_OLHO(), matIris, matPele: matPalpebra, cilios: false });
-    o.olho.position.set(lado * 0.105, 0.065, 0.2); o.olho.rotation.y = lado * 0.3; o.sup.rotation.x = -0.3; pescoco.add(o.olho); olhos.push(o);
-    const sobrolho = bola(0.05, mCab); sobrolho.scale.set(1.3, 0.55, 0.8); sobrolho.position.set(lado * 0.105, 0.115, 0.2); sobrolho.rotation.z = lado * 0.3; pescoco.add(sobrolho);
+    const o = criarOlho(lado, { r: 0.06, ...MAT_OLHO(), matIris, matPele: matPalpebra, cilios: false, grande: true });
+    o.olho.position.set(lado * 0.115, 0.07, 0.185); o.olho.rotation.y = lado * 0.3; pescoco.add(o.olho); olhos.push(o);
+    const sobrolho = bola(0.05, mCab); sobrolho.scale.set(1.3, 0.55, 0.8); sobrolho.position.set(lado * 0.115, 0.14, 0.19); sobrolho.rotation.z = lado * 0.3; pescoco.add(sobrolho);
   }
+  pescoco.scale.setScalar(1.18); // cabeção de desenho animado
   const cauda = new THREE.Group(); cauda.position.set(0, 0.08, -0.6); tronco.add(cauda);
   extras?.({ raiz, tronco, pescoco, cauda, pernas });
   raiz.scale.setScalar(escala);
@@ -202,7 +204,7 @@ function urso() {
     extras: ({ cauda, pescoco }) => {
       const rabo = bola(0.07, mat(0xf2efe6)); cauda.add(rabo);
       // urso-polar tem a cabeça mais comprida
-      pescoco.scale.set(0.9, 0.9, 1.15);
+      pescoco.scale.set(1.08, 1.08, 1.32);
       gorroComPompom(pescoco, 0xe5484d, 0.265, 0.15);
       // cachecol listrado com as pontas voando para trás
       const listra = (k) => mat(k % 2 ? 0xffffff : 0x3e8bff);
@@ -315,7 +317,7 @@ function policial() {
     joelho.add(torneada([[0.082, 0], [0.08, -0.1], [0.07, -0.3], [0.066, -0.37]], calca));
     const faixa = peca(new THREE.BoxGeometry(0.006, 0.36, 0.022), ouro); faixa.position.set(lado * 0.077, -0.18, 0); joelho.add(faixa);
     const sapato = criarTenis({ cabedal: couro, sola: mat(0x1d1d1f, { roughness: 0.6 }), detalhe: mat(0x0a0a0a, { roughness: 0.5 }), cadarco: mat(0x2a2a2a), borracha: couro });
-    sapato.scale.setScalar(1.5); sapato.position.set(0, -0.375, 0.035); joelho.add(sapato);
+    sapato.scale.setScalar(1.85); sapato.position.set(0, -0.355, 0.04); joelho.add(sapato);
     return { coxa, joelho };
   });
   const tronco = new THREE.Group(); tronco.position.y = 0.9; corpo.add(tronco);
@@ -343,29 +345,29 @@ function policial() {
   const bracos = [-1, 1].map((lado) => {
     const ombro = new THREE.Group(); ombro.position.set(lado * 0.285, 0.59, 0); tronco.add(ombro);
     // manga curta, cotovelo e antebraço de fora, relógio e a mão com dedos
-    ombro.add(torneada([[0, 0.065], [0.05, 0.055], [0.078, 0.02], [0.08, -0.05], [0.074, -0.2], [0.073, -0.23], [0.066, -0.23]], new THREE.MeshStandardMaterial({ color: 0x24479c, roughness: 0.8, side: THREE.DoubleSide })));
+    ombro.add(torneada([[0, 0.065], [0.05, 0.055], [0.078, 0.02], [0.08, -0.05], [0.074, -0.2], [0.073, -0.23], [0.066, -0.23]], desenho({ color: 0x24479c, side: THREE.DoubleSide })));
     ombro.add(torneada([[0.058, -0.16], [0.056, -0.3], [0.052, -0.34]], pele));
     const cotovelo = new THREE.Group(); cotovelo.position.y = -0.34; ombro.add(cotovelo);
     cotovelo.add(bola(0.05, pele, 12));
     const ante = torneada([[0.053, 0], [0.057, -0.06], [0.05, -0.16], [0.04, -0.25], [0.037, -0.28]], pele); ante.scale.z = 0.92; cotovelo.add(ante);
     if (lado < 0) { const relogio = peca(new THREE.CylinderGeometry(0.042, 0.042, 0.026, 16), couro); relogio.position.y = -0.255; cotovelo.add(relogio); const visor = peca(new THREE.CylinderGeometry(0.022, 0.022, 0.01, 14), mat(0xdfe8f0, { metalness: 0.5, roughness: 0.2 })); visor.rotation.x = Math.PI / 2; visor.position.set(0, -0.255, -0.042); cotovelo.add(visor); }
-    const mao = criarMao(lado, pele, 1.6); mao.position.y = -0.285; cotovelo.add(mao);
+    const mao = criarMao(lado, pele, 2); mao.position.y = -0.285; cotovelo.add(mao);
     return { ombro, cotovelo };
   });
   // cabeça: mesmo rosto esculpido dos humanos, com queixo largo, bigode, costeletas e o quepe
-  const cabeca = new THREE.Group(); cabeca.position.y = 0.85; tronco.add(cabeca);
+  const cabeca = new THREE.Group(); cabeca.position.y = 0.9; cabeca.scale.setScalar(1.32); tronco.add(cabeca);
   cabeca.add(torneada([[0.07, -0.16], [0.062, -0.1], [0.06, -0.02]], pele));
   const R = 0.15; const geoC = geoCabeca(R, 48); geoC.scale(1.06, 1, 1.02);
   const sup = superficieDe(geoC);
   cabeca.add(peca(geoC, pele));
   const escuroP = mat(0x2e2018, { roughness: 0.7 });
   const cabelo = peca(geoCabelo(R, 1.04, 48, 12), mat(0x2e2018, { roughness: 0.6, side: THREE.DoubleSide })); cabelo.scale.set(1.06, 1, 1.02); cabeca.add(cabelo);
-  const olhoMat = { ...MAT_OLHO(), matIris: mat(0xffffff, { roughness: 0.12, map: texIris('#4a3524') }), matPele: new THREE.MeshStandardMaterial({ color: 0xd9a27c, roughness: 0.6, side: THREE.DoubleSide }) };
+  const olhoMat = { ...MAT_OLHO(), matIris: mat(0xffffff, { roughness: 0.12, map: texIris('#4a3524') }), matPele: desenho({ color: 0xd9a27c, side: THREE.DoubleSide }) };
   const tubo = (pts, raio, m, achatar = 1) => peca(tuboAfinado(new THREE.CatmullRomCurve3(pts.map(([x, y, dz = 0.001]) => new THREE.Vector3(x, y, sup(x, y) + dz))), 16, raio, 7, achatar), m);
   for (const lado of [-1, 1]) {
-    const o = criarOlho(lado, { r: 0.024, ...olhoMat, cilios: false });
-    o.olho.position.set(lado * 0.048, 0.002, sup(lado * 0.048, 0.002) - 0.013); cabeca.add(o.olho);
-    cabeca.add(tubo([[lado * 0.02, 0.04], [lado * 0.045, 0.05], [lado * 0.08, 0.042]], (t) => 0.0075 * (1 - 0.5 * t), escuroP, 0.5)); // sobrancelha grossa
+    const o = criarOlho(lado, { r: 0.034, ...olhoMat, cilios: false, grande: true });
+    o.olho.position.set(lado * 0.052, -0.004, sup(lado * 0.052, -0.004) - 0.019); cabeca.add(o.olho);
+    cabeca.add(tubo([[lado * 0.018, 0.04, 0.004], [lado * 0.05, 0.058, 0.004], [lado * 0.092, 0.048, 0.004]], (t) => 0.0105 * (1 - 0.5 * t), escuroP, 0.5)); // sobrancelha grossa
     const orelha = bola(0.034, pele, 12); orelha.scale.set(0.35, 1, 0.7); orelha.position.set(lado * 0.148, -0.01, -0.01); orelha.rotation.y = lado * 0.4; cabeca.add(orelha);
     cabeca.add(tubo([[lado * 0.004, -0.068, 0.004], [lado * 0.03, -0.066, 0.004], [lado * 0.052, -0.08, 0.002]], (t) => 0.0105 * (1 - 0.65 * t), escuroP)); // bigode
   }
@@ -378,7 +380,6 @@ function policial() {
   const aba = peca(new THREE.CylinderGeometry(0.165, 0.165, 0.014, 24, 1, false, -Math.PI / 2, Math.PI), mat(0x0c0c0e, { roughness: 0.15 })); aba.position.set(0, 0.082, 0.06); aba.rotation.x = 0.22; cabeca.add(aba);
   const fita = peca(new THREE.CylinderGeometry(0.162, 0.16, 0.026, 28), ouro); fita.position.y = 0.095; cabeca.add(fita);
   const brasao = peca(new THREE.ExtrudeGeometry(formaD, { depth: 0.006, bevelEnabled: false }), ouro); brasao.scale.setScalar(0.8); brasao.position.set(0, 0.15, 0.165); cabeca.add(brasao);
-  oculosEscuros(cabeca, 0.052, 0.004, sup(0.048, 0) + 0.016, 0.036); // óculos escuros de aviador
   return {
     raiz,
     animar(fase) {

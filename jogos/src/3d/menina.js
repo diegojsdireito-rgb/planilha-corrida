@@ -1,9 +1,9 @@
 // A menina em 3D, mais realista: material que reage à luz como pele e tecido, braços e pernas
 // com formato de músculo (torneados), roupa com textura de tecido, tênis detalhado e cabelo
 // ondulado feito de várias mechas que balançam separadas.
-import { THREE, xDe, textura, ruido, sombrear, texBrilho } from './base.js';
+import { THREE, xDe, textura, ruido, sombrear, texBrilho, desenho } from './base.js';
 import { PELES, ROUPAS } from '../personagem.js';
-import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_ABERTA, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
+import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
 
 const CABELO = ['#2c1a10', '#331e12', '#3b2316', '#46291a', '#52301f']; // castanho-escuro, com pontas um pouco mais claras
 
@@ -40,7 +40,7 @@ function membro(perfil, material, ossoCima, ossoBaixo, yJunta, faixa, zEscala = 
 }
 
 // Pele: um pouco de brilho rasante (como a luz que atravessa a pele nas bordas) e sem cara de plástico.
-function pele(cor, extra = {}) { return new THREE.MeshStandardMaterial({ color: cor, roughness: 0.56, metalness: 0, ...extra }); }
+function pele(cor, extra = {}) { return desenho({ color: cor, ...extra }); }
 
 // ---------- Tecidos dos estilos (desenhados na hora) ----------
 // Nas peças torneadas, u = 0 é a frente, 0,25 e 0,75 as laterais e 0,5 as costas.
@@ -326,27 +326,27 @@ export function criarMenina() {
   const mat = {
     pele: pele(PELES[1]),
     rosto: pele(PELES[1], { map: texRosto() }),
-    manga: new THREE.MeshStandardMaterial({ color: ROUPAS[0], roughness: 0.85, map: tex.tecido, side: THREE.DoubleSide }),
+    manga: desenho({ color: ROUPAS[0], roughness: 0.85, map: tex.tecido, side: THREE.DoubleSide }),
     palpebra: pele(PELES[1], { side: THREE.DoubleSide }),
-    cachos: ['#2a180e', '#33200f', '#3d2414', '#472a17', '#54331c', '#3a2212'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.42 })),
-    roupa: new THREE.MeshStandardMaterial({ color: ROUPAS[0], roughness: 0.85, map: tex.tecido }),
-    camiseta: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
-    shortTorneado: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }),
-    branco: new THREE.MeshStandardMaterial({ color: 0xf7f7f7, roughness: 0.8, map: tex.tecido }),
-    short: new THREE.MeshStandardMaterial({ color: 0x2f3446, roughness: 0.9, map: tex.tecido }),
-    tenis: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, map: tex.tenis }),
-    sola: new THREE.MeshStandardMaterial({ color: 0xe6e8ec, roughness: 0.8 }),
-    detalhe: new THREE.MeshStandardMaterial({ color: ROUPAS[0], roughness: 0.6 }),
-    cadarco: new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.7 }),
-    cabelo: CABELO.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, map: tex.cabelo, side: THREE.DoubleSide })),
-    cabeloLiso: new THREE.MeshStandardMaterial({ color: CABELO[2], roughness: 0.45, side: THREE.DoubleSide }),
-    perna: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }), // calça, legging ou meião
-    meiao: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
-    mangaLonga: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, map: tex.tecido }),
-    saia: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide }),
-    jeans: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
-    chapeu: new THREE.MeshStandardMaterial({ color: ROUPAS[0], roughness: 0.75, map: tex.tecido }),
-    chapeu2: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, map: tex.tecido }),
+    cachos: ['#2a180e', '#33200f', '#3d2414', '#472a17', '#54331c', '#3a2212'].map((c) => desenho({ color: c, roughness: 0.42 })),
+    roupa: desenho({ color: ROUPAS[0], roughness: 0.85, map: tex.tecido }),
+    camiseta: desenho({ color: 0xffffff, roughness: 0.85 }),
+    shortTorneado: desenho({ color: 0xffffff, roughness: 0.9 }),
+    branco: desenho({ color: 0xf7f7f7, roughness: 0.8, map: tex.tecido }),
+    short: desenho({ color: 0x2f3446, roughness: 0.9, map: tex.tecido }),
+    tenis: desenho({ color: 0xffffff, roughness: 0.6, map: tex.tenis }),
+    sola: desenho({ color: 0xe6e8ec, roughness: 0.8 }),
+    detalhe: desenho({ color: ROUPAS[0], roughness: 0.6 }),
+    cadarco: desenho({ color: 0xdddddd, roughness: 0.7 }),
+    cabelo: CABELO.map((c) => desenho({ color: c, roughness: 0.5, map: tex.cabelo, side: THREE.DoubleSide })),
+    cabeloLiso: desenho({ color: CABELO[2], roughness: 0.45, side: THREE.DoubleSide }),
+    perna: desenho({ color: 0xffffff, roughness: 0.85 }), // calça, legging ou meião
+    meiao: desenho({ color: 0xffffff, roughness: 0.85 }),
+    mangaLonga: desenho({ color: 0xffffff, roughness: 0.85, map: tex.tecido }),
+    saia: desenho({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide }),
+    jeans: desenho({ color: 0xffffff, roughness: 0.85 }),
+    chapeu: desenho({ color: ROUPAS[0], roughness: 0.75, map: tex.tecido }),
+    chapeu2: desenho({ color: 0xffffff, roughness: 0.75, map: tex.tecido }),
   };
   const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
 
@@ -357,8 +357,8 @@ export function criarMenina() {
   // músculos da perna: a panturrilha salta para trás, a coxa é mais cheia na frente e a patela marca o joelho
   const formaPerna = (x, y, z) => {
     const tras = Math.max(0, -z) / 0.05; const frente = Math.max(0, z) / 0.05;
-    return [x * (1 + 0.06 * sinoM(y, -0.39, 0.06)),
-      z - 0.013 * sinoM(y, -0.385, 0.055) * tras + 0.007 * sinoM(y, -0.12, 0.09) * frente + 0.006 * sinoM(y, -0.285, 0.022) * frente - 0.004 * sinoM(y, -0.3, 0.03) * tras];
+    return [x * 0.88 * (1 + 0.06 * sinoM(y, -0.39, 0.06)),
+      z * 0.88 - 0.013 * sinoM(y, -0.385, 0.055) * tras + 0.007 * sinoM(y, -0.12, 0.09) * frente + 0.006 * sinoM(y, -0.285, 0.022) * frente - 0.004 * sinoM(y, -0.3, 0.03) * tras];
   };
   const pernas = [-1, 1].map((lado) => {
     const coxa = new THREE.Group(); coxa.position.set(lado * 0.076, 0, 0);
@@ -372,7 +372,7 @@ export function criarMenina() {
     // tênis: solado com formato de pé, cabedal, biqueira, língua, cadarço cruzado e faixas
     const tenis = new THREE.Group(); tenis.position.set(0, -0.3, 0.035); joelho.add(tenis);
     const sapato = criarTenis({ cabedal: mat.tenis, sola: mat.sola, detalhe: mat.detalhe, cadarco: mat.cadarco, borracha: mat.sola });
-    sapato.position.set(0, 0.012, -0.012); tenis.add(sapato);
+    sapato.scale.setScalar(1.32); sapato.position.set(0, 0.031, -0.008); tenis.add(sapato);
     // cano alto (estilos street e jeans): sobe pelo tornozelo
     const cano = peca(new THREE.CylinderGeometry(0.041, 0.045, 0.07, 18), mat.tenis); cano.position.set(0, 0.07, -0.04); tenis.add(cano);
     const bordaCano = peca(new THREE.TorusGeometry(0.041, 0.008, 6, 18), mat.detalhe); bordaCano.rotation.x = Math.PI / 2; bordaCano.position.set(0, 0.105, -0.04); tenis.add(bordaCano);
@@ -424,7 +424,7 @@ export function criarMenina() {
 
   // ---- braços: ombro -> cotovelo -> mão ----
   // músculos do braço: o antebraço é mais largo perto do cotovelo e achata no pulso
-  const formaBraco = (x, y, z) => [x * (1 + 0.07 * sinoM(y, -0.25, 0.05) - 0.12 * sinoM(y, -0.38, 0.03)), z * (1 - 0.14 * sinoM(y, -0.37, 0.05)) + 0.004 * sinoM(y, -0.08, 0.06) * Math.sign(z)];
+  const formaBraco = (x, y, z) => [x * 0.9 * (1 + 0.07 * sinoM(y, -0.25, 0.05) - 0.12 * sinoM(y, -0.38, 0.03)), z * (1 - 0.14 * sinoM(y, -0.37, 0.05)) + 0.004 * sinoM(y, -0.08, 0.06) * Math.sign(z)];
   const bracos = [-1, 1].map((lado) => {
     const ombro = new THREE.Group(); ombro.position.set(lado * 0.153, 0.392, 0); tronco.add(ombro);
     const manga = peca(torneada([[0, 0.034], [0.022, 0.032], [0.037, 0.018], [0.0425, -0.005], [0.0432, -0.045], [0.0428, -0.062], [0.04, -0.062]], 20), mat.manga); ombro.add(manga);
@@ -433,14 +433,14 @@ export function criarMenina() {
     const mBraco = sombrear(membro([[0, 0.028], [0.03, 0.02], [0.039, -0.005], [0.04, -0.06], [0.038, -0.13], [0.035, -0.18], [0.034, -0.2]], mat.pele, ombro, cotovelo, -0.2, 0.035, 1, 20, formaBraco));
     const mAnte = sombrear(membro([[0.034, -0.2], [0.035, -0.225], [0.034, -0.27], [0.029, -0.33], [0.025, -0.365], [0.023, -0.385], [0, -0.39]], mat.pele, ombro, cotovelo, -0.2, 0.035, 1, 20, formaBraco));
     const mao = new THREE.Group(); mao.position.y = -0.19; cotovelo.add(mao);
-    mao.add(criarMao(lado, mat.pele));
+    mao.add(criarMao(lado, mat.pele, 1.35));
     const punho = peca(new THREE.CylinderGeometry(0.03, 0.032, 0.035, 16), mat.mangaLonga); punho.position.y = -0.165; cotovelo.add(punho);
     return { ombro, cotovelo, mao, manga, mBraco, mAnte, punho };
   });
 
   // ---- cabeça e cabelo ----
-  // a cabeça é montada no tamanho antigo e encolhida: corpo com cerca de 5 cabeças e meia, como uma criança
-  const cabeca = new THREE.Group(); cabeca.position.y = 0.612; cabeca.scale.setScalar(0.83); tronco.add(cabeca); cabeca.add(capuzCabeca);
+  // estilo desenho animado: cabeça grande (o corpo tem umas 4 cabeças de altura), olhos enormes, mãos e tênis grandes
+  const cabeca = new THREE.Group(); cabeca.position.y = 0.648; cabeca.scale.setScalar(1.2); tronco.add(cabeca); cabeca.add(capuzCabeca);
   const geoCranio = geoCabeca(0.142);
   const superficie = superficieDe(geoCranio);
   const cranio = peca(geoCranio, mat.rosto); cabeca.add(cranio);
@@ -456,11 +456,11 @@ export function criarMenina() {
   }
   // ---- rosto (aparece no saguão e na tela de fim, quando ela olha para a câmera) ----
   const rosto = new THREE.Group(); cabeca.add(rosto);
-  const matOlho = new THREE.MeshStandardMaterial({ color: 0xf6f3ee, roughness: 0.18 });
-  const matIris = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.12, map: texIris('#6a4222') });
-  const matEscuro = new THREE.MeshStandardMaterial({ color: 0x1a0f0a, roughness: 0.5 });
-  const matSobrancelha = new THREE.MeshStandardMaterial({ color: 0x2e1b10, roughness: 0.7 });
-  const matBoca = new THREE.MeshStandardMaterial({ color: 0xb9606a, roughness: 0.38 });
+  const matOlho = desenho({ color: 0xf6f3ee, roughness: 0.18 });
+  const matIris = desenho({ color: 0xffffff, roughness: 0.12, map: texIris('#6a4222') });
+  const matEscuro = desenho({ color: 0x1a0f0a, roughness: 0.5 });
+  const matSobrancelha = desenho({ color: 0x2e1b10, roughness: 0.7 });
+  const matBoca = desenho({ color: 0xd4526a, roughness: 0.38 });
   const matPalpebra = mat.palpebra;
   const olhos = []; const sobrancelhas = [];
   // tubo que acompanha a curva do rosto (lábios e sobrancelhas)
@@ -468,31 +468,31 @@ export function criarMenina() {
     const pts = Array.from({ length: n + 1 }, (_, k) => { const x = x0 + ((x1 - x0) * k) / n; const y = yDe(x); return new THREE.Vector3(x, y, superficie(x, y) + folga); });
     return peca(tuboAfinado(new THREE.CatmullRomCurve3(pts), n * 2, raio, 8, achatar), material);
   };
-  const X_OLHO = 0.044; const Y_OLHO = 0.0;
+  const X_OLHO = 0.052; const Y_OLHO = -0.012;
   for (const lado of [-1, 1]) {
     const x = lado * X_OLHO;
-    const o = criarOlho(lado, { r: 0.0245, matBranco: matOlho, matIris, matPele: matPalpebra, matCilio: matEscuro });
-    o.olho.position.set(x, Y_OLHO, superficie(x, Y_OLHO) - 0.0125);
+    const o = criarOlho(lado, { r: 0.037, matBranco: matOlho, matIris, matPele: matPalpebra, matCilio: matEscuro, grande: true });
+    o.olho.position.set(x, Y_OLHO, superficie(x, Y_OLHO) - 0.02);
     o.olho.rotation.y = lado * 0.1; // cada olho acompanha a curva do rosto
     rosto.add(o.olho);
     olhos.push(o);
     // sobrancelha em arco, mais grossa perto do nariz
-    const grupoS = new THREE.Group(); grupoS.position.set(x + lado * 0.003, 0.042, 0); rosto.add(grupoS);
-    const s = noRosto((xx) => 0.042 + 0.006 * (1 - ((xx - x) / 0.026) ** 2) - 0.003 * lado * ((xx - x) / 0.026), x - lado * 0.026, x + lado * 0.03, (t) => 0.0048 * (1 - 0.6 * t * t) * (0.6 + 0.4 * Math.min(1, t * 6)), matSobrancelha, { folga: 0.0006, achatar: 0.5 });
+    const grupoS = new THREE.Group(); grupoS.position.set(x + lado * 0.003, 0.05, 0); rosto.add(grupoS);
+    const s = noRosto((xx) => 0.05 + 0.009 * (1 - ((xx - x) / 0.034) ** 2) - 0.005 * lado * ((xx - x) / 0.034), x - lado * 0.034, x + lado * 0.04, (t) => 0.0078 * (1 - 0.7 * t * t) * (0.7 + 0.3 * Math.min(1, t * 6)), matSobrancelha, { folga: 0.0012, achatar: 0.5 });
     s.position.set(-grupoS.position.x, -grupoS.position.y, 0); grupoS.add(s);
     sobrancelhas.push({ sobrancelha: grupoS, lado, z0: 0, y0: grupoS.position.y });
   }
   // nariz: ponta arredondada, asas e narinas (o dorso já vem esculpido na cabeça)
-  const Y_NARIZ = -0.043;
-  const nariz = new THREE.Group(); nariz.position.set(0, Y_NARIZ, superficie(0, Y_NARIZ)); rosto.add(nariz);
+  const Y_NARIZ = -0.052;
+  const nariz = new THREE.Group(); nariz.position.set(0, Y_NARIZ, superficie(0, Y_NARIZ)); nariz.scale.setScalar(0.72); rosto.add(nariz);
   const ponta = peca(new THREE.SphereGeometry(0.0118, 16, 12), mat.pele); ponta.scale.set(1.1, 0.82, 0.95); ponta.position.z = -0.0045; nariz.add(ponta);
   const baseNariz = peca(new THREE.SphereGeometry(0.012, 14, 10), mat.pele); baseNariz.scale.set(1.45, 0.62, 0.8); baseNariz.position.set(0, -0.0015, -0.0095); nariz.add(baseNariz);
   for (const l of [-1, 1]) {
     const asa = peca(new THREE.SphereGeometry(0.0066, 10, 8), mat.pele); asa.scale.set(1, 0.9, 1.1); asa.position.set(l * 0.0128, -0.0022, -0.0125); nariz.add(asa);
-    const narina = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), new THREE.MeshStandardMaterial({ color: 0x6e3a2c, roughness: 0.9 })); narina.scale.set(1.25, 0.5, 0.8); narina.position.set(l * 0.006, -0.0092, -0.0075); nariz.add(narina);
+    const narina = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 6), desenho({ color: 0x6e3a2c, roughness: 0.9 })); narina.scale.set(1.25, 0.5, 0.8); narina.position.set(l * 0.006, -0.0092, -0.0075); nariz.add(narina);
   }
   // boca sorrindo: lábio de cima com o arco do cupido, lábio de baixo mais cheio e os dentes entre eles
-  const Y_BOCA = -0.08; const L_BOCA = 0.027;
+  const Y_BOCA = -0.088; const L_BOCA = 0.024;
   const cima = (x) => Y_BOCA + 0.003 + 0.008 * (x / L_BOCA) ** 2 - 0.002 * Math.exp(-((x / 0.006) ** 2));
   const baixo = (x) => Y_BOCA - 0.009 + 0.02 * (x / L_BOCA) ** 2;
   const labio = new THREE.Group(); rosto.add(labio);
@@ -507,8 +507,8 @@ export function criarMenina() {
   };
   const meio = (x) => cima(x) * 0.42 + baixo(x) * 0.58;
   const sorriso = new THREE.Group(); rosto.add(sorriso);
-  sorriso.add(tiraBoca(cima, meio, new THREE.MeshStandardMaterial({ color: 0xfbfaf5, roughness: 0.25, side: THREE.DoubleSide }), 0.0022));
-  sorriso.add(tiraBoca(meio, baixo, new THREE.MeshStandardMaterial({ color: 0x7a2633, roughness: 0.6, side: THREE.DoubleSide }), 0.003));
+  sorriso.add(tiraBoca(cima, meio, desenho({ color: 0xfbfaf5, roughness: 0.25, side: THREE.DoubleSide }), 0.0022));
+  sorriso.add(tiraBoca(meio, baixo, desenho({ color: 0x7a2633, roughness: 0.6, side: THREE.DoubleSide }), 0.003));
   // covinhas no canto do sorriso
   for (const l of [-1, 1]) { const c = peca(new THREE.SphereGeometry(0.0022, 8, 6), matBoca); c.position.set(l * L_BOCA, cima(L_BOCA), superficie(l * L_BOCA, cima(L_BOCA)) + 0.0002); labio.add(c); }
   // rosto triste: lábios fechados com os cantos para baixo, sobrancelhas levantadas no meio e lágrimas
@@ -516,7 +516,7 @@ export function criarMenina() {
   const triste = (x) => Y_BOCA - 0.004 - 0.011 * (x / 0.024) ** 2;
   bocaTriste.add(noRosto((x) => triste(x) + 0.0035, -0.024, 0.024, (t) => 0.0036 * Math.sin(t * Math.PI) ** 0.6 + 0.0008, matBoca, { folga: 0.0008 }));
   bocaTriste.add(noRosto((x) => triste(x) - 0.0035, -0.021, 0.021, (t) => 0.0048 * Math.sin(t * Math.PI) ** 0.7 + 0.0008, matBoca, { folga: 0.0012 }));
-  const matLagrima = new THREE.MeshStandardMaterial({ color: 0x8fd3ff, roughness: 0.05, transparent: true, opacity: 0.85 });
+  const matLagrima = desenho({ color: 0x8fd3ff, roughness: 0.05, transparent: true, opacity: 0.85 });
   const lagrimas = [-1, 1].map((l) => {
     const g = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 10, 8), matLagrima); g.scale.set(0.8, 1.3, 0.6); g.visible = false; rosto.add(g);
     return { g, l, x: l * 0.055, z: superficie(l * 0.055, -0.045) + 0.004 };
@@ -526,25 +526,25 @@ export function criarMenina() {
   const mechas = [];
   // camada de baixo, contínua: não deixa a camiseta aparecer entre os cachos
   const base = new THREE.Group();
-  base.add(peca(mecha(0, 0.56, 0.3, 0.5), mat.cabelo[0]));
+  base.add(peca(mecha(0, 0.36, 0.3, 0.5), mat.cabelo[0]));
   base.scale.set(0.93, 1, 0.93);
   cabeca.add(base);
   mechas.push({ piv: base, fase: 0 });
   let sem = 20240;
   const sorte = () => { sem = (sem * 16807) % 2147483647; return sem / 2147483647; };
   // os cachos são juntados em poucos grupos (cada grupo balança no seu tempo): leve para o celular
-  const NC = 34; const GRUPOS = 6;
+  const NC = 22; const GRUPOS = 6;
   const porGrupo = Array.from({ length: GRUPOS }, () => []);
   for (let k = 0; k < NC; k++) {
     const t = k / (NC - 1);
     const camada = k % 2; // duas camadas: a de fora é mais comprida e mais solta
     const az = (t - 0.5) * 3.5 + (sorte() - 0.5) * 0.08;
-    porGrupo[k % GRUPOS].push(geoCacho({ az, y0: 0.1 - camada * 0.04 - sorte() * 0.02, comp: 0.57 + Math.sin(t * Math.PI) * 0.13 + sorte() * 0.07 - camada * 0.05, fase: sorte() * 6.3, amp: 0.013 + sorte() * 0.008 + (1 - camada) * 0.004, voltas: 2.6 + sorte() * 1.6, raio: 0.0135 + sorte() * 0.004 }));
+    porGrupo[k % GRUPOS].push(geoCacho({ az, y0: 0.1 - camada * 0.04 - sorte() * 0.02, comp: 0.36 + Math.sin(t * Math.PI) * 0.08 + sorte() * 0.05 - camada * 0.04, fase: sorte() * 6.3, amp: 0.018 + sorte() * 0.008 + (1 - camada) * 0.004, voltas: 1.8 + sorte() * 0.9, raio: 0.024 + sorte() * 0.006 }));
   }
   // cachos da frente: emolduram o rosto e caem na frente dos ombros
   const daFrente = [[], []];
-  [[2.02, 0.57, 0.3, 0.08], [-2.02, 0.61, 1.1, 0.08], [2.3, 0.5, 2.2, 0.09], [-2.28, 0.53, 2.9, 0.09], [1.8, 0.63, 4.0, 0.07], [-1.82, 0.59, 5.1, 0.07]].forEach(([az, comp, fase, y0], k) => {
-    daFrente[k % 2].push(geoCacho({ az, y0, comp, fase, amp: 0.014, voltas: 3.4, raio: 0.0125, frente: true }));
+  [[2.02, 0.36, 0.3, 0.08], [-2.02, 0.39, 1.1, 0.08], [2.3, 0.31, 2.2, 0.09], [-2.28, 0.33, 2.9, 0.09], [1.8, 0.4, 4.0, 0.07], [-1.82, 0.37, 5.1, 0.07]].forEach(([az, comp, fase, y0], k) => {
+    daFrente[k % 2].push(geoCacho({ az, y0, comp, fase, amp: 0.016, voltas: 2.3, raio: 0.021, frente: true }));
   });
   [...porGrupo, ...daFrente].forEach((geos, k) => {
     const piv = new THREE.Group();
@@ -560,7 +560,7 @@ export function criarMenina() {
       const t = k / n; const x = x0 + (x1 - x0) * t; const y = 0.128 + (y1 - 0.128) * t ** 1.5 + 0.012 * Math.sin(t * Math.PI);
       return new THREE.Vector3(x, y, Math.max(superficie(x, y), 0.02) + 0.012 - 0.004 * t);
     });
-    franja.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 14, (t) => r * (0.7 + 0.5 * Math.sin(t * Math.PI)) * (1 - 0.5 * t * t), 6, 0.6));
+    franja.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 14, (t) => r * 1.7 * (0.7 + 0.5 * Math.sin(t * Math.PI)) * (1 - 0.5 * t * t), 6, 0.6));
   }
   cabeca.add(peca(fundirGeos(franja), mat.cachos[3]));
   rosto.traverse((x) => { x.castShadow = false; }); // as peças miúdas do rosto não precisam fazer sombra
@@ -941,7 +941,7 @@ export function criarMenina() {
       }
     }
     for (const o of olhos) {
-      o.sup.rotation.x = PALPEBRA_ABERTA + (PALPEBRA_FECHADA - PALPEBRA_ABERTA) * fechado;
+      o.sup.rotation.x = o.aberta + (PALPEBRA_FECHADA - o.aberta) * fechado;
       o.brilho.visible = fechado < 0.5;
       o.mira.rotation.y = 0.28 * a.olhar;
     }
