@@ -3,6 +3,7 @@
 // ondulado feito de várias mechas que balançam separadas.
 import { THREE, xDe, textura, ruido, sombrear, texBrilho, desenho } from './base.js';
 import { PELES, ROUPAS } from '../personagem.js';
+import { personagemDe } from '../personagens.js';
 import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
 
 const CABELO = ['#2c1a10', '#331e12', '#3b2316', '#46291a', '#52301f']; // castanho-escuro, com pontas um pouco mais claras
@@ -524,6 +525,7 @@ export function criarMenina() {
   // cabelo: casca penteada colada na cabeça e os cachos, cada um um tubo em espiral que balança
   const casca = peca(geoCabelo(0.142), mat.cabeloLiso); cabeca.add(casca);
   const mechas = [];
+  const inicioCachos = cabeca.children.length; // daqui em diante, as peças do penteado de cachos
   // camada de baixo, contínua: não deixa a camiseta aparecer entre os cachos
   const base = new THREE.Group();
   base.add(peca(mecha(0, 0.36, 0.3, 0.5), mat.cabelo[0]));
@@ -562,7 +564,53 @@ export function criarMenina() {
     });
     franja.push(tuboAfinado(new THREE.CatmullRomCurve3(pts), 14, (t) => r * 1.7 * (0.7 + 0.5 * Math.sin(t * Math.PI)) * (1 - 0.5 * t * t), 6, 0.6));
   }
-  cabeca.add(peca(fundirGeos(franja), mat.cachos[3]));
+  const pecasCachos = cabeca.children.slice(inicioCachos);
+  const mFranja = peca(fundirGeos(franja), mat.cachos[3]); cabeca.add(mFranja);
+
+  // ---- outros penteados da turma (cada personagem usa um) ----
+  const girada = (geo, [x, y, z], [rx, ry, rz] = [0, 0, 0], [ex, ey, ez] = [1, 1, 1]) => geo.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(ex, ey, ez)));
+  const penteado = (geos, material = mat.cachos[2]) => { const g = new THREE.Group(); g.add(peca(fundirGeos(geos), material)); g.visible = false; cabeca.add(g); return g; };
+  // curto e espetado na frente
+  const espetos = [];
+  for (let k = 0; k < 9; k++) { const x = (k - 4) * 0.027; espetos.push(girada(new THREE.ConeGeometry(0.03, 0.1, 7), [x, 0.128 - Math.abs(x) * 0.3, 0.092 - x * x * 2.5], [1.0, 0, -x * 4.5])); }
+  for (let k = 0; k < 7; k++) { const x = (k - 3) * 0.03; espetos.push(girada(new THREE.ConeGeometry(0.032, 0.085, 7), [x, 0.155 - Math.abs(x) * 0.25, 0.04], [0.5, 0, -x * 4])); }
+  for (let k = 0; k < 5; k++) { const x = (k - 2) * 0.034; espetos.push(girada(new THREE.ConeGeometry(0.03, 0.07, 7), [x, 0.162 - Math.abs(x) * 0.2, -0.02], [0.05, 0, -x * 3.5])); }
+  const hCurto = penteado(espetos);
+  // rabo de cavalo alto, preso com elástico da cor da roupa
+  const hRabo = penteado([tuboAfinado(new THREE.CatmullRomCurve3([[0, 0.125, -0.085], [0, 0.205, -0.17], [0, 0.15, -0.275], [0, 0.0, -0.31], [0, -0.15, -0.265]].map((v) => new THREE.Vector3(...v))), 22, (t) => 0.014 + 0.042 * Math.sin(Math.PI * Math.min(1, t * 1.3)) ** 0.7 * (1 - 0.55 * t), 8)]);
+  const elastico = peca(new THREE.TorusGeometry(0.03, 0.013, 8, 16), mat.roupa); elastico.position.set(0, 0.165, -0.125); elastico.rotation.x = 0.85; hRabo.add(elastico);
+  mechas.push({ piv: hRabo, fase: 1.3 });
+  // black power: nuvem de cachinhos bem fechados em volta da cabeça
+  const bolinhas = [];
+  for (let k = 0; k < 80; k++) {
+    const y = 1 - (k / 79) * 1.5; const r = Math.sqrt(Math.max(0, 1 - y * y)); const a = k * 2.39996;
+    const d = new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r);
+    if (d.z > 0.3 && d.y < 0.52) continue; // deixa o rosto livre
+    bolinhas.push(girada(new THREE.SphereGeometry(0.078, 8, 6), [d.x * 0.15, 0.04 + d.y * 0.16, -0.02 + d.z * 0.16]));
+  }
+  const hAfro = penteado(bolinhas);
+  // moicano: crista de pontas do alto da testa até a nuca
+  const crista = [];
+  for (let k = 0; k < 11; k++) { const teta = -0.75 + k * 0.3; const alto = 0.15 - Math.abs(k - 4) * 0.008; crista.push(girada(new THREE.ConeGeometry(0.04, alto, 8), [0, Math.cos(teta) * 0.168, -Math.sin(teta) * 0.158 - 0.005], [-teta, 0, 0], [0.42, 1, 1])); }
+  const hMoicano = penteado(crista);
+  // dois coques no alto, com elásticos
+  const hCoques = penteado([girada(new THREE.SphereGeometry(0.068, 14, 10), [-0.092, 0.158, -0.03]), girada(new THREE.SphereGeometry(0.068, 14, 10), [0.092, 0.158, -0.03])]);
+  for (const l of [-1, 1]) { const e2 = peca(new THREE.TorusGeometry(0.036, 0.011, 8, 16), mat.roupa); e2.position.set(l * 0.075, 0.118, -0.025); e2.rotation.set(Math.PI / 2 + 0.1, 0, l * 0.5); hCoques.add(e2); }
+  const penteados = { curto: hCurto, rabo: hRabo, afro: hAfro, moicano: hMoicano, coques: hCoques };
+  // ---- acessórios da turma ----
+  const matArmacao = desenho({ color: 0x22242c });
+  const oculos = new THREE.Group(); oculos.visible = false; rosto.add(oculos);
+  for (const lado of [-1, 1]) {
+    const aro = peca(new THREE.TorusGeometry(0.045, 0.0045, 6, 24), matArmacao); aro.position.set(lado * X_OLHO, Y_OLHO, superficie(lado * X_OLHO, Y_OLHO) + 0.021); aro.rotation.y = lado * 0.1; oculos.add(aro);
+    const haste = peca(new THREE.BoxGeometry(0.004, 0.006, 0.13), matArmacao); haste.position.set(lado * 0.108, Y_OLHO + 0.006, 0.06); haste.rotation.y = -lado * 0.22; oculos.add(haste);
+  }
+  const ponte = peca(new THREE.BoxGeometry(0.02, 0.005, 0.004), matArmacao); ponte.position.set(0, Y_OLHO + 0.004, superficie(0, Y_OLHO) + 0.016); oculos.add(ponte);
+  const fones = new THREE.Group(); fones.visible = false; cabeca.add(fones);
+  const arco = peca(new THREE.TorusGeometry(0.168, 0.011, 8, 28, Math.PI), matArmacao); arco.position.set(0, -0.005, -0.012); arco.scale.set(0.88, 1.05, 1); fones.add(arco);
+  for (const lado of [-1, 1]) {
+    const concha = peca(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 20), mat.detalhe); concha.rotation.z = Math.PI / 2; concha.position.set(lado * 0.145, -0.015, -0.012); fones.add(concha);
+    const almofada = peca(new THREE.TorusGeometry(0.04, 0.012, 8, 18), matArmacao); almofada.rotation.y = Math.PI / 2; almofada.position.set(lado * 0.128, -0.015, -0.012); fones.add(almofada);
+  }
   rosto.traverse((x) => { x.castShadow = false; }); // as peças miúdas do rosto não precisam fazer sombra
 
   // faixa de cabelo: arco de uma orelha à outra, por cima da cabeça
@@ -641,10 +689,28 @@ export function criarMenina() {
   let visual = '';
   // troca o tecido de uma peça; a malha comum (tex.tecido) é usada por várias peças e não é descartada
   const trocarMapa = (m, t) => { if (m.map && m.map !== tex.tecido) m.map.dispose(); m.map = t; m.color.set(0xffffff); m.needsUpdate = true; };
-  function vestir(p, r, estilo = 'esportiva') {
-    const chave = `${p}-${r}-${estilo}`;
+  let quemAntes = '';
+  function vestir(p, r, estilo = 'esportiva', quem = 'cachinhos') {
+    const chave = `${p}-${r}-${estilo}-${quem}`;
     if (chave === visual) return;
     visual = chave;
+    const pers = personagemDe(quem);
+    if (pers.id !== quemAntes) {
+      // cabelo, olhos e acessório de cada personagem da turma
+      quemAntes = pers.id;
+      const base = new THREE.Color(pers.corCabelo);
+      mat.cachos.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k - 2) * 0.022));
+      mat.cabelo.forEach((m, k) => m.color.copy(base).offsetHSL(0, 0, (k - 2) * 0.02));
+      mat.cabeloLiso.color.copy(base);
+      matSobrancelha.color.copy(base).offsetHSL(0, -0.1, -0.06);
+      matIris.map?.dispose(); matIris.map = texIris(pers.olhos); matIris.needsUpdate = true;
+      matBoca.color.set(pers.menino ? 0xb8705f : 0xd4526a);
+      for (const o of pecasCachos) o.visible = pers.cabelo === 'cachos';
+      for (const [id, g] of Object.entries(penteados)) g.visible = pers.cabelo === id;
+      mFranja.visible = ['cachos', 'rabo', 'coques'].includes(pers.cabelo);
+      oculos.visible = pers.acessorio === 'oculos'; fones.visible = pers.acessorio === 'fones';
+    }
+    const cabeChapeu = ['cachos', 'curto'].includes(pers.cabelo) && !pers.acessorio; // penteados altos e fones não cabem debaixo de chapéu
     mat.pele.color.set(PELES[p] ?? PELES[1]); mat.rosto.color.copy(mat.pele.color); mat.palpebra.color.copy(mat.pele.color);
     const cor = ROUPAS[r] ?? ROUPAS[0];
     mat.roupa.color.set(cor);
@@ -673,9 +739,9 @@ export function criarMenina() {
     else mat.tenis.color.set(0xffffff);
     if (e.meiao) trocarMapa(mat.meiao, texMeiao(cor));
     // partes de cima
-    faixa.visible = Boolean(e.faixa);
+    faixa.visible = Boolean(e.faixa) && cabeChapeu;
     barraCamiseta.material = estilo === 'moletom' ? mat.branco : mat.roupa; // barra do moletom é off-white, como na foto
-    capuz.visible = false; casca.visible = true; capuzCabeca.visible = Boolean(e.capuz); cordoes.visible = Boolean(e.capuz);
+    capuz.visible = false; casca.visible = true; capuzCabeca.visible = Boolean(e.capuz) && cabeChapeu; cordoes.visible = Boolean(e.capuz);
     jaqueta.visible = Boolean(e.jaqueta); golaJaqueta.visible = Boolean(e.jaqueta);
     camiseta.scale.set(e.largo ? 1.07 : 1, 1, e.largo ? 1.08 : 1);
     for (const b of bracos) {
@@ -699,9 +765,9 @@ export function criarMenina() {
       for (const c of p2.cano) c.visible = Boolean(e.cano);
     }
     // cabeça
-    bone.visible = Boolean(e.bone);
-    gorro.visible = Boolean(e.gorro);
-    viseira.visible = Boolean(e.viseira);
+    bone.visible = Boolean(e.bone) && cabeChapeu;
+    gorro.visible = Boolean(e.gorro) && cabeChapeu;
+    viseira.visible = Boolean(e.viseira) && cabeChapeu;
   }
 
   const SKATE_COR = { classico: 0xd79a5b, voador: 0x29b7dc, supersonico: 0xd83a2c };

@@ -1,5 +1,6 @@
 // Carteira, loja, missões e presente do dia da Corrida dos Cachinhos. Só funções puras:
 // cada uma recebe a carteira e devolve uma nova, sem mexer na original.
+import { PERSONAGENS } from './personagens.js';
 
 export const PODERES = {
   ima: { nome: 'Ímã de moedas', icone: '🧲', texto: 'Puxa as moedas das três faixas.' },
@@ -35,6 +36,8 @@ export function carteiraNova() {
     skate: 'classico',
     estilos: ['moletom', 'esportiva'],
     estilo: 'moletom',
+    personagens: ['cachinhos'],
+    personagem: 'cachinhos',
     cargas: 2,
     arrancadas: 1,
     poderes: { ima: 0, pulo: 0, maleta: 0, supercarga: 0 },
@@ -56,6 +59,8 @@ export function normalizar(c) {
     estilos: Array.from(new Set(['moletom', 'esportiva', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
     // quem já jogava antes do moletom passa a vestir ele uma vez; depois, vale a escolha da pessoa
     estilo: !(c.estilos ?? []).includes('moletom') ? 'moletom' : (ESTILOS.some((x) => x.id === c.estilo) ? c.estilo : 'moletom'),
+    personagens: Array.from(new Set(['cachinhos', ...(c.personagens ?? [])])).filter((p) => PERSONAGENS.some((x) => x.id === p)),
+    personagem: (c.personagens ?? []).includes(c.personagem) && PERSONAGENS.some((x) => x.id === c.personagem) ? c.personagem : 'cachinhos',
     missoes: Array.isArray(c.missoes) ? c.missoes : [],
   };
 }
@@ -76,6 +81,19 @@ export function comprarEstilo(c, id) {
   if (c.estilos.includes(id)) return erro('Você já tem este estilo.');
   if (c.moedas < item.preco) return erro(`Faltam ${item.preco - c.moedas} moedas.`);
   return { carteira: { ...c, moedas: c.moedas - item.preco, estilos: [...c.estilos, id], estilo: id } };
+}
+
+export function comprarPersonagem(c, id) {
+  const item = PERSONAGENS.find((p) => p.id === id);
+  if (!item) return erro('Personagem desconhecido.');
+  if (c.personagens.includes(id)) return erro('Este personagem já é seu.');
+  if (c.moedas < item.preco) return erro(`Faltam ${item.preco - c.moedas} moedas.`);
+  return { carteira: { ...c, moedas: c.moedas - item.preco, personagens: [...c.personagens, id], personagem: id } };
+}
+
+export function escolherPersonagem(c, id) {
+  if (!c.personagens.includes(id)) return erro('Desbloqueie este personagem primeiro.');
+  return { carteira: { ...c, personagem: id } };
 }
 
 export function vestirEstilo(c, id) {
@@ -187,6 +205,7 @@ export function mesclarCarteiras(a, b) {
     arrancadas: Math.max(x.arrancadas, y.arrancadas),
     skates: [...x.skates, ...y.skates],
     estilos: [...x.estilos, ...y.estilos],
+    personagens: [...x.personagens, ...y.personagens],
     poderes: Object.fromEntries(Object.keys(PODERES).map((k) => [k, Math.max(x.poderes[k], y.poderes[k])])),
     feitas: Math.max(x.feitas, y.feitas),
   });
