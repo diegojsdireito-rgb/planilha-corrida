@@ -782,3 +782,48 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 @keyframes mj-pisca { 50% { transform: translateY(-4px); } }
 @keyframes mj-treme { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
 .pintar-ajuda { text-align: center; font-size: 12px; color: var(--suave); margin: 6px 0 0; }
+
+/* ---------- Corrida: galeria de personagens ---------- */
+.lobby-esquerda { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; }
+.lobby-esquerda .lobby-menina { flex: 1; min-height: 0; }
+.botao-turma {
+  align-self: center; margin-bottom: 6px; display: flex; flex-direction: column; align-items: center; padding: 6px 12px; border-radius: 14px;
+  background: rgba(20, 30, 60, .78); color: #fff; border: 2px solid rgba(255, 255, 255, .4); font-size: 13px; box-shadow: 0 3px 0 rgba(0, 0, 0, .25);
+}
+.botao-turma b { font-size: 14px; }
+.botao-turma small { font-size: 10px; opacity: .85; }
+.lobby.galeria { gap: 6px; }
+.galeria-titulo { text-align: center; color: #fff; text-shadow: 0 2px 0 #2a2f8f, 0 0 8px rgba(0, 0, 40, .5); margin-top: 6px; }
+.galeria-titulo h3 { margin: 0; font-family: var(--titulos); font-size: 32px; font-weight: 900; line-height: 1; -webkit-text-stroke: 1.5px #2a2f8f; }
+.galeria-titulo span { font-size: 14px; font-weight: 700; }
+.galeria-palco { flex: 1; min-height: 120px; display: grid; place-items: center; }
+.galeria-2d svg { width: 150px; height: 150px; }
+.galeria-acao {
+  align-self: center; min-width: 210px; text-align: center; padding: 12px 22px; border-radius: 16px; border: 3px solid #fff; font-size: 20px; font-weight: 900; letter-spacing: .03em;
+  background: linear-gradient(#6fd04a, #3f9e2c); color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, .3); box-shadow: 0 5px 0 #2c7a1d, 0 8px 14px rgba(0, 0, 0, .3);
+}
+.galeria-acao:disabled { filter: grayscale(.7); opacity: .85; }
+.galeria-acao.selecionado { background: #2c3260; box-shadow: 0 5px 0 #1b1f40; font-size: 17px; }
+.galeria-aviso { margin: 0; text-align: center; color: #fff; font-weight: 700; font-size: 13px; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.galeria-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; border-radius: 18px; background: rgba(225, 235, 255, .92); border: 2px solid rgba(255, 255, 255, .8); }
+.cartao-turma { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px 6px; border-radius: 14px; border: 3px solid transparent; background: #fff; color: #1d2150; }
+.cartao-turma svg { width: 62px; height: 62px; }
+.cartao-turma b { font-size: 13px; }
+.cartao-turma small { font-size: 11px; font-weight: 700; color: #8a5a00; }
+.cartao-turma.vendo { border-color: #18a8e8; box-shadow: 0 0 0 2px rgba(24, 168, 232, .3); }
+.cartao-turma .marca { position: absolute; right: 4px; bottom: 4px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 900; background: #c9ccd6; color: #fff; }
+.cartao-turma .marca.usando { background: #35b53a; }
+.galeria-base { display: grid; grid-template-columns: 1fr 2.2fr; gap: 8px; }
+@media (max-height: 700px) { .cartao-turma svg { width: 46px; height: 46px; } .galeria-titulo h3 { font-size: 24px; } }
+.cartao-turma img.arte { width: 62px; height: 62px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 60, .25); }
+.galeria-palco { position: relative; }
+.galeria-arte { position: absolute; right: 2px; bottom: 6px; width: 84px; border-radius: 12px; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0, 0, 40, .35); }
+.galeria-2d img { height: 210px; border-radius: 14px; }
+@media (max-height: 700px) { .cartao-turma img.arte { width: 46px; height: 46px; } .galeria-arte { width: 60px; } }
+.galeria-titulo .galeria-dom { display: inline-block; margin-top: 4px; padding: 3px 12px; border-radius: 999px; background: linear-gradient(#5a6cf0, #3a45c8); border: 2px solid #fff; text-shadow: none; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.galeria-titulo small { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; }
+.galeria-grade { grid-template-columns: repeat(5, 1fr); gap: 5px; padding: 7px; }
+.cartao-turma svg, .cartao-turma img.arte { width: 46px; height: 46px; }
+.cartao-turma b { font-size: 11px; }
+.cartao-turma small { font-size: 10px; }
+.cartao-turma .marca { width: 16px; height: 16px; font-size: 10px; right: 2px; bottom: 2px; }

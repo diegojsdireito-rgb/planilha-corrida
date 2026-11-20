@@ -1,5 +1,6 @@
 import * as cor from '../corrida.js';
 import { el } from '../comum.js';
+import { PERSONAGENS, personagemDe, miniatura } from '../personagens.js';
 import { prefs, guardar, perfilAtual, temVariosPerfis } from '../dados.js';
 import * as loja from '../loja.js';
 import { ligarLaco, desligarLaco, desligarLacos } from '../som.js';
@@ -58,6 +59,13 @@ export function montar(area, ctl) {
 
   const ctx = tela.getContext('2d');
   let vitrinePose = 'vitrine'; let vitrineAnimando = false;
+  let previa = null; // personagem que está sendo visto na galeria (pode ainda não ser seu)
+  // o que a menina 3D mostra: personagem, pele, cor e estilo de roupa
+  const visualAtual = () => {
+    const c = prefs.carteira;
+    if (previa && previa !== c.personagem) return { ...prefs.personagem, pele: personagemDe(previa).pele, estilo: c.estilo, personagem: previa, palco: 'galeria' };
+    return { ...prefs.personagem, estilo: c.estilo, personagem: c.personagem, palco: previa ? 'galeria' : undefined };
+  };
   let capturada = null; // segundos desde que quem persegue a alcançou (cena da captura)
   let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
@@ -315,7 +323,7 @@ export function montar(area, ctl) {
         }
         temaVisto = tema;
       }
-      mundo.desenhar(s ?? parado, t, { ...prefs.personagem, estilo: prefs.carteira.estilo }, tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose, capturada);
+      mundo.desenhar(s ?? parado, t, visualAtual(), tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose, capturada);
       ctx.clearRect(0, 0, W, H);
       if (s?.supercarga > 0) linhasDeVelocidade(t);
       return;
@@ -537,7 +545,7 @@ export function montar(area, ctl) {
     ctl.som('clique');
     ativa = ctl.ativa();
     const c = prefs.carteira;
-    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas });
+    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas, dom: personagemDe(c.personagem).dom });
     temaVisto = null;
     pegando = 0;
     capturada = null;
@@ -619,6 +627,8 @@ export function montar(area, ctl) {
     vitrinePose = 'vitrine';
     salvarCarteira(loja.completarMissoes(prefs.carteira));
     const c = prefs.carteira;
+    if (aba !== 'personagens') previa = null;
+    if (aba === 'personagens') { galeria(aviso); return; }
     if (aba === 'saguao') {
       const r = recorde();
       const presente = loja.presenteDisponivel(c, hoje());
@@ -626,7 +636,7 @@ export function montar(area, ctl) {
       camada.innerHTML = `<div class="lobby">
         ${topoLobby()}
         <div class="lobby-meio">
-          ${lugarDaMenina('feliz')}
+          <div class="lobby-esquerda">${lugarDaMenina('feliz')}<button class="botao-turma" data-ir="personagens">👥 <b>${personagemDe(c.personagem).nome}</b><small>Trocar personagem</small></button></div>
           <div class="lobby-placas">
             <div class="placa"><span>Recorde</span><b>${r ? fmt(r) : '—'}</b></div>
             <div class="placa"><span>Moedas</span><b>🪙 ${fmt(c.moedas)}</b></div>
@@ -715,6 +725,50 @@ export function montar(area, ctl) {
     desenhar(0);
     animarVitrine();
     ctl.status(aba === 'loja' ? 'Troque suas moedas por roupas, skates e poderes' : aba === 'missoes' ? 'Cumpra missões para ganhar moedas' : 'Escolha o visual, a velocidade e o cenário', 'voce');
+  }
+
+  // ---------- galeria de personagens ----------
+  // Em cima, o personagem em 3D de corpo inteiro com o nome e o botão; embaixo, a turma para escolher.
+  function galeria(aviso = '') {
+    const c = prefs.carteira;
+    previa ??= c.personagem;
+    const p = personagemDe(previa);
+    const tem = c.personagens.includes(p.id);
+    const usando = c.personagem === p.id;
+    const acao = usando ? '<span class="galeria-acao selecionado">Selecionado ✓</span>'
+      : tem ? `<button class="galeria-acao" data-escolher="${p.id}">SELECIONAR</button>`
+        : `<button class="galeria-acao comprar" data-comprar="${p.id}" ${c.moedas < p.preco ? 'disabled' : ''}>${p.preco ? `🪙 ${fmt(p.preco)}` : 'GRÁTIS'}</button>`;
+    camada.className = 'corrida-camada modo-lobby';
+    camada.innerHTML = `<div class="lobby galeria">
+      ${topoLobby()}
+      <div class="galeria-titulo"><h3>${p.nome}</h3><span class="galeria-dom">${p.iconeDom ?? ''} ${p.titulo}</span><small>${p.textoDom ?? ''}</small></div>
+      <div class="galeria-palco">${mundo ? (p.arteCorpo ? `<img class="galeria-arte" src="${p.arteCorpo}" alt="Ilustração de ${p.nome}">` : '') : `<div class="galeria-2d">${p.arteCorpo ? `<img src="${p.arteCorpo}" alt="">` : miniatura(p)}</div>`}</div>
+      ${acao}
+      ${!tem && c.moedas < p.preco ? `<p class="galeria-aviso">Faltam ${fmt(p.preco - c.moedas)} moedas</p>` : aviso ? `<p class="galeria-aviso">${aviso}</p>` : ''}
+      <div class="galeria-grade">${PERSONAGENS.map((x) => {
+        const meu = c.personagens.includes(x.id);
+        return `<button class="cartao-turma${x.id === p.id ? ' vendo' : ''}" data-ver="${x.id}" aria-pressed="${x.id === p.id}">${miniatura(x)}<b>${x.nome}</b>${c.personagem === x.id ? '<i class="marca usando">✓</i>' : meu ? '<i class="marca">✓</i>' : `<small>${x.preco ? `🪙 ${fmt(x.preco)}` : 'Grátis'}</small>`}</button>`;
+      }).join('')}</div>
+      <div class="galeria-base"><button class="botao-lobby" data-ir="saguao"><b>✕</b>Voltar</button><button class="botao-jogar" data-correr>JOGAR</button></div>
+    </div>`;
+    const q = (sel) => camada.querySelectorAll(sel);
+    q('[data-ver]').forEach((b) => { b.onclick = () => { previa = b.dataset.ver; ctl.som('clique'); galeria(); }; });
+    q('[data-ir]').forEach((b) => { b.onclick = () => { ctl.som('clique'); telaInicial(b.dataset.ir); }; });
+    q('[data-correr]').forEach((b) => { b.onclick = () => { previa = null; comecar(); }; });
+    const aplicar = (r, texto) => {
+      if (r.erro) { ctl.som('erro'); galeria(r.erro); return; }
+      salvarCarteira(r.carteira);
+      const escolhido = personagemDe(r.carteira.personagem);
+      if (escolhido.estilo) salvarCarteira({ ...r.carteira, estilos: Array.from(new Set([...r.carteira.estilos, escolhido.estilo])), estilo: escolhido.estilo }); // chega vestindo a roupa dele, que fica de brinde
+      prefs.personagem.pele = escolhido.pele; guardar(); // cada um chega com o seu tom de pele (dá para mudar em Visual)
+      ctl.som('premio'); galeria(texto);
+    };
+    q('[data-escolher]').forEach((b) => { b.onclick = () => aplicar(loja.escolherPersonagem(prefs.carteira, b.dataset.escolher), `${p.nome} vai correr!`); });
+    q('[data-comprar]').forEach((b) => { b.onclick = () => aplicar(loja.comprarPersonagem(prefs.carteira, b.dataset.comprar), `${p.nome} entrou para a turma!`); });
+    desenharHud();
+    desenhar(0);
+    animarVitrine();
+    ctl.status('Escolha quem vai correr', 'voce');
   }
 
   function ligarTelaInicial(aba) {
