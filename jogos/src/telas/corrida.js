@@ -487,6 +487,18 @@ export function montar(area, ctl) {
     'skate-quebrou': 'quebra', quebra: 'quebra', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
   };
 
+  // aviso rápido no meio da tela quando a corrida fica mais rápida
+  const avisoAcelera = el('div', 'aviso-acelera');
+  avisoAcelera.hidden = true;
+  palco.append(avisoAcelera);
+  function mostrarAcelera() {
+    avisoAcelera.textContent = `🔥 Mais rápido! ${Math.round(s.vel * 3.6)} km/h`;
+    avisoAcelera.hidden = false;
+    avisoAcelera.classList.remove('mostra'); void avisoAcelera.offsetWidth; avisoAcelera.classList.add('mostra');
+    clearTimeout(mostrarAcelera.relogio);
+    mostrarAcelera.relogio = setTimeout(() => { avisoAcelera.hidden = true; }, 1600);
+  }
+
   function laco(agora) {
     if (!rodando || !ativa()) { rodando = false; return; }
     const dt = anterior ? (agora - anterior) / 1000 : 0;
@@ -495,6 +507,7 @@ export function montar(area, ctl) {
       cor.avancar(s, dt);
       for (const e of s.eventos) {
         if (e === 'perseguidor') ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
+        else if (e === 'acelera') { ctl.som('turbo'); mostrarAcelera(); }
         else if (SOM[e]) ctl.som(SOM[e]);
       }
       s.eventos.length = 0;

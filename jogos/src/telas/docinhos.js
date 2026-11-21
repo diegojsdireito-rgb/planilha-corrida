@@ -1,6 +1,6 @@
 import * as doce from '../docinhos.js';
 import { el } from '../comum.js';
-import { prefs } from '../dados.js';
+import { prefs, guardar } from '../dados.js';
 import { retrato } from '../personagem.js';
 
 // Cada tipo tem forma e cor próprias: dá para distinguir mesmo sem enxergar bem as cores.
@@ -27,13 +27,30 @@ const ARCOIRIS = '<circle cx="50" cy="50" r="36" fill="#5b3a29"/>' + Array.from(
 const NOME_TIPO = ['coração vermelho', 'pirulito laranja', 'estrela amarela', 'bala verde', 'gota azul', 'diamante roxo'];
 const NOME_ESPECIAL = { linha: 'listrado na horizontal', coluna: 'listrado na vertical', bomba: 'bomba', arcoiris: 'arco-íris' };
 
+const PEDRA_SVG = (forca) => `<path d="M18 62 L14 40 L30 20 L58 14 L80 26 L88 50 L78 78 L50 88 L26 82Z" fill="${forca > 1 ? '#6f7480' : '#9aa0aa'}" stroke="#4d525c" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M30 26 L44 22 M66 22 L76 32 M22 54 L28 46" stroke="#c9ced6" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+  ${forca > 1 ? '<path d="M26 70 L40 66 M60 76 L72 70" stroke="#4d525c" stroke-width="4" stroke-linecap="round"/>' : '<path d="M50 14 L46 34 L56 46 L48 62 L54 88 M46 34 L32 40 M56 46 L72 50" fill="none" stroke="#3b3f47" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>'}`;
+// gelo por cima do doce: bloco azul-claro transparente; com duas camadas, mais grosso e com borda dupla
+const GELO_SVG = (camadas) => `<rect x="6" y="6" width="88" height="88" rx="16" fill="#bfe9ff" fill-opacity="${camadas > 1 ? 0.62 : 0.45}" stroke="#ffffff" stroke-width="${camadas > 1 ? 7 : 4}"/>
+  ${camadas > 1 ? '<rect x="15" y="15" width="70" height="70" rx="10" fill="none" stroke="#e8f8ff" stroke-width="3"/>' : ''}
+  <path d="M18 34 L34 18 M18 50 L50 18" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".85"/>`;
+
 function svgDoce(d) {
+  if (d.pedra) return `<svg viewBox="0 0 100 100">${PEDRA_SVG(d.pedra)}</svg>`;
+  if (d.gelo) return `<svg viewBox="0 0 100 100">${svgDoce({ ...d, gelo: 0 }).replace(/^<svg[^>]*>|<\/svg>$/g, '')}${GELO_SVG(d.gelo)}</svg>`;
   if (d.especial === 'arcoiris') return `<svg viewBox="0 0 100 100">${ARCOIRIS}</svg>`;
   let extra = '';
   if (d.especial === 'linha') extra = '<path d="M14 44 H86 M14 56 H86" stroke="#fff" stroke-width="6" opacity=".9" stroke-linecap="round"/>';
   if (d.especial === 'coluna') extra = '<path d="M44 14 V86 M56 14 V86" stroke="#fff" stroke-width="6" opacity=".9" stroke-linecap="round"/>';
   if (d.especial === 'bomba') extra = '<circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="10 7"/>';
   return `<svg viewBox="0 0 100 100">${DESENHO[d.tipo]}${extra}</svg>`;
+}
+
+// Bônus guardados (por jogador). Quem nunca jogou com bônus ganha alguns de cada para começar.
+function estoque() {
+  prefs.bonusDocinhos ??= Object.fromEntries(doce.BONUS.map((b) => [b.id, doce.BONUS_INICIAL]));
+  for (const b of doce.BONUS) prefs.bonusDocinhos[b.id] ??= doce.BONUS_INICIAL;
+  return prefs.bonusDocinhos;
 }
 
 const ELOGIOS = ['Doce!', 'Uau!', 'Que delícia!', 'Incrível!', 'Demais!'];
@@ -58,11 +75,93 @@ export function montar(area, ctl) {
   const botoes = el('div', 'acoes-solo');
   const dicaEl = el('button', 'botao secundario', '🤖 Dica do robô');
   botoes.append(dicaEl);
-  area.append(topo, fases, tabuleiro, botoes);
+  const barraBonus = el('div', 'doce-bonus');
+  barraBonus.setAttribute('role', 'group'); barraBonus.setAttribute('aria-label', 'Bônus');
+  area.append(topo, fases, tabuleiro, barraBonus, botoes);
   mascote.append(fala);
 
   let f; let grade; let pontos; let movimentos; let ocupado = false; let acabou = false;
   let selecionada = null; let ocioso = null;
+  let bonusAtivo = null; let trocaA = null; // bônus escolhido, esperando o toque na mesa
+
+  function desenharBonus() {
+    const est = estoque();
+    barraBonus.innerHTML = '';
+    for (const b of doce.BONUS) {
+      const botao = el('button', `bonus${bonusAtivo === b.id ? ' ativo' : ''}`, `<span class="ic">${b.icone}</span><span class="nome">${b.nome}</span><b class="qtd">${est[b.id]}</b>`);
+      botao.disabled = !est[b.id] || acabou || (ocupado && bonusAtivo !== b.id);
+      botao.title = b.texto; botao.setAttribute('aria-label', `${b.nome}: ${b.texto} Você tem ${est[b.id]}.`);
+      botao.setAttribute('aria-pressed', String(bonusAtivo === b.id));
+      botao.onclick = () => escolherBonus(b);
+      barraBonus.append(botao);
+    }
+    tabuleiro.classList.toggle('mirando', Boolean(bonusAtivo));
+  }
+
+  function gastar(id) { estoque()[id]--; guardar(); }
+
+  async function escolherBonus(b) {
+    if (ocupado || acabou) return;
+    pararDica();
+    selecionada = null;
+    if (bonusAtivo === b.id) { bonusAtivo = null; trocaA = null; ctl.som('clique'); falar('Bônus guardado.'); desenharBonus(); desenharGrade(false); return; }
+    ctl.som('clique');
+    if (b.id === 'mais5') {
+      gastar(b.id); movimentos += 5; desenharPlacar(); desenharBonus(); salvar();
+      falar('+5 movimentos!'); desenharMascote('uau'); ctl.som('premio');
+      return;
+    }
+    if (b.id === 'mistura') {
+      gastar(b.id); desenharBonus();
+      tabuleiro.classList.add('mistura'); falar('Misturando!');
+      grade = doce.embaralhar(grade);
+      desenharGrade(false);
+      if (!await ctl.esperar(450)) return;
+      tabuleiro.classList.remove('mistura'); salvar(); agendarDica();
+      return;
+    }
+    bonusAtivo = b.id; trocaA = null;
+    falar(b.texto);
+    desenharBonus();
+  }
+
+  // O toque na mesa com um bônus escolhido.
+  async function usarBonus(i) {
+    const id = bonusAtivo;
+    let r = null;
+    if (id === 'troca') {
+      if (trocaA === null) { trocaA = i; selecionada = i; ctl.som('clique'); desenharGrade(false); falar('Agora o vizinho.'); return; }
+      if (trocaA === i) { trocaA = null; selecionada = null; desenharGrade(false); return; }
+      if (!doce.vizinhas(trocaA, i)) { trocaA = i; selecionada = i; ctl.som('clique'); desenharGrade(false); return; }
+      const a = trocaA; trocaA = null; selecionada = null;
+      r = doce.trocaLivre(grade, a, i, f.tipos);
+      if (!r) { ctl.som('erro'); falar('Doce congelado e pedra não saem do lugar.'); desenharGrade(false); return; }
+      const ea = elementos.get(grade[a].id); const eb = elementos.get(grade[i].id);
+      posicionar(ea, i); posicionar(eb, a);
+    } else if (id === 'martelo') r = doce.martelo(grade, i, f.tipos);
+    else if (id === 'vassoura') r = doce.vassoura(grade, i, f.tipos);
+    else if (id === 'arcoiris') {
+      if (grade[i].especial === 'arcoiris' || grade[i].pedra) { ctl.som('erro'); falar('Escolha um doce, não uma pedra.'); return; }
+      gastar(id); bonusAtivo = null;
+      elementos.get(grade[i].id)?.classList.add('estoura');
+      ctl.som('estrela');
+      ocupado = true;
+      if (!await ctl.esperar(200)) return;
+      elementos.get(grade[i].id)?.remove(); elementos.delete(grade[i].id);
+      grade = doce.virarArcoiris(grade, i);
+      ocupado = false;
+      desenharGrade(false); desenharBonus(); salvar();
+      falar('Troque o arco-íris com uma cor!');
+      agendarDica();
+      return;
+    }
+    if (!r) return;
+    gastar(id); bonusAtivo = null;
+    desenharBonus();
+    ctl.som(id === 'martelo' ? 'captura' : id === 'vassoura' ? 'captura' : 'clique');
+    await animar(r);
+    desenharBonus();
+  }
   const elementos = new Map();
 
   const desenharMascote = (humor = 'feliz') => {
@@ -79,8 +178,11 @@ export function montar(area, ctl) {
   function desenharPlacar() {
     const pct = Math.min(1, pontos / (f.meta * 2));
     const marcas = [1, 1.5, 2].map((m) => `<i style="left:${(m / 2) * 100}%" class="${pontos >= f.meta * m ? 'ok' : ''}">★</i>`).join('');
+    const ob = doce.obstaculos(grade);
+    const metaOb = (f.gelo ? `<span class="meta-ob ${ob.gelo ? '' : 'ok'}" title="Gelo para quebrar">🧊 ${ob.gelo || '✓'}</span>` : '')
+      + (f.pedra ? `<span class="meta-ob ${ob.pedra ? '' : 'ok'}" title="Pedras para quebrar">🪨 ${ob.pedra || '✓'}</span>` : '');
     placar.innerHTML = `
-      <div class="linha-placar"><span>Pontos</span><span>Movimentos <b class="${movimentos <= 3 ? 'poucos' : ''}">${movimentos}</b></span></div>
+      <div class="linha-placar"><span>Pontos ${metaOb}</span><span>Movimentos <b class="${movimentos <= 3 ? 'poucos' : ''}">${movimentos}</b></span></div>
       <div class="pontos-doce">${pontos.toLocaleString('pt-BR')}<small> / meta ${f.meta.toLocaleString('pt-BR')}</small></div>
       <div class="barra-meta"><span style="width:${pct * 100}%"></span>${marcas}</div>`;
   }
@@ -126,13 +228,14 @@ export function montar(area, ctl) {
           e.style.transition = '';
         }
       }
-      if (e.dataset.desenho !== `${d.tipo}${d.especial}`) {
+      const chave = `${d.tipo}${d.especial}${d.gelo ?? 0}${d.pedra ?? 0}`;
+      if (e.dataset.desenho !== chave) {
         e.innerHTML = svgDoce(d);
-        e.dataset.desenho = `${d.tipo}${d.especial}`;
+        e.dataset.desenho = chave;
       }
       e.dataset.i = i;
       e.classList.toggle('sel', i === selecionada);
-      e.setAttribute('aria-label', `${d.especial ? NOME_ESPECIAL[d.especial] : ''} ${d.especial === 'arcoiris' ? '' : NOME_TIPO[d.tipo]}`.trim());
+      e.setAttribute('aria-label', d.pedra ? `pedra${d.pedra > 1 ? ' dura' : ''}` : `${d.especial ? NOME_ESPECIAL[d.especial] : ''} ${d.especial === 'arcoiris' ? '' : NOME_TIPO[d.tipo]}${d.gelo ? ' congelado' : ''}`.trim());
       posicionar(e, i);
     });
     for (const [id, e] of elementos) if (!vivos.has(id)) { e.remove(); elementos.delete(id); }
@@ -153,6 +256,7 @@ export function montar(area, ctl) {
     if (!r) {
       posicionar(ea, a); posicionar(eb, b);
       ctl.som('erro');
+      if (doce.preso(grade[a]) || doce.preso(grade[b])) falar('Esse não sai do lugar: estoure doces ao lado!');
       await ctl.esperar(220);
       ocupado = false;
       desenharGrade(false);
@@ -161,6 +265,12 @@ export function montar(area, ctl) {
     }
     movimentos--;
     desenharPlacar();
+    await animar(r);
+  }
+
+  // Mostra as etapas de uma jogada ou de um bônus: estoura, cai, cascatas e pontos.
+  async function animar(r) {
+    ocupado = true;
     let passo = 0;
     for (const etapa of r.etapas) {
       if (etapa.embaralhou) {
@@ -183,6 +293,7 @@ export function montar(area, ctl) {
     if (etapaComEspecial(r)) falar('Doce especial!');
     desenharMascote();
     ocupado = false;
+    desenharBonus();
     if (movimentos <= 0) return terminar();
     salvar();
     agendarDica();
@@ -193,21 +304,31 @@ export function montar(area, ctl) {
   function terminar() {
     acabou = true;
     pararDica();
-    const est = doce.estrelas(pontos, f.meta);
-    const venceu = est > 0;
+    const sobra = doce.obstaculos(grade).total;
+    const venceu = doce.venceu(pontos, f, grade);
+    const est = venceu ? doce.estrelas(pontos, f.meta) : 0;
     desenharMascote(venceu ? 'uau' : 'feliz');
     const cartao = el('div', 'faixa-fim doce-fim', `<div>
       <strong>${venceu ? `Fase ${f.nivel} concluída!` : 'Quase lá!'}</strong>
       <span class="estrelas-fim">${'★'.repeat(est)}${'☆'.repeat(3 - est)}</span>
-      <small>${pontos.toLocaleString('pt-BR')} pontos · meta ${f.meta.toLocaleString('pt-BR')}</small>
+      <small>${pontos.toLocaleString('pt-BR')} pontos · meta ${f.meta.toLocaleString('pt-BR')}${sobra ? ` · faltou quebrar ${sobra}` : ''}</small>
     </div>`);
     cartao.style.pointerEvents = 'auto';
+    // prêmio: um bônus sorteado por estrela
+    if (venceu) {
+      const ganhos = Array.from({ length: est }, () => doce.BONUS[Math.floor(Math.random() * doce.BONUS.length)]);
+      for (const g of ganhos) estoque()[g.id]++;
+      guardar();
+      cartao.firstChild.append(el('small', 'premio-bonus', `Você ganhou: ${ganhos.map((g) => `${g.icone} ${g.nome}`).join(' · ')}`));
+      desenharBonus();
+    }
     const b = el('button', 'botao', venceu ? 'Próxima fase ›' : 'Tentar de novo');
     b.onclick = () => { ctl.som('clique'); cartao.remove(); iniciar(null, venceu ? f.nivel + 1 : f.nivel); };
     cartao.firstChild.append(b);
-    ctl.fim(venceu ? 'vitoria' : 'derrota', venceu ? `Fase ${f.nivel} concluída com ${est} estrela${est > 1 ? 's' : ''}!` : `Faltaram ${(f.meta - pontos).toLocaleString('pt-BR')} pontos. Tente de novo!`, null, { nivel: f.nivel, pontos, estrelas: est });
+    ctl.fim(venceu ? 'vitoria' : 'derrota', venceu ? `Fase ${f.nivel} concluída com ${est} estrela${est > 1 ? 's' : ''}!` : pontos < f.meta ? `Faltaram ${(f.meta - pontos).toLocaleString('pt-BR')} pontos${sobra ? ` e ${sobra} ${sobra === 1 ? 'obstáculo' : 'obstáculos'}` : ''}. Tente de novo!` : `Faltou quebrar ${sobra} ${sobra === 1 ? 'obstáculo' : 'obstáculos'}. Tente de novo!`, null, { nivel: f.nivel, pontos, estrelas: est });
     tabuleiro.append(cartao);
     desenharFases();
+    desenharBonus();
   }
 
   // Dica do robô: depois de um tempo parado, ou no botão.
@@ -233,6 +354,7 @@ export function montar(area, ctl) {
   tabuleiro.addEventListener('pointerdown', (e) => {
     const alvo = e.target.closest('.doce');
     if (!alvo || ocupado || acabou) return;
+    if (bonusAtivo) { usarBonus(Number(alvo.dataset.i)); return; }
     inicio = { i: Number(alvo.dataset.i), x: e.clientX, y: e.clientY };
     tabuleiro.setPointerCapture?.(e.pointerId);
   });
@@ -260,7 +382,7 @@ export function montar(area, ctl) {
 
   function iniciar(salvo, nivel) {
     pararDica();
-    acabou = false; ocupado = false; selecionada = null;
+    acabou = false; ocupado = false; selecionada = null; bonusAtivo = null; trocaA = null;
     tabuleiro.querySelectorAll('.faixa-fim').forEach((x) => x.remove());
     for (const e of elementos.values()) e.remove();
     elementos.clear();
@@ -269,7 +391,7 @@ export function montar(area, ctl) {
       ({ grade, pontos, movimentos } = salvo);
     } else {
       f = doce.fase(nivel ?? nivelLiberado());
-      grade = doce.novaGrade(f.tipos);
+      grade = doce.comObstaculos(doce.novaGrade(f.tipos), f);
       pontos = 0;
       movimentos = f.movimentos;
       ctl.apagar();
@@ -278,8 +400,9 @@ export function montar(area, ctl) {
     desenharPlacar();
     desenharFases();
     desenharGrade();
-    ctl.status(salvo ? 'Partida retomada' : `Faça ${f.meta.toLocaleString('pt-BR')} pontos em ${f.movimentos} movimentos`, 'voce');
-    falar(salvo ? 'Vamos continuar!' : f.nivel === 1 ? 'Arraste um doce para trocar!' : `Fase ${f.nivel}!`);
+    desenharBonus();
+    ctl.status(salvo ? 'Partida retomada' : `Faça ${f.meta.toLocaleString('pt-BR')} pontos${f.gelo || f.pedra ? ` e quebre ${[f.gelo ? 'o gelo' : '', f.pedra ? 'as pedras' : ''].filter(Boolean).join(' e ')}` : ''} em ${f.movimentos} movimentos`, 'voce');
+    falar(salvo ? 'Vamos continuar!' : f.nivel === 1 ? 'Arraste um doce para trocar!' : f.nivel === 3 ? 'Estoure doces perto do gelo para quebrar!' : f.nivel === 4 ? 'Estoure doces ao lado das pedras!' : `Fase ${f.nivel}!`);
     agendarDica();
   }
 

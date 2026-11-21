@@ -24,11 +24,25 @@ export const JANELA_ARRANCADA = 6;
 // Quem persegue a menina: começa colado nela, fica para trás e volta a chegar perto quando ela tropeça.
 export const PERSEGUIDOR = { perto: 0.9, longe: 14, largada: 3, tropeco: 4 }; // segundos do começo em que dá para decolar com a mochila de bônus
 
+// Velocidade: começa em "base" e vai subindo com a distância, sem parar, mas cada vez mais devagar
+// (nunca passa de "topo"). Na metade do caminho até o topo ela chega depois de "meia" metros.
 const VELOCIDADE = {
-  facil: { base: 11, max: 24, ganho: 0.14 },
-  medio: { base: 13, max: 28, ganho: 0.18 },
-  dificil: { base: 15, max: 33, ganho: 0.22 },
+  facil: { base: 11, topo: 30, meia: 1500 },
+  medio: { base: 13, topo: 36, meia: 1300 },
+  dificil: { base: 15, topo: 42, meia: 1100 },
 };
+export function velocidadeEm(nivel, dist) {
+  const c = VELOCIDADE[nivel] ?? VELOCIDADE.medio;
+  return c.base + (c.topo - c.base) * (dist / (dist + c.meia));
+}
+// O contrário: a distância em que a corrida chega a essa velocidade (usada nos testes).
+export function distanciaPara(nivel, vel) {
+  const c = VELOCIDADE[nivel] ?? VELOCIDADE.medio;
+  const f = Math.min(0.999, Math.max(0, (vel - c.base) / (c.topo - c.base)));
+  return (c.meia * f) / (1 - f);
+}
+// A cada tantas unidades de velocidade ganhas, aparece o aviso "mais rápido".
+export const DEGRAU_ACELERA = 2;
 
 // Skates: todos protegem de uma batida; cada um tem um efeito a mais enquanto está ativo.
 export const SKATES = {
@@ -179,11 +193,13 @@ function colide(s, o) {
 export function avancar(s, dt, aleatorio = Math.random) {
   if (!s.vivo) return s;
   dt = Math.min(dt, 0.05);
-  const cfg = VELOCIDADE[s.nivel];
   const sk = skateAtivo(s);
   s.t += dt;
   const turbo = (s.supercarga > 0 ? 1.4 : 1) * (s.voo > 0 && s.vooTipo === 'nave' ? 1.25 : 1);
-  s.vel = Math.min(cfg.max, cfg.base + cfg.ganho * s.t) * turbo * (sk?.velocidade ?? 1);
+  const corrida = velocidadeEm(s.nivel, s.dist);
+  const degrau = Math.floor((corrida - VELOCIDADE[s.nivel].base) / DEGRAU_ACELERA);
+  if (degrau > (s.degrau ?? 0)) { s.degrau = degrau; s.eventos.push('acelera'); }
+  s.vel = corrida * turbo * (sk?.velocidade ?? 1);
   const dz = s.vel * dt;
   s.dist += dz;
   if (s.dobro > 0) s.bonus += dz;

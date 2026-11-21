@@ -111,6 +111,7 @@ function montarPrefs(dados) {
     carteira: normalizar(inicial.carteira),
     cenario: inicial.cenario ?? 'passeio',
     perseguidorFloresta: inicial.perseguidorFloresta ?? 'leao',
+    bonusDocinhos: inicial.bonusDocinhos ?? null, // quantos bônus do Docinhos o jogador tem (null = ainda não ganhou os iniciais)
   };
   // Migra o placar da primeira versão, que não guardava histórico.
   if (inicial.placar && !inicial.historico) {
