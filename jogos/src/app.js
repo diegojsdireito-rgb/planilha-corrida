@@ -17,6 +17,13 @@ import * as telaDocinhos from './telas/docinhos.js';
 import * as telaCorrida from './telas/corrida.js';
 import * as telaPintar from './telas/pintar.js';
 import * as telaMahjong from './telas/mahjong.js';
+import * as telaDomino from './telas/domino.js';
+import * as telaMancala from './telas/mancala.js';
+import * as telaBatalha from './telas/batalha.js';
+import * as telaCores from './telas/cores.js';
+import * as telaLabirinto from './telas/labirinto.js';
+import * as telaPescaria from './telas/pescaria.js';
+import * as telaBichinho from './telas/bichinho.js';
 import { DESENHOS } from './pintar-desenhos.js';
 import { retrato } from './personagem.js';
 
@@ -156,7 +163,11 @@ const JOGOS = [
     'O nível vale para a próxima grade. No computador, dá para usar o teclado e as setas.',
   ] },
 ];
-for (const j of JOGOS) j.icone = ICONES[j.id];
+// Os jogos mais novos trazem a descrição e o ícone no próprio módulo da tela.
+const deTela = (tela) => ({ ...tela.INFO, tela, icone: tela.ICONE, ...(tela.resumo ? { resumo: tela.resumo } : {}) });
+JOGOS.splice(JOGOS.findIndex((j) => j.id === 'velha') + 1, 0, ...[telaDomino, telaMancala, telaBatalha, telaCores].map(deTela));
+JOGOS.push(...[telaLabirinto, telaPescaria, telaBichinho].map(deTela));
+for (const j of JOGOS) j.icone ??= ICONES[j.id];
 
 let sairDaTela = null;
 

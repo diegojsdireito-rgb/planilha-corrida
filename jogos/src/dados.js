@@ -112,6 +112,7 @@ function montarPrefs(dados) {
     cenario: inicial.cenario ?? 'passeio',
     perseguidorFloresta: inicial.perseguidorFloresta ?? 'leao',
     bonusDocinhos: inicial.bonusDocinhos ?? null, // quantos bônus do Docinhos o jogador tem (null = ainda não ganhou os iniciais)
+    bichinho: inicial.bichinho ?? null, // o bichinho virtual (null = ainda não adotou)
   };
   // Migra o placar da primeira versão, que não guardava histórico.
   if (inicial.placar && !inicial.historico) {
@@ -178,7 +179,7 @@ export function montarCopia(jogos) {
     const s = lerSalvo(id);
     if (s) salvos[id] = s;
   }
-  return { app: MARCA, versao: 1, criada: Date.now(), perfil: perfilAtual().nome, nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, perseguidorFloresta: prefs.perseguidorFloresta, historico: prefs.historico, salvos };
+  return { app: MARCA, versao: 1, criada: Date.now(), perfil: perfilAtual().nome, nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, perseguidorFloresta: prefs.perseguidorFloresta, bonusDocinhos: prefs.bonusDocinhos, bichinho: prefs.bichinho, historico: prefs.historico, salvos };
 }
 
 const chaveDoRegistro = (h) => `${h.j}|${h.r}|${h.t}|${h.tempo ?? ''}`;
@@ -217,6 +218,8 @@ export function restaurarCopia(texto, jogos) {
   prefs.historico = r.historico;
   if (copia.personagem) prefs.personagem = copia.personagem;
   if (copia.carteira) prefs.carteira = mesclarCarteiras(prefs.carteira, copia.carteira);
+  if (copia.bichinho && !prefs.bichinho) prefs.bichinho = copia.bichinho;
+  if (copia.bonusDocinhos && !prefs.bonusDocinhos) prefs.bonusDocinhos = copia.bonusDocinhos;
   guardar();
   for (const [id, s] of Object.entries(r.salvos)) {
     try { localStorage.setItem(SALVO + id, JSON.stringify(s)); } catch { /* sem armazenamento */ }
