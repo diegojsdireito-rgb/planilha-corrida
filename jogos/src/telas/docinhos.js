@@ -2,6 +2,7 @@ import * as doce from '../docinhos.js';
 import { el } from '../comum.js';
 import { prefs, guardar } from '../dados.js';
 import { retrato } from '../personagem.js';
+import { CENARIOS, placa, nuvem, estrelinha } from './docinhos-mapa-arte.js';
 
 // Cada tipo tem forma e cor próprias: dá para distinguir mesmo sem enxergar bem as cores.
 const DESENHO = [
@@ -214,13 +215,34 @@ export function montar(area, ctl) {
       const porRegiao = doce.TOTAL_FASES / doce.REGIOES.length;
       const topo = (doce.TOTAL_FASES - (k + 1) * porRegiao) * ESPACO + BORDA - ESPACO / 2;
       const alto = porRegiao * ESPACO;
-      return `<div class="mapa-regiao" style="top:${Math.max(0, topo)}px;height:${alto + (k === 0 ? BORDA : 0) + (k === doce.REGIOES.length - 1 ? BORDA : 0)}px;background:linear-gradient(${r.cor[1]}, ${r.cor[0]})"><span>${r.icone} ${r.nome}</span></div>`;
+      return `<div class="mapa-regiao" style="top:${Math.max(0, topo)}px;height:${alto + (k === 0 ? BORDA : 0) + (k === doce.REGIOES.length - 1 ? BORDA : 0)}px;background-color:${r.cor[0]};--c1:${r.cor[1]};--c2:${r.cor[0]}"></div>`;
     }).join('');
     // docinhos espalhados pelos lados do caminho
-    const enfeites = Array.from({ length: doce.TOTAL_FASES / 2 }, (_, k) => {
-      const n = k * 2 + 1.5; const q = posicao(n); const lado = q.x > 50 ? -1 : 1;
-      return `<span class="mapa-enfeite" style="left:${q.x + lado * 30}%;top:${q.y - 30}px">${svgDoce({ tipo: k % 6, especial: null })}</span>`;
-    }).join('');
+    // cenário: dos lados do caminho, desenhos do lugar; nuvens passando e estrelinhas piscando
+    let semente = 9;
+    const sorte = () => { semente = (semente * 16807) % 2147483647; return semente / 2147483647; };
+    const porRegiao = doce.TOTAL_FASES / doce.REGIOES.length;
+    const enfeites = [];
+    for (let n = 1; n <= doce.TOTAL_FASES; n++) {
+      const cena = CENARIOS[Math.min(CENARIOS.length - 1, Math.floor((n - 1) / porRegiao))];
+      const q = posicao(n + 0.5);
+      const lado = q.x > 50 ? -1 : 1; // do lado oposto ao caminho
+      const x = Math.min(86, Math.max(14, q.x + lado * (30 + sorte() * 12)));
+      const tam = 56 + sorte() * 26;
+      const peca = cena.pecas[Math.floor(sorte() * cena.pecas.length)]();
+      // o espaço antes de cada lugar novo fica para a placa
+      if (n % porRegiao !== 0) enfeites.push(`<span class="mapa-deco${sorte() < 0.35 ? ' balanca' : ''}" style="left:${x}%;top:${q.y - tam / 2}px;width:${tam}px;animation-delay:${(-sorte() * 3).toFixed(2)}s">${peca}</span>`);
+      if (n % 2) enfeites.push(`<span class="mapa-enfeite" style="left:${Math.min(92, Math.max(8, q.x - lado * 34))}%;top:${posicao(n).y - 20}px">${svgDoce({ tipo: n % 6, especial: null })}</span>`);
+      if (n % 3 === 0) enfeites.push(`<span class="mapa-brilho" style="left:${(8 + sorte() * 84).toFixed(1)}%;top:${(posicao(n).y + sorte() * 60 - 30).toFixed(0)}px;animation-delay:${(-sorte() * 2).toFixed(2)}s">${estrelinha()}</span>`);
+      if (n % 5 === 2) enfeites.push(`<span class="mapa-nuvem" style="top:${posicao(n).y - 40}px;animation-duration:${(26 + sorte() * 20).toFixed(0)}s;animation-delay:${(-sorte() * 40).toFixed(1)}s">${nuvem()}</span>`);
+    }
+    // placa com o nome no começo de cada lugar
+    doce.REGIOES.forEach((r, k) => {
+      // entre a última fase do lugar anterior e a primeira deste, do lado oposto da trilha
+      const n = k * porRegiao + 1; const q = posicao(n); const ant = posicao(Math.max(1, n - 1));
+      const meioX = k ? (q.x + ant.x) / 2 : q.x; const meioY = k ? (q.y + ant.y) / 2 : q.y + 60;
+      enfeites.push(`<span class="mapa-placa-lugar" style="left:${meioX > 50 ? 23 : 77}%;top:${meioY + 22}px">${placa(r.nome, r.icone, CENARIOS[k].placa)}</span>`);
+    });
     const nos = pontos.map((q, k) => {
       const n = k + 1; const m = p.melhor[n];
       const estado = n > p.liberada ? 'trancada' : n === atual ? 'atual' : m?.estrelas ? 'feita' : 'aberta';
@@ -236,7 +258,7 @@ export function montar(area, ctl) {
     mapa.innerHTML = `
       <div class="mapa-topo"><span>⭐ <b>${p.estrelas}</b> / ${p.maxEstrelas}</span><span>Fase <b>${p.liberada}</b> de ${doce.TOTAL_FASES}</span></div>
       <div class="mapa-rolagem"><div class="mapa-caminho" style="height:${altura}px">
-        ${regioes}${enfeites}
+        ${regioes}${enfeites.join('')}
         <svg class="mapa-trilha"></svg>
         ${nos}
       </div></div>
