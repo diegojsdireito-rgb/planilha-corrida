@@ -372,6 +372,9 @@ export function criarMenina() {
 
   // ---- pernas: quadril -> joelho -> pé ----
   // quadril: gira ao contrário dos ombros a cada passada, como numa corrida de verdade
+  const matMola = new THREE.MeshStandardMaterial({ color: 0xd8dde6, metalness: 0.7, roughness: 0.25, emissive: 0x3a4250 });
+  const matMolaPe = new THREE.MeshStandardMaterial({ color: 0x35c46a, roughness: 0.5 }); // base verde, a cor do item do tênis de mola
+  const molas = [];
   const PERNA = 0.84; // pernas mais curtas que o natural: proporção de desenho animado
   const ALTURA_QUADRIL = 0.62 - 0.585 * (1 - PERNA);
   const quadril = new THREE.Group(); quadril.position.y = ALTURA_QUADRIL; corpo.add(quadril);
@@ -393,6 +396,11 @@ export function criarMenina() {
     const dobraMeia = peca(new THREE.TorusGeometry(0.0345, 0.005, 6, 16), mat.branco); dobraMeia.rotation.x = Math.PI / 2; dobraMeia.position.y = 0.03; meia.add(dobraMeia);
     // tênis: solado com formato de pé, cabedal, biqueira, língua, cadarço cruzado e faixas
     const tenis = new THREE.Group(); tenis.position.set(0, -0.3 * PERNA, 0.035); joelho.add(tenis);
+    // mola embaixo do tênis: aparece com o super pulo ligado
+    const mola = new THREE.Group(); mola.visible = false; mola.position.set(0, -0.05, 0.005); tenis.add(mola);
+    for (let k = 0; k < 5; k++) { const anel = peca(new THREE.TorusGeometry(0.04, 0.009, 6, 18), matMola); anel.rotation.x = Math.PI / 2 + (k % 2 ? 0.25 : -0.25); anel.position.y = -0.012 - k * 0.02; mola.add(anel); }
+    const pezinho = peca(new THREE.CylinderGeometry(0.046, 0.046, 0.012, 16), matMolaPe); pezinho.position.y = -0.11; mola.add(pezinho);
+    molas.push(mola);
     const sapato = criarTenis({ cabedal: mat.tenis, sola: mat.sola, detalhe: mat.detalhe, cadarco: mat.cadarco, borracha: mat.sola });
     sapato.scale.setScalar(1.5); sapato.position.set(0, 0.059, -0.004); tenis.add(sapato);
     // cano alto (estilos street e jeans): sobe pelo tornozelo
@@ -848,7 +856,7 @@ export function criarMenina() {
   // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
   const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'cabecaZ', 'vento', 'balanco',
     'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1', 'm0', 'm1', 'olhar', 'palpebra', 'esticar'];
-  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0, capturada: 0 };
+  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0, capturada: 0, saltitante: 0 };
   // ombro: primeiro torce o braço no próprio eixo (y), depois leva à frente (x) e abre para o lado (z).
   // A torção é o que permite pôr a mão na cintura com o cotovelo para fora.
   for (const b of bracos) b.ombro.rotation.order = 'ZXY';
@@ -901,6 +909,35 @@ export function criarMenina() {
         r[`oz${k}`] = lado(k) * (0.14 - 0.1 * Math.max(0, aw) + 0.08 * Math.max(0, -aw));
         r[`c${k}`] = -1.45 - 0.4 * Math.max(0, aw) + 0.3 * Math.max(0, -aw); // fecha na frente, abre atrás
         r[`m${k}`] = -0.15 - 0.22 * Math.sin(ff + Math.PI - 0.8); // o pulso vem atrasado em relação ao braço
+      }
+      return r;
+    },
+    saltitante: (s, t, f0) => {
+      // Corrida de super pulo (tênis de mola): passadas mais longas e mais lentas, cada uma um
+      // pequeno salto — o corpo sobe bem alto entre um passo e outro, a perna da frente vai alta e
+      // a de trás estica toda no impulso; os braços acompanham com bastante força.
+      const f = f0 * 0.74;
+      const passo = Math.abs(Math.sin(f)); // 1 no meio do salto, 0 quando o pé bate no chão
+      const r = {
+        posY: 0.1 + 0.28 * passo ** 0.75, esticar: 0.05 * passo - 0.04 * (1 - passo) ** 4,
+        quadrilY: 0.24 * Math.sin(f), troncoY: -0.36 * Math.sin(f), cabecaY: 0.12 * Math.sin(f),
+        quadrilZ: 0.05 * Math.cos(f), troncoZ: -0.04 * Math.cos(f),
+        troncoX: 0.14 - 0.06 * passo, cabecaX: -0.12 + 0.04 * passo,
+        vento: 0.3 + 0.2 * passo, balanco: 0.12,
+      };
+      for (const k of [0, 1]) {
+        const ff = f + (k ? Math.PI : 0);
+        const sw = Math.sin(ff); const cw = Math.cos(ff);
+        r[`cx${k}`] = -0.35 - 0.95 * sw - 0.25 * Math.max(0, sw) ** 2 + 0.2 * Math.max(0, -sw) ** 2; // abre bem as pernas
+        r[`j${k}`] = 0.12 + 1.5 * Math.max(0, cw) ** 1.4 + 0.5 * Math.max(0, sw) ** 2; // joelho da frente bem alto
+        r[`p${k}`] = 0.7 * Math.max(0, -sw) ** 1.4 - 0.25 * Math.max(0, sw) ** 2;
+        r[`cz${k}`] = lado(k) * 0.04;
+        const aw = Math.sin(ff + Math.PI - 0.1);
+        r[`ox${k}`] = -0.2 - 1.3 * aw;
+        r[`oy${k}`] = -lado(k) * 0.2 * Math.max(0, aw);
+        r[`oz${k}`] = lado(k) * (0.22 + 0.12 * Math.max(0, -aw));
+        r[`c${k}`] = -1.25 - 0.35 * Math.max(0, aw) + 0.45 * Math.max(0, -aw);
+        r[`m${k}`] = -0.1 - 0.25 * Math.sin(ff + Math.PI - 0.8);
       }
       return r;
     },
@@ -1052,6 +1089,7 @@ export function criarMenina() {
     else if (s.y > 0.05) estado = 'ar';
     else if (pouso > 0) estado = 'pouso';
     else if (naPrancha) estado = 'skate';
+    else if (s.superPulo > 0) estado = 'saltitante';
     const k = dtp >= 1 ? 1 : 1 - Math.exp(-dtp * 14);
     for (const nome of Object.keys(pesos)) pesos[nome] += ((nome === estado ? 1 : 0) - pesos[nome]) * k;
     const a = Object.fromEntries(JUNTAS.map((j) => [j, 0]));
@@ -1125,6 +1163,7 @@ export function criarMenina() {
     const naNave = s.voo > 0 && s.vooTipo === 'nave';
     const deCapa = s.voo > 0 && s.vooTipo === 'capa';
     skate.visible = naPrancha && !naNave;
+    for (const m of molas) { m.visible = s.superPulo > 0 && !naPrancha && s.voo <= 0; m.scale.y = 0.75 + 0.5 * Math.min(1, pesos.saltitante * Math.abs(Math.sin(fase * 0.74))); } // a mola estica no salto e encolhe na pisada
     if (naPrancha) {
       matDeck.color.setHex(SKATE_COR[s.skateTipo] ?? SKATE_COR.classico);
       rodas.visible = s.skateTipo === 'classico';
@@ -1194,7 +1233,7 @@ export function criarMenina() {
     if (poseForcada) {
       // no saguão e na tela de fim: só ela, sem skate, mochila nem auras
       skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true; mochilaCostas.visible = temMochila;
-      nave.visible = false; teleFeixe.visible = false; for (const parte of partesCapa) parte.visible = false;
+      nave.visible = false; teleFeixe.visible = false; for (const parte of partesCapa) parte.visible = false; for (const m of molas) m.visible = false;
       for (const f of fumaca) f.sp.visible = false;
       raiz.position.y = 0;
     }
