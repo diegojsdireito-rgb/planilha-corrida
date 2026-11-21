@@ -51,6 +51,7 @@ const ARQUIVOS = [
   'src/sudoku.js',
   'src/telas/corrida.js',
   'src/telas/damas.js',
+  'src/telas/docinhos-mapa-arte.js',
   'src/telas/docinhos.js',
   'src/telas/lig4.js',
   'src/telas/ludo.js',
