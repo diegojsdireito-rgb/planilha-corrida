@@ -1,0 +1,31 @@
+/* Pescaria: lago visto de lado */
+.pescaria-hud { display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto 10px; background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 8px 12px; font-variant-numeric: tabular-nums; }
+.pescaria-hud b { font-family: var(--titulos); font-size: 18px; }
+.pesc-tempo { white-space: nowrap; }
+.pesc-tempo.pouco b { color: var(--vermelho); animation: pesc-pulsa 1s ease-in-out infinite; display: inline-block; }
+@keyframes pesc-pulsa { 50% { transform: scale(1.15); } }
+.pesc-pontos { white-space: nowrap; font-size: 14px; color: var(--suave); }
+.pesc-pontos b { color: var(--texto); }
+.pesc-barra { position: relative; flex: 1; height: 12px; border-radius: 99px; background: var(--preenchido); margin: 0 6px 12px; }
+.pesc-enche { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #5fd0ff, #2f9e62 55%, #f2b100); transition: width .3s ease-out; }
+.pesc-marca { position: absolute; top: -5px; transform: translateX(-50%); font-size: 15px; line-height: 1; color: var(--borda); text-shadow: 0 0 0 transparent; display: flex; flex-direction: column; align-items: center; -webkit-text-stroke: .6px var(--suave); }
+.pesc-marca small { font-size: 9px; color: var(--suave); -webkit-text-stroke: 0; margin-top: 2px; font-weight: 600; }
+.pesc-marca:last-child { transform: translateX(-80%); }
+.pesc-marca.ok { color: #ffc400; -webkit-text-stroke: .6px #c98a00; animation: pesc-ganhou .4s ease-out; }
+@keyframes pesc-ganhou { 50% { transform: translateX(-50%) scale(1.5); } }
+
+.pescaria-palco { position: relative; max-width: 480px; margin: 0 auto; border-radius: 20px; overflow: hidden; box-shadow: 0 0 0 3px #1659b8, 0 6px 0 #0d3a80, var(--sombra); background: #2b93e0; }
+@media (prefers-color-scheme: dark) { .pescaria-palco { box-shadow: 0 0 0 3px #0d3a80, 0 6px 0 #081f45, var(--sombra); } .pescaria-canvas { filter: brightness(.88) saturate(1.05); } }
+.pescaria-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; outline: none; }
+.pescaria-aviso { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 40, 90, .25); touch-action: none; cursor: pointer; }
+.pescaria-aviso[hidden] { display: none; }
+.pescaria-aviso div { background: var(--cartao); color: var(--texto); border-radius: 18px; padding: 14px 22px; text-align: center; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 4px; animation: pesc-flutua 2s ease-in-out infinite; }
+.pescaria-aviso b { font-family: var(--titulos); font-size: 22px; }
+.pescaria-aviso span { font-size: 14px; color: var(--suave); }
+.pescaria-aviso div::before { content: "👆"; font-size: 30px; }
+@keyframes pesc-flutua { 50% { transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pesc-tempo.pouco b, .pescaria-aviso div, .pesc-marca.ok { animation: none; }
+  .pesc-enche { transition: none; }
+}
