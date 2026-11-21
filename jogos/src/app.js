@@ -111,6 +111,8 @@ const JOGOS = [
       '4 em linha vira um doce listrado, que limpa a linha ou a coluna. L ou T vira uma bomba. 5 em linha vira o arco-íris, que limpa todos de uma cor.',
       'Faça a meta de pontos antes de acabarem os movimentos. Mais pontos dão até 3 estrelas.',
       'Ficou parado? O robô mostra uma troca possível.',
+      'Bônus (embaixo da mesa), que não gastam movimento: 🔨 Martelo quebra um doce, 🔄 Troca livre troca dois vizinhos mesmo sem trinca, 🧹 Vassoura limpa uma linha, 🌈 Arco-íris transforma um doce em arco-íris, 🔀 Misturar embaralha a mesa e ➕ dá 5 movimentos a mais. Toque no bônus e depois no doce; toque de novo no bônus para desistir.',
+      'Você começa com 3 de cada. Cada fase vencida dá um bônus sorteado por estrela.',
     ] },
   { id: 'pintar', nome: 'Pintar', descricao: 'Canetinhas, pincéis e purpurina', solo: true, semNivel: true, tela: telaPintar, rotuloNovo: 'Escolher outro desenho',
     resumo() {

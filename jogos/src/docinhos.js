@@ -194,7 +194,13 @@ export function trocar(grade, a, b, tipos = 6, aleatorio = Math.random) {
     return null;
   }
 
-  // Cascatas
+  return continuar(g, etapas, combo, tipos, aleatorio, a, b);
+}
+
+
+// Depois de uma jogada ou de um bônus: cascatas (o que cai e forma novas sequências), e embaralha
+// se acabarem as jogadas. a e b são as casas da troca, onde nascem os doces especiais.
+function continuar(g, etapas, combo, tipos, aleatorio, a = -1, b = -1) {
   for (;;) {
     const gs = grupos(g);
     if (!gs.length) break;
@@ -272,4 +278,48 @@ export function estrelas(pontos, meta) {
   if (pontos >= meta * 1.5) return 2;
   if (pontos >= meta) return 1;
   return 0;
+}
+
+// ---------- Bônus (usados quando a pessoa quiser; não gastam movimento) ----------
+export const BONUS = [
+  { id: 'martelo', icone: '🔨', nome: 'Martelo', texto: 'Toque num doce para quebrar só ele.' },
+  { id: 'troca', icone: '🔄', nome: 'Troca livre', texto: 'Troque dois doces vizinhos, mesmo sem formar trinca.' },
+  { id: 'vassoura', icone: '🧹', nome: 'Vassoura', texto: 'Toque numa linha para limpar ela inteira.' },
+  { id: 'arcoiris', icone: '🌈', nome: 'Arco-íris', texto: 'Toque num doce para virar um doce arco-íris.' },
+  { id: 'mistura', icone: '🔀', nome: 'Misturar', texto: 'Mistura todos os doces da mesa.' },
+  { id: 'mais5', icone: '➕', nome: '+5 movimentos', texto: 'Ganha 5 movimentos a mais nesta fase.' },
+];
+export const BONUS_INICIAL = 3; // de cada bônus, para quem está começando
+
+// Remove as casas (acionando os especiais atingidos) e segue com as cascatas.
+function remover(grade, casas, tipos, aleatorio) {
+  const g = copia(grade);
+  const rem = estourar(g, casas);
+  const removidos = rem.map((i) => g[i].id);
+  rem.forEach((i) => { g[i] = null; });
+  cair(g, tipos, aleatorio);
+  const etapas = [{ removidos, criados: [], grade: copia(g), pontos: rem.length * PONTOS_POR_DOCE }];
+  return continuar(g, etapas, 2, tipos, aleatorio);
+}
+
+export const martelo = (grade, i, tipos = 6, aleatorio = Math.random) => remover(grade, [i], tipos, aleatorio);
+export const vassoura = (grade, i, tipos = 6, aleatorio = Math.random) => remover(grade, Array.from({ length: LADO }, (_, k) => linha(i) * LADO + k), tipos, aleatorio);
+
+// Troca livre: troca dois vizinhos; se formar algo, as cascatas acontecem como numa troca normal.
+export function trocaLivre(grade, a, b, tipos = 6, aleatorio = Math.random) {
+  if (!vizinhas(a, b)) return null;
+  const normal = trocar(grade, a, b, tipos, aleatorio);
+  if (normal) return normal;
+  let g = copia(grade);
+  [g[a], g[b]] = [g[b], g[a]];
+  const etapas = [{ removidos: [], criados: [], grade: copia(g), pontos: 0 }];
+  if (!encontrarJogada(g)) { g = embaralhar(g, aleatorio); etapas.push({ removidos: [], criados: [], grade: copia(g), pontos: 0, embaralhou: true }); }
+  return { etapas, grade: g, pontos: 0 };
+}
+
+// Arco-íris: o doce tocado vira um arco-íris, pronto para ser trocado com qualquer cor.
+export function virarArcoiris(grade, i) {
+  const g = copia(grade);
+  g[i] = { ...novoDoce(-1, 'arcoiris') };
+  return g;
 }
