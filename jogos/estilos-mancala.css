@@ -1,0 +1,43 @@
+/* Mancala */
+.mc-jogo { display: flex; flex-direction: column; gap: 10px; }
+.mc-faixa {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px;
+  background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 6px 12px;
+  transition: box-shadow .2s ease, border-color .2s ease;
+}
+.mc-quem { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.mc-dep { color: var(--suave); font-size: 14px; display: flex; align-items: baseline; gap: 6px; }
+.mc-dep b { font-family: var(--titulos); font-size: 22px; color: var(--texto); font-variant-numeric: tabular-nums; }
+.mc-faixa.pensando { border-color: color-mix(in srgb, var(--robo) 60%, var(--borda)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--robo) 18%, transparent); }
+.mc-faixa.pensando .avatar { animation: mc-pensa 1s ease-in-out infinite; }
+.mc-faixa.ativa { border-color: color-mix(in srgb, var(--voce) 60%, var(--borda)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--voce) 16%, transparent); }
+@keyframes mc-pensa { 50% { transform: translateY(-3px) rotate(-8deg); } }
+
+.mc-caixa { position: relative; border-radius: 20px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .18)); }
+.mc-caixa svg { width: 100%; height: auto; display: block; -webkit-user-select: none; user-select: none; }
+
+.mc-casa .mc-aro { stroke: transparent; stroke-width: 3.5; }
+.mc-casa.pode { cursor: pointer; outline: none; }
+.mc-casa.pode .mc-aro { stroke: #ffd84d; animation: mc-chama 1.3s ease-in-out infinite; }
+.mc-casa.pode:hover .mc-fundo, .mc-casa.pode:focus-visible .mc-fundo { filter: brightness(1.35); }
+.mc-casa.pode:focus-visible .mc-aro { stroke: #fff; }
+.mc-casa.brilha .mc-aro { stroke: #fff6c2; stroke-width: 4; animation: none; }
+@keyframes mc-chama { 50% { stroke-opacity: .3; } }
+
+.mc-semente { transform-box: fill-box; transform-origin: center; }
+.mc-semente.cai { animation: mc-cai .26s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes mc-cai { from { transform: translateY(-16px) scale(1.5); opacity: .2; } }
+
+.mc-num rect { fill: rgba(40, 20, 8, .55); stroke: rgba(255, 255, 255, .25); }
+.mc-num text { fill: #fff6e6; font: 700 13px var(--titulos); }
+.mc-num.dep rect { fill: #fff6e6; stroke: #6b4128; stroke-width: 1.5; }
+.mc-num.dep text { fill: #5a3520; font-size: 15px; }
+.mc-num.muda rect { fill: #f2b100; }
+.mc-num.muda text { fill: #3a2410; }
+
+.mc-mao circle { fill: #fff; stroke: #f2b100; stroke-width: 3; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35)); }
+.mc-mao text { fill: #6b4128; font: 800 15px var(--titulos); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-semente.cai, .mc-casa.pode .mc-aro, .mc-faixa.pensando .avatar { animation: none; }
+}
