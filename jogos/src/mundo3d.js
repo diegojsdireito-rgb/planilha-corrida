@@ -117,7 +117,7 @@ export function criarMundo(canvas) {
   let cenario = null; let temaAtual = null;
   let perseguidor = null; let perseguidorId = null; let perX = 0;
   const objetos = new Map();
-  let camX = 0; let camY = 2.4; let ultimoT = 0; let afastar = 0;
+  let camX = 0; let camY = 2.4; let ultimoT = 0; let afastar = 0; let altoVoo = 0;
 
   function limparObjetos() {
     const manter = COMUNS();
@@ -236,9 +236,13 @@ export function criarMundo(canvas) {
       // na nave a câmera se afasta um pouco, para caber o disco voador inteiro
       afastar += ((s.voo > 0 && s.vooTipo === 'nave' ? 1 : 0) - afastar) * 0.06;
       camX += (px * 0.75 - camX) * 0.12;
-      camY += (2.35 + Math.max(0, s.y - 0.4) * 0.8 + afastar * 0.9 - camY) * 0.1;
-      camera.position.set(camX, camY, -2.9 - afastar * 1.8);
-      camera.lookAt(px * 0.85, 0.95 + s.y * 0.6, 6);
+      // voando de mochila ou de capa: a câmera sobe acima dela e se afasta, e mira longe na pista.
+      // Assim a menina fica embaixo na tela, menor, e dá para ver as moedas que vêm pela frente.
+      altoVoo += ((s.voo > 0 && s.vooTipo !== 'nave' ? 1 : 0) - altoVoo) * 0.06;
+      const alvoY = (2.35 + Math.max(0, s.y - 0.4) * 0.8) * (1 - altoVoo) + (s.y + 2.45) * altoVoo;
+      camY += (alvoY + afastar * 0.9 - camY) * 0.1;
+      camera.position.set(camX, camY, -2.9 - afastar * 1.8 - altoVoo * 2.3);
+      camera.lookAt(px * 0.85, (0.95 + s.y * 0.6) * (1 - altoVoo) + (s.y - 0.35) * altoVoo, 6 + altoVoo * 10);
     }
     sol.position.set(px - 4, 9, -2);
     sol.target.position.set(px, 0, 6);
