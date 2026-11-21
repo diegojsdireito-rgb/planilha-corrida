@@ -34,9 +34,10 @@ export function montar(area, ctl) {
   botoes.append(desfazerEl, dicaEl);
   area.append(mesa, info, botoes);
   // girar o celular ou mudar o tamanho da janela redistribui as cartas
-  const aoMudarTamanho = () => { if (!document.body.contains(mesa)) { window.removeEventListener('resize', aoMudarTamanho); return; } if (s) desenhar(); };
+  const aoMudarTamanho = () => { if (!document.body.contains(mesa)) { window.removeEventListener('resize', aoMudarTamanho); return; } alturaMesa = 0; if (s) desenhar(); };
   window.addEventListener('resize', aoMudarTamanho);
 
+  let alturaMesa = 0;
   let s; let sel = null; let pilha = []; let tempo = 0; let acabou = false; let relogio = null; let terminando = false;
 
   const salvar = () => ctl.salvar({ s, tempo });
@@ -72,16 +73,19 @@ export function montar(area, ctl) {
       }
       f.onclick = () => tocar(null, { tipo: 'fundacao' });
     });
-    // espaço entre as cartas de cada coluna: o maior que couber na altura livre da tela,
-    // para as cartas abertas mostrarem bem o número (e encolhe quando a coluna fica comprida)
+    // A mesa tem altura fixa (medida uma vez pela tela, não pelas cartas): o fundo verde não
+    // cresce nem encolhe durante a partida. As cartas é que se aproximam quando a coluna fica comprida.
     const cw = (mesaCols.clientWidth - 6 * parseFloat(getComputedStyle(mesa).getPropertyValue('--gap') || 4)) / 7 || 50;
-    const livre = Math.max(cw * 4, window.innerHeight - mesaCols.getBoundingClientRect().top - 190) / cw - 1.4;
+    if (!alturaMesa) {
+      const topo = mesaCols.getBoundingClientRect().top + window.scrollY;
+      alturaMesa = Math.round(Math.max(cw * 5.2, window.innerHeight - topo - 170));
+      mesaCols.style.height = `${alturaMesa}px`;
+    }
+    const livre = alturaMesa / cw - 1.4;
     const alturaDe = (col, ab, fe) => col.slice(0, -1).reduce((t, c) => t + (c.aberta ? ab : fe), 0);
-    let aberta = 0.62; let fechada = 0.26;
+    let aberta = 0.7; let fechada = 0.28;
     const maior = Math.max(...s.colunas.map((col) => alturaDe(col, aberta, fechada)));
-    // estica quando sobra altura (até as cartas abertas mostrarem quase metade) e aperta quando falta
-    const k = Math.min(1.45, Math.max(0.55, livre / Math.max(maior, 0.01)));
-    aberta = Math.min(0.9, aberta * k); fechada = Math.min(0.34, fechada * Math.max(0.75, k));
+    if (maior > livre) { const k = livre / maior; aberta *= k; fechada *= Math.max(0.6, k); }
     colunasEl.forEach((colEl, c) => {
       colEl.innerHTML = '';
       let topoY = 0;

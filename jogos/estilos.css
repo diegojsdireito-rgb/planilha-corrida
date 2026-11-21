@@ -830,3 +830,4 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .cartao-turma b { font-size: 11px; }
 .cartao-turma small { font-size: 10px; }
 .cartao-turma .marca { width: 16px; height: 16px; font-size: 10px; right: 2px; bottom: 2px; }
+.paciencia .colunas { align-items: start; overflow: hidden; }
