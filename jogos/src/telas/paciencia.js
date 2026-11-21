@@ -33,6 +33,9 @@ export function montar(area, ctl) {
   const dicaEl = el('button', 'botao secundario', '🤖 Dica do robô');
   botoes.append(desfazerEl, dicaEl);
   area.append(mesa, info, botoes);
+  // girar o celular ou mudar o tamanho da janela redistribui as cartas
+  const aoMudarTamanho = () => { if (!document.body.contains(mesa)) { window.removeEventListener('resize', aoMudarTamanho); return; } if (s) desenhar(); };
+  window.addEventListener('resize', aoMudarTamanho);
 
   let s; let sel = null; let pilha = []; let tempo = 0; let acabou = false; let relogio = null; let terminando = false;
 
@@ -69,6 +72,16 @@ export function montar(area, ctl) {
       }
       f.onclick = () => tocar(null, { tipo: 'fundacao' });
     });
+    // espaço entre as cartas de cada coluna: o maior que couber na altura livre da tela,
+    // para as cartas abertas mostrarem bem o número (e encolhe quando a coluna fica comprida)
+    const cw = (mesaCols.clientWidth - 6 * parseFloat(getComputedStyle(mesa).getPropertyValue('--gap') || 4)) / 7 || 50;
+    const livre = Math.max(cw * 4, window.innerHeight - mesaCols.getBoundingClientRect().top - 190) / cw - 1.4;
+    const alturaDe = (col, ab, fe) => col.slice(0, -1).reduce((t, c) => t + (c.aberta ? ab : fe), 0);
+    let aberta = 0.62; let fechada = 0.26;
+    const maior = Math.max(...s.colunas.map((col) => alturaDe(col, aberta, fechada)));
+    // estica quando sobra altura (até as cartas abertas mostrarem quase metade) e aperta quando falta
+    const k = Math.min(1.45, Math.max(0.55, livre / Math.max(maior, 0.01)));
+    aberta = Math.min(0.9, aberta * k); fechada = Math.min(0.34, fechada * Math.max(0.75, k));
     colunasEl.forEach((colEl, c) => {
       colEl.innerHTML = '';
       let topoY = 0;
@@ -84,7 +97,7 @@ export function montar(area, ctl) {
           w.onclick = (e) => { e.stopPropagation(); tocar({ tipo: 'coluna', col: c, idx }, { tipo: 'coluna', col: c }); };
         }
         colEl.append(w);
-        if (idx < col.length - 1) topoY += carta.aberta ? 0.46 : 0.2;
+        if (idx < col.length - 1) topoY += carta.aberta ? aberta : fechada;
       });
       colEl.style.height = `calc(var(--cw) * ${topoY + 1.4})`;
       colEl.onclick = () => tocar(null, { tipo: 'coluna', col: c });
