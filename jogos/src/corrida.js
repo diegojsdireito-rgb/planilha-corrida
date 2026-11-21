@@ -65,10 +65,24 @@ export function nova(nivel = 'medio', cfg = {}) {
 // Distância mínima entre linhas: dá tempo de reagir mesmo em alta velocidade.
 export const intervalo = (vel) => Math.max(12, vel * 0.95);
 
+// Altura máxima do pulo normal e quanto tempo ele dura no ar.
+export const APICE_PULO = (PULO * PULO) / (2 * GRAVIDADE);
+export const TEMPO_PULO = (2 * PULO) / GRAVIDADE;
+
+// Arco de moedas por cima de uma cerca: segue a curva exata do pulo normal na velocidade atual,
+// com o ponto mais alto em cima da cerca. Quem pula para passar a cerca pega o arco inteiro.
+export function arcoDeMoedas(faixa, z, vel = 13, n = 7) {
+  const metade = (vel * TEMPO_PULO) / 2; // metade do caminho que ela percorre no ar
+  return Array.from({ length: n }, (_, k) => {
+    const u = -0.8 + (1.6 * k) / (n - 1); // de 80% antes a 80% depois do ponto mais alto
+    return { tipo: 'moeda', faixa, z: z + u * metade, h: 0.6 + APICE_PULO * (1 - u * u) };
+  });
+}
+
 const fileira = (faixa, z, n, h = 0.5, passo = 1.6) => Array.from({ length: n }, (_, k) => ({ tipo: 'moeda', faixa, z: z + k * passo, h }));
 
 // Uma linha de obstáculos. Garante pelo menos uma faixa sem carrinho e nunca mais de um carrinho.
-export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false) {
+export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false, vel = 13) {
   const r = aleatorio;
   if (voando) {
     // no ar não há obstáculos: só uma trilha de moedas lá em cima
@@ -92,7 +106,7 @@ export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false)
   const cerca = objetos.find((o) => o.tipo === 'cerca');
   if (cerca && r() < 0.35) {
     // arco de moedas por cima da cerca
-    for (let k = 0; k < 5; k++) objetos.push({ tipo: 'moeda', faixa: cerca.faixa, z: z - 2 + k, h: Math.sin((k / 4) * Math.PI) * 1.6 + 0.4 });
+    objetos.push(...arcoDeMoedas(cerca.faixa, z, vel));
   } else if (livres.length && r() < 0.85) {
     objetos.push(...fileira(livres[Math.floor(r() * livres.length)], z, 3 + Math.floor(r() * 5)));
   }
@@ -224,14 +238,15 @@ export function avancar(s, dt, aleatorio = Math.random) {
   s.objetos = s.objetos.filter((o) => o.z + (o.comp ?? 0) > -6 && !o.pego && !o.quebrado);
   s.ultimaLinha -= dz;
   if (s.ultimaLinha <= LONGE - intervalo(s.vel / turbo)) {
-    s.objetos.push(...gerarLinha(LONGE, aleatorio, s.dist, s.voo > 1.5));
+    s.objetos.push(...gerarLinha(LONGE, aleatorio, s.dist, s.voo > 1.5, s.vel));
     s.ultimaLinha = LONGE;
   }
 
   // coletas e batidas
   for (const o of s.objetos) {
     if (!['cerca', 'faixa', 'carrinho'].includes(o.tipo)) {
-      if (Math.abs(o.z) < 0.7 && Math.abs(o.faixa - s.x) < 0.6 && Math.abs((o.h ?? 0) - (s.y + 0.6)) < 1.1) {
+      // a moeda conta se passou por ela neste quadro (mesmo num celular lento, que anda mais de uma vez por quadro)
+      if (o.z < 0.7 && o.z > -0.7 - dz && Math.abs(o.faixa - s.x) < 0.6 && Math.abs((o.h ?? 0) - (s.y + 0.6)) < 1.1) {
         o.pego = true;
         coletar(s, o);
       }

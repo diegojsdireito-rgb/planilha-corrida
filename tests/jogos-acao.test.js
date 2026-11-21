@@ -381,3 +381,22 @@ test('loja: estilos de roupa são comprados uma vez e vestidos quando quiser', (
   assert.equal(loja.normalizar({ ...antiga, estilo: 'jeans' }).estilo, 'jeans'); // depois, a escolha da pessoa vale
   assert.deepEqual([...loja.mesclarCarteiras(c, { ...loja.carteiraNova(), estilos: ['esportiva', 'street'] }).estilos].sort(), ['corredor', 'esportiva', 'moletom', 'skatista', 'street']);
 });
+
+test('corrida: o pulo normal na hora certa pega todas as moedas do arco em cima da cerca', () => {
+  for (const vel of [13, 20, 28]) {
+    for (const fps of [60, 20]) {
+      const s = corrida.nova('medio'); s.t = (vel - 13) / 0.18; s.perseguidor = { dist: 99, perto: 99 }; s.ultimaLinha = 1e9;
+      const arco = corrida.arcoDeMoedas(1, 30, vel);
+      const cerca = { tipo: 'cerca', faixa: 1, z: 30, comp: 0.4 };
+      s.objetos = [cerca, ...arco];
+      let pulou = false;
+      for (let i = 0; i < 3000 && s.vivo; i++) {
+        if (!pulou && cerca.z <= (vel * corrida.TEMPO_PULO) / 2) { corrida.comando(s, 'pular'); pulou = true; }
+        corrida.avancar(s, 1 / fps, () => 0.99);
+        if (cerca.z < -12) break;
+      }
+      assert.ok(s.vivo, `passou a cerca a ${vel}`);
+      assert.equal(s.moedas, arco.length, `pegou todas a ${vel} com ${fps} quadros/s`);
+    }
+  }
+});
