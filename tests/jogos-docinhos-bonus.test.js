@@ -51,3 +51,57 @@ test('arco-íris transforma o doce tocado num arco-íris que pode ser trocado', 
   const r = doce.trocar(n, 10, 11, 6, sorteio);
   assert.ok(r && r.pontos > 0, 'arco-íris trocado com um vizinho estoura a cor dele');
 });
+
+// ---------- obstáculos: gelo e pedra ----------
+test('obstáculos: as fases 1 e 2 só pedem pontos; da 3 em diante aparecem gelo e pedras', () => {
+  assert.equal(doce.fase(1).gelo + doce.fase(1).pedra, 0);
+  assert.equal(doce.fase(2).gelo + doce.fase(2).pedra, 0);
+  assert.ok(doce.fase(3).gelo > 0);
+  assert.ok(doce.fase(4).pedra > 0);
+  assert.ok(doce.fase(5).gelo > 0 && doce.fase(5).pedra > 0);
+  for (let n = 3; n < 30; n++) {
+    const f = doce.fase(n);
+    const g = doce.comObstaculos(doce.novaGrade(f.tipos, sorteio), f, sorteio);
+    assert.equal(doce.obstaculos(g).total, f.gelo + f.pedra + f.forte, `fase ${n}`);
+    assert.ok(doce.encontrarJogada(g), `fase ${n} começa com jogada`);
+    assert.equal(doce.sequencias(g).length, 0);
+  }
+});
+
+test('obstáculos: doce congelado e pedra não saem do lugar na troca', () => {
+  const g = doce.novaGrade(5, sorteio);
+  g[10] = { ...g[10], gelo: 1 };
+  assert.equal(doce.trocar(g, 10, 11, 5, sorteio), null);
+  assert.equal(doce.trocaLivre(g, 10, 11, 5, sorteio), null);
+  assert.ok(doce.preso(g[10]));
+});
+
+test('obstáculos: estourar um doce ao lado racha o gelo e quebra a pedra; pedra dura aguenta duas', () => {
+  const g = doce.novaGrade(5, sorteio);
+  g[27] = { ...g[27], gelo: 1 };
+  g[29] = { id: 999, tipo: -2, especial: null, pedra: 2 };
+  const r = doce.martelo(g, 28, 5, sorteio);
+  const depois = doce.obstaculos(r.grade);
+  assert.equal(depois.gelo, 0, 'o gelo ao lado rachou');
+  assert.equal(depois.pedra, 1, 'a pedra dura perdeu uma camada');
+  assert.ok(r.pontos >= doce.PONTOS_POR_DOCE + doce.PONTOS_GELO + doce.PONTOS_PEDRA);
+  // martelo direto na pedra que sobrou quebra ela de vez
+  const i = r.grade.findIndex((d) => d.pedra);
+  const r2 = doce.martelo(r.grade, i, 5, sorteio);
+  assert.equal(doce.obstaculos(r2.grade).pedra, 0);
+});
+
+test('obstáculos: pedras não formam trinca entre si', () => {
+  const g = doce.novaGrade(5, sorteio);
+  for (const i of [0, 1, 2]) g[i] = { id: 500 + i, tipo: -2, especial: null, pedra: 1 };
+  assert.ok(!doce.sequencias(g).some((s) => s.casas.includes(0)));
+});
+
+test('obstáculos: para vencer precisa dos pontos e de quebrar tudo', () => {
+  const f = doce.fase(5);
+  const limpa = doce.novaGrade(f.tipos, sorteio);
+  const suja = doce.comObstaculos(limpa, f, sorteio);
+  assert.ok(doce.venceu(f.meta, f, limpa));
+  assert.ok(!doce.venceu(f.meta, f, suja));
+  assert.ok(!doce.venceu(f.meta - 1, f, limpa));
+});

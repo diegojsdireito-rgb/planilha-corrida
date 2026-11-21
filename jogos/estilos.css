@@ -852,3 +852,6 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 }
 .aviso-acelera.mostra { animation: acelera 1.6s ease-out forwards; }
 @keyframes acelera { 0% { opacity: 0; transform: translate(-50%, 14px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 25% { transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -12px); } }
+.meta-ob { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-weight: 800; background: #dff3ff; color: #1d5e8a; font-size: 12px; }
+.meta-ob.ok { background: #d9f7e2; color: #1f7a3f; }
+@media (prefers-color-scheme: dark) { .meta-ob { background: #1e3a4c; color: #bfe6ff; } .meta-ob.ok { background: #1d3d29; color: #a8efc0; } }
