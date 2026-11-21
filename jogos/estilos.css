@@ -855,3 +855,50 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 .meta-ob { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-weight: 800; background: #dff3ff; color: #1d5e8a; font-size: 12px; }
 .meta-ob.ok { background: #d9f7e2; color: #1f7a3f; }
 @media (prefers-color-scheme: dark) { .meta-ob { background: #1e3a4c; color: #bfe6ff; } .meta-ob.ok { background: #1d3d29; color: #a8efc0; } }
+
+/* ---------- Docinhos: mapa das fases ---------- */
+.doce-mapa { max-width: 480px; margin: 0 auto; position: relative; }
+.mapa-topo { display: flex; justify-content: space-between; padding: 8px 14px; margin-bottom: 8px; border-radius: 14px; background: var(--cartao); border: 1px solid var(--borda); box-shadow: var(--sombra); font-size: 14px; color: var(--suave); }
+.mapa-topo b { color: var(--texto); font-size: 16px; }
+.mapa-rolagem { height: min(64vh, 560px); overflow-y: auto; border-radius: 22px; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .7), var(--sombra); overscroll-behavior: contain; scrollbar-width: none; }
+.mapa-rolagem::-webkit-scrollbar { display: none; }
+.mapa-caminho { position: relative; width: 100%; overflow: hidden; }
+.mapa-regiao { position: absolute; left: 0; right: 0; }
+.mapa-regiao span { position: absolute; left: 10px; bottom: 8px; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, .75); font-size: 12px; font-weight: 800; color: #7a2a4a; }
+.mapa-enfeite { position: absolute; width: 34px; height: 34px; transform: translate(-50%, 0) rotate(-12deg); opacity: .55; pointer-events: none; }
+.mapa-enfeite svg { width: 100%; height: 100%; }
+.mapa-trilha { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.mapa-trilha path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.mapa-trilha .fundo { stroke: #fff; stroke-width: 22; opacity: .75; }
+.mapa-trilha .feito { stroke: #ff7aa8; stroke-width: 14; }
+.mapa-trilha .pontilhado { stroke: #fff; stroke-width: 3; stroke-dasharray: 2 12; }
+.mapa-fase {
+  position: absolute; transform: translate(-50%, -50%); width: 54px; height: 54px; border-radius: 50%; padding: 0;
+  display: grid; place-items: center; font-size: 20px; color: #fff; border: 4px solid #fff;
+  background: radial-gradient(circle at 35% 30%, #ff9cc0, #e0457b 70%); box-shadow: 0 4px 0 #b02e5c, 0 6px 12px rgba(0, 0, 0, .25);
+}
+.mapa-fase b { font-weight: 900; text-shadow: 0 2px 0 rgba(0, 0, 0, .25); }
+.mapa-fase.chefe { width: 64px; height: 64px; background: radial-gradient(circle at 35% 30%, #ffe08a, #f0a400 70%); box-shadow: 0 4px 0 #b57a00, 0 6px 12px rgba(0, 0, 0, .25); }
+.mapa-fase.aberta { background: radial-gradient(circle at 35% 30%, #9fd6ff, #3e8bff 70%); box-shadow: 0 4px 0 #2763c4, 0 6px 12px rgba(0, 0, 0, .25); }
+.mapa-fase.atual { width: 66px; height: 66px; background: radial-gradient(circle at 35% 30%, #a8f0c0, #2fb66a 70%); box-shadow: 0 4px 0 #1f8a4c, 0 0 0 6px rgba(47, 182, 106, .35), 0 6px 14px rgba(0, 0, 0, .25); animation: pulso-fase 1.4s ease-in-out infinite; z-index: 2; }
+.mapa-fase.trancada { background: #c9c3cf; box-shadow: 0 4px 0 #9a94a2; font-size: 18px; }
+@keyframes pulso-fase { 50% { transform: translate(-50%, -50%) scale(1.08); } }
+.mapa-estrelas { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); display: flex; gap: 0; font-size: 15px; line-height: 1; white-space: nowrap; }
+.mapa-estrelas i { font-style: normal; color: rgba(0, 0, 0, .22); -webkit-text-stroke: 1px #fff; }
+.mapa-estrelas i.ok { color: #ffc61a; }
+.mapa-estrelas i:nth-child(2) { transform: translateY(4px); }
+.mapa-andamento { position: absolute; top: -6px; right: -8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: #ff9a1f; border: 2px solid #fff; }
+.mapa-eu { position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); width: 54px; height: 54px; pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .3)); }
+.mapa-eu svg { width: 100%; height: 100%; }
+.mapa-detalhe { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(40, 10, 30, .35); border-radius: 22px; }
+.mapa-cartao { position: relative; width: min(88%, 320px); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px 16px; border-radius: 22px; background: var(--cartao); box-shadow: 0 10px 30px rgba(0, 0, 0, .3); text-align: center; }
+.mapa-cartao strong { font-family: var(--titulos); font-size: 26px; }
+.mapa-cartao small { color: var(--suave); font-weight: 700; }
+.mapa-cartao p { margin: 2px 0; font-size: 14px; color: var(--suave); }
+.mapa-cartao p b { color: var(--texto); }
+.mapa-cartao .recorde { color: #c2185b; }
+.mapa-cartao .botao { width: 100%; }
+.mapa-cartao .fechar { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; font-size: 15px; }
+.botao-mapa { padding: 6px 12px; font-size: 14px; }
+.fim-botoes { display: flex; gap: 8px; justify-content: center; margin-top: 6px; }
+.doce-mapa[hidden], .doce-topo[hidden], .doce-fases[hidden], .doce-grade[hidden], .doce-bonus[hidden], .acoes-solo[hidden], .mapa-detalhe[hidden] { display: none !important; }

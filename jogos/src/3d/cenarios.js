@@ -373,8 +373,19 @@ export function criarObstaculo(o, tema) {
       for (const lado of [-1, 1]) { const anel = malha(new THREE.CircleGeometry(0.27, 14), toon(0xd9a86a)); anel.position.set(lado * (L / 2 + 0.101), 0.29, 0); anel.rotation.y = lado * Math.PI / 2; g.add(anel); }
       const musgo = malha(new THREE.SphereGeometry(0.16, 8, 6), toon(0x4f9a45)); musgo.position.set(0.2, 0.52, 0); musgo.scale.y = 0.5; g.add(musgo);
     } else if (tema === 'neve') {
-      const muro = malha(new THREE.BoxGeometry(L, 0.5, 0.5), toon(0xf4f8ff)); muro.position.y = 0.25; g.add(muro);
-      for (let k = 0; k < 4; k++) { const b = malha(new THREE.SphereGeometry(0.13, 10, 8), toon(0xffffff)); b.position.set(-L / 2 + 0.2 + k * (L - 0.4) / 3, 0.55, 0); g.add(b); }
+      // barreira de esqui: tábuas vermelhas e brancas em postes escuros, com um montinho de neve em cima.
+      // Vermelho forte contra o chão branco: dá para ver de longe (o muro de neve branco sumia na pista).
+      const listras = texPano('barreira-neve', (ctx, w, h) => { for (let k = 0; k < 8; k++) { ctx.fillStyle = k % 2 ? '#ffffff' : '#d8262f'; ctx.beginPath(); ctx.moveTo(k * 16 - 8, h); ctx.lineTo(k * 16 + 8, 0); ctx.lineTo(k * 16 + 24, 0); ctx.lineTo(k * 16 + 8, h); ctx.fill(); } }, 128, 32);
+      const vermelho = toon(0xd8262f); const face = toon(0xffffff, { map: listras });
+      for (const lado of [-1, 1]) {
+        const poste = malha(new THREE.BoxGeometry(0.1, 0.66, 0.1), toon(0x3b2a22)); poste.position.set(lado * (L / 2 - 0.06), 0.33, 0); g.add(poste);
+        const capa = malha(new THREE.SphereGeometry(0.09, 10, 8), toon(0xffffff)); capa.scale.y = 0.6; capa.position.set(lado * (L / 2 - 0.06), 0.68, 0); g.add(capa);
+      }
+      for (const y of [0.5, 0.24]) { const tabua = malha(new THREE.BoxGeometry(L, 0.17, 0.08), [vermelho, vermelho, vermelho, vermelho, face, face]); tabua.position.y = y; g.add(tabua); }
+      const neveTopo = malha(new THREE.CapsuleGeometry(0.06, L - 0.3, 4, 10), toon(0xffffff)); neveTopo.rotation.z = Math.PI / 2; neveTopo.scale.set(1, 1, 1.3); neveTopo.position.y = 0.62; g.add(neveTopo);
+      // bandeirinha laranja no meio, como nas pistas de esqui
+      const haste = malha(new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6), toon(0x3b2a22)); haste.position.set(0, 0.8, 0); g.add(haste);
+      const flamula = malha(new THREE.ConeGeometry(0.1, 0.26, 3), toon(0xff8a1f)); flamula.rotation.z = -Math.PI / 2; flamula.scale.z = 0.2; flamula.position.set(0.13, 0.92, 0); g.add(flamula);
     } else if (tema === 'praia') {
       for (const lado of [-1, 1]) { const p = malha(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), toon(0xd8b26a)); p.position.set(lado * (L / 2 - 0.05), 0.3, 0); g.add(p); }
       for (const y of [0.18, 0.32, 0.46]) { const b = malha(new THREE.CylinderGeometry(0.035, 0.035, L, 8), toon(0xc9a45a)); b.rotation.z = Math.PI / 2; b.position.y = y; g.add(b); }
