@@ -383,6 +383,9 @@ function telaJogadores({ abertura = false } = {}) {
 
 pedirPersistencia();
 
+// Funciona sem internet: os arquivos do app ficam guardados no aparelho (veja sw.js).
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
 // Puxar para atualizar: só no app aberto pelo ícone, que não tem o recarregar do Safari,
 // e só na tela inicial, para não confundir com arrastar peças nos tabuleiros.
 const instalado = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
