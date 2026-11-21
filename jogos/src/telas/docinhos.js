@@ -55,12 +55,7 @@ function estoque() {
 
 const ELOGIOS = ['Doce!', 'Uau!', 'Que delícia!', 'Incrível!', 'Demais!'];
 
-export function nivelLiberado() {
-  let n = 1;
-  for (const h of prefs.historico) if (h.j === 'docinhos' && h.r === 'vitoria' && h.nivel >= n) n = h.nivel + 1;
-  return n;
-}
-const estrelasDoNivel = (n) => Math.max(0, ...prefs.historico.filter((h) => h.j === 'docinhos' && h.nivel === n).map((h) => h.estrelas ?? 0));
+export const nivelLiberado = () => doce.progresso(prefs.historico).liberada;
 
 export function montar(area, ctl) {
   const topo = el('div', 'doce-topo');
@@ -77,7 +72,10 @@ export function montar(area, ctl) {
   botoes.append(dicaEl);
   const barraBonus = el('div', 'doce-bonus');
   barraBonus.setAttribute('role', 'group'); barraBonus.setAttribute('aria-label', 'Bônus');
-  area.append(topo, fases, tabuleiro, barraBonus, botoes);
+  const mapa = el('div', 'doce-mapa');
+  area.append(mapa, topo, fases, tabuleiro, barraBonus, botoes);
+  const telaJogo = [topo, fases, tabuleiro, barraBonus, botoes];
+  let noMapa = false;
   mascote.append(fala);
 
   let f; let grade; let pontos; let movimentos; let ocupado = false; let acabou = false;
@@ -188,18 +186,101 @@ export function montar(area, ctl) {
   }
 
   function desenharFases() {
-    const liberado = nivelLiberado();
     fases.innerHTML = '';
-    const ant = el('button', 'botao-icone', '‹');
-    ant.setAttribute('aria-label', 'Fase anterior');
-    ant.disabled = f.nivel <= 1 || ocupado;
-    ant.onclick = () => { ctl.som('clique'); iniciar(null, f.nivel - 1); };
-    const prox = el('button', 'botao-icone', '›');
-    prox.setAttribute('aria-label', 'Próxima fase');
-    prox.disabled = f.nivel >= liberado || ocupado;
-    prox.onclick = () => { ctl.som('clique'); iniciar(null, f.nivel + 1); };
-    const est = estrelasDoNivel(f.nivel);
-    fases.append(ant, el('span', '', `Fase ${f.nivel} · ${'★'.repeat(est)}${'☆'.repeat(3 - est)}`), prox);
+    const voltar = el('button', 'botao secundario botao-mapa', '🗺️ Mapa');
+    voltar.disabled = ocupado;
+    voltar.onclick = () => { ctl.som('clique'); salvarSeJogando(); mostrarMapa(); };
+    const est = doce.progresso(prefs.historico).melhor[f.nivel]?.estrelas ?? 0;
+    fases.append(voltar, el('span', '', `${doce.regiaoDa(f.nivel).icone} Fase ${f.nivel} de ${doce.TOTAL_FASES} · ${'★'.repeat(est)}${'☆'.repeat(3 - est)}`));
+  }
+  const salvarSeJogando = () => { if (!acabou && f && grade) salvar(); };
+
+  // ---------- Mapa das fases ----------
+  // Um caminho que sobe: fase 1 embaixo, as próximas para cima. Fases passadas mostram as estrelas
+  // (tocando dá para jogar de novo e melhorar); a fase da vez fica com a personagem; as outras, trancadas.
+  const ESPACO = 92; const BORDA = 70;
+  const posicao = (n) => ({ x: 50 + Math.sin(n * 0.95) * 30, y: (doce.TOTAL_FASES - n) * ESPACO + BORDA });
+  function mostrarMapa(foco = null) {
+    noMapa = true;
+    pararDica();
+    for (const e of telaJogo) e.hidden = true;
+    mapa.hidden = false;
+    const p = doce.progresso(prefs.historico);
+    const salvo = ctl.salvo();
+    const atual = foco ?? (salvo?.grade ? salvo.nivel : p.liberada);
+    const altura = (doce.TOTAL_FASES - 1) * ESPACO + BORDA * 2;
+    const pontos = Array.from({ length: doce.TOTAL_FASES }, (_, k) => posicao(k + 1));
+    const regioes = doce.REGIOES.map((r, k) => {
+      const porRegiao = doce.TOTAL_FASES / doce.REGIOES.length;
+      const topo = (doce.TOTAL_FASES - (k + 1) * porRegiao) * ESPACO + BORDA - ESPACO / 2;
+      const alto = porRegiao * ESPACO;
+      return `<div class="mapa-regiao" style="top:${Math.max(0, topo)}px;height:${alto + (k === 0 ? BORDA : 0) + (k === doce.REGIOES.length - 1 ? BORDA : 0)}px;background:linear-gradient(${r.cor[1]}, ${r.cor[0]})"><span>${r.icone} ${r.nome}</span></div>`;
+    }).join('');
+    // docinhos espalhados pelos lados do caminho
+    const enfeites = Array.from({ length: doce.TOTAL_FASES / 2 }, (_, k) => {
+      const n = k * 2 + 1.5; const q = posicao(n); const lado = q.x > 50 ? -1 : 1;
+      return `<span class="mapa-enfeite" style="left:${q.x + lado * 30}%;top:${q.y - 30}px">${svgDoce({ tipo: k % 6, especial: null })}</span>`;
+    }).join('');
+    const nos = pontos.map((q, k) => {
+      const n = k + 1; const m = p.melhor[n];
+      const estado = n > p.liberada ? 'trancada' : n === atual ? 'atual' : m?.estrelas ? 'feita' : 'aberta';
+      const est = m?.estrelas ?? 0;
+      const andamento = salvo?.grade && salvo.nivel === n;
+      return `<button class="mapa-fase ${estado}${n % 15 === 0 ? ' chefe' : ''}" data-fase="${n}" style="left:${q.x}%;top:${q.y}px" aria-label="Fase ${n}${estado === 'trancada' ? ', trancada' : `, ${est} estrela${est === 1 ? '' : 's'}`}">
+        ${estado === 'trancada' ? '🔒' : `<b>${n}</b>`}
+        ${estado !== 'trancada' ? `<span class="mapa-estrelas">${[1, 2, 3].map((e) => `<i class="${e <= est ? 'ok' : ''}">★</i>`).join('')}</span>` : ''}
+        ${andamento ? '<span class="mapa-andamento">▶</span>' : ''}
+        ${n === atual ? `<span class="mapa-eu">${retrato({ ...prefs.personagem, estilo: prefs.carteira?.estilo, sorriso: 'feliz' })}</span>` : ''}
+      </button>`;
+    }).join('');
+    mapa.innerHTML = `
+      <div class="mapa-topo"><span>⭐ <b>${p.estrelas}</b> / ${p.maxEstrelas}</span><span>Fase <b>${p.liberada}</b> de ${doce.TOTAL_FASES}</span></div>
+      <div class="mapa-rolagem"><div class="mapa-caminho" style="height:${altura}px">
+        ${regioes}${enfeites}
+        <svg class="mapa-trilha"></svg>
+        ${nos}
+      </div></div>
+      <div class="mapa-detalhe" hidden></div>`;
+    // a trilha é desenhada em pixels, depois de saber a largura: curvas suaves entre as fases,
+    // e o trecho já percorrido fica colorido
+    const svg = mapa.querySelector('.mapa-trilha');
+    const largura = mapa.querySelector('.mapa-caminho').clientWidth || 360;
+    const px = pontos.map((q) => [q.x / 100 * largura, q.y]);
+    const curva = (lista) => lista.map(([x, y], k) => {
+      if (!k) return `M${x.toFixed(1)} ${y}`;
+      const [x0, y0] = lista[k - 1]; const my = (y0 + y) / 2;
+      return `C${x0.toFixed(1)} ${my} ${x.toFixed(1)} ${my} ${x.toFixed(1)} ${y}`;
+    }).join(' ');
+    svg.setAttribute('viewBox', `0 0 ${largura} ${altura}`);
+    svg.innerHTML = `<path d="${curva(px)}" class="fundo"/><path d="${curva(px.slice(0, p.liberada))}" class="feito"/><path d="${curva(px)}" class="pontilhado"/>`;
+    const rolagem = mapa.querySelector('.mapa-rolagem');
+    const alvo = posicao(atual).y;
+    requestAnimationFrame(() => { rolagem.scrollTop = alvo - rolagem.clientHeight / 2; });
+    mapa.querySelectorAll('[data-fase]').forEach((b) => { b.onclick = () => escolherFase(Number(b.dataset.fase), p, salvo); });
+    ctl.status(p.liberada === 1 && !p.melhor[1] ? 'Toque na fase 1 para começar!' : 'Escolha uma fase. Nas que você já passou, dá para jogar de novo e ganhar mais estrelas.', 'voce');
+  }
+
+  function escolherFase(n, p, salvo) {
+    const caixa = mapa.querySelector('.mapa-detalhe');
+    if (n > p.liberada) { ctl.som('erro'); ctl.status(`Passe a fase ${p.liberada} para abrir esta.`, ''); return; }
+    ctl.som('clique');
+    const fz = doce.fase(n); const m = p.melhor[n]; const est = m?.estrelas ?? 0;
+    const andamento = salvo?.grade && salvo.nivel === n;
+    const obst = [fz.gelo ? `🧊 ${fz.gelo} congelados` : '', fz.pedra ? `🪨 ${fz.pedra} pedras` : ''].filter(Boolean).join(' · ');
+    caixa.innerHTML = `<div class="mapa-cartao">
+      <button class="botao-icone fechar" aria-label="Fechar">✕</button>
+      <small>${doce.regiaoDa(n).icone} ${doce.regiaoDa(n).nome}</small>
+      <strong>Fase ${n}</strong>
+      <span class="estrelas-fim">${'★'.repeat(est)}${'☆'.repeat(3 - est)}</span>
+      <p>Meta: <b>${fz.meta.toLocaleString('pt-BR')}</b> pontos em ${fz.movimentos} movimentos${obst ? `<br>Quebre: ${obst}` : ''}</p>
+      ${m?.pontos ? `<p class="recorde">Seu recorde: <b>${m.pontos.toLocaleString('pt-BR')}</b> pontos${est < 3 ? ` · ★★★ com ${(fz.meta * 2).toLocaleString('pt-BR')}` : ''}</p>` : ''}
+      ${andamento ? '<button class="botao" data-continuar>▶ Continuar de onde parou</button><button class="botao secundario" data-jogar>Começar de novo</button>' : `<button class="botao" data-jogar>${m?.estrelas ? 'Jogar de novo' : 'Jogar'}</button>`}
+    </div>`;
+    caixa.hidden = false;
+    caixa.querySelector('.fechar').onclick = () => { ctl.som('clique'); caixa.hidden = true; };
+    caixa.onclick = (e) => { if (e.target === caixa) caixa.hidden = true; };
+    caixa.querySelector('[data-continuar]')?.addEventListener('click', () => { ctl.som('clique'); iniciar(salvo); });
+    caixa.querySelector('[data-jogar]').onclick = () => { ctl.som('clique'); iniciar(null, n); };
   }
 
   function posicionar(e, i, linhaInicial = null) {
@@ -322,9 +403,14 @@ export function montar(area, ctl) {
       cartao.firstChild.append(el('small', 'premio-bonus', `Você ganhou: ${ganhos.map((g) => `${g.icone} ${g.nome}`).join(' · ')}`));
       desenharBonus();
     }
-    const b = el('button', 'botao', venceu ? 'Próxima fase ›' : 'Tentar de novo');
-    b.onclick = () => { ctl.som('clique'); cartao.remove(); iniciar(null, venceu ? f.nivel + 1 : f.nivel); };
-    cartao.firstChild.append(b);
+    const proxima = Math.min(doce.TOTAL_FASES, f.nivel + 1);
+    const b = el('button', 'botao', venceu ? (f.nivel < doce.TOTAL_FASES ? 'Próxima fase ›' : 'Jogar de novo') : 'Tentar de novo');
+    b.onclick = () => { ctl.som('clique'); cartao.remove(); iniciar(null, venceu ? proxima : f.nivel); };
+    const bm = el('button', 'botao secundario', '🗺️ Mapa');
+    bm.onclick = () => { ctl.som('clique'); cartao.remove(); mostrarMapa(venceu ? proxima : f.nivel); };
+    const linhaBotoes = el('div', 'fim-botoes'); linhaBotoes.append(bm, b);
+    cartao.firstChild.append(linhaBotoes);
+    if (venceu && f.nivel === doce.TOTAL_FASES) cartao.firstChild.insertBefore(el('small', 'premio-bonus', '🏆 Você terminou o caminho inteiro!'), linhaBotoes);
     ctl.fim(venceu ? 'vitoria' : 'derrota', venceu ? `Fase ${f.nivel} concluída com ${est} estrela${est > 1 ? 's' : ''}!` : pontos < f.meta ? `Faltaram ${(f.meta - pontos).toLocaleString('pt-BR')} pontos${sobra ? ` e ${sobra} ${sobra === 1 ? 'obstáculo' : 'obstáculos'}` : ''}. Tente de novo!` : `Faltou quebrar ${sobra} ${sobra === 1 ? 'obstáculo' : 'obstáculos'}. Tente de novo!`, null, { nivel: f.nivel, pontos, estrelas: est });
     tabuleiro.append(cartao);
     desenharFases();
@@ -381,6 +467,9 @@ export function montar(area, ctl) {
   });
 
   function iniciar(salvo, nivel) {
+    noMapa = false;
+    mapa.hidden = true;
+    for (const e of telaJogo) e.hidden = false;
     pararDica();
     acabou = false; ocupado = false; selecionada = null; bonusAtivo = null; trocaA = null;
     tabuleiro.querySelectorAll('.faixa-fim').forEach((x) => x.remove());
@@ -406,6 +495,7 @@ export function montar(area, ctl) {
     agendarDica();
   }
 
-  iniciar(ctl.salvo());
-  return { reiniciar: () => iniciar(null, f?.nivel) };
+  // Abre no mapa; "Nova partida" joga de novo a fase aberta (ou a próxima, a partir do mapa).
+  mostrarMapa();
+  return { reiniciar: () => (noMapa ? iniciar(null, nivelLiberado()) : iniciar(null, f?.nivel)) };
 }

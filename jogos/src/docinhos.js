@@ -403,3 +403,30 @@ export function virarArcoiris(grade, i) {
   g[i] = { ...novoDoce(-1, 'arcoiris') };
   return g;
 }
+
+// ---------- Mapa das fases ----------
+export const TOTAL_FASES = 60;
+// O caminho passa por quatro lugares, 15 fases cada.
+export const REGIOES = [
+  { nome: 'Vale do Morango', icone: '🍓', cor: ['#ffd6e4', '#ffb3cc'] },
+  { nome: 'Floresta de Menta', icone: '🍃', cor: ['#d4f5dd', '#a9e8bd'] },
+  { nome: 'Lago de Mirtilo', icone: '🫐', cor: ['#d6e8ff', '#aecdff'] },
+  { nome: 'Castelo de Uva', icone: '🏰', cor: ['#e9dcff', '#cdb5ff'] },
+];
+export const regiaoDa = (n) => REGIOES[Math.min(REGIOES.length - 1, Math.floor((n - 1) / (TOTAL_FASES / REGIOES.length)))];
+
+// Melhor resultado de cada fase (estrelas e pontos) a partir do histórico, e até onde já foi liberado.
+export function progresso(historico) {
+  const melhor = {};
+  let liberada = 1;
+  for (const h of historico) {
+    if (h.j !== 'docinhos' || !h.nivel) continue;
+    const m = (melhor[h.nivel] ??= { estrelas: 0, pontos: 0, vezes: 0 });
+    m.vezes++;
+    m.pontos = Math.max(m.pontos, h.pontos ?? 0);
+    if (h.r === 'vitoria') { m.estrelas = Math.max(m.estrelas, h.estrelas ?? 1); liberada = Math.max(liberada, h.nivel + 1); }
+  }
+  liberada = Math.min(TOTAL_FASES, liberada);
+  const estrelas = Object.values(melhor).reduce((t, m) => t + m.estrelas, 0);
+  return { melhor, liberada, estrelas, maxEstrelas: TOTAL_FASES * 3 };
+}

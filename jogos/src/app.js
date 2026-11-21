@@ -107,6 +107,7 @@ const JOGOS = [
       };
     },
     regras: [
+      'O jogo abre no mapa: um caminho de 60 fases por quatro lugares (Vale do Morango, Floresta de Menta, Lago de Mirtilo e Castelo de Uva). Toque numa fase para ver a meta e jogar; nas que você já passou, dá para jogar de novo e ganhar mais estrelas. O botão 🗺️ Mapa volta para o caminho e guarda a partida.',
       'Arraste um doce para o lado, ou toque nele e depois no vizinho, para trocar os dois de lugar.',
       'A troca só vale se formar uma linha de 3 ou mais doces iguais. Os doces somem e outros caem de cima.',
       '4 em linha vira um doce listrado, que limpa a linha ou a coluna. L ou T vira uma bomba. 5 em linha vira o arco-íris, que limpa todos de uma cor.',

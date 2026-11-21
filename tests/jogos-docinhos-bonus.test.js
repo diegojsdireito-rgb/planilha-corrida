@@ -105,3 +105,23 @@ test('obstáculos: para vencer precisa dos pontos e de quebrar tudo', () => {
   assert.ok(!doce.venceu(f.meta, f, suja));
   assert.ok(!doce.venceu(f.meta - 1, f, limpa));
 });
+
+test('mapa: progresso guarda a melhor nota de cada fase e libera a próxima', () => {
+  const h = [
+    { j: 'docinhos', r: 'vitoria', nivel: 1, estrelas: 1, pontos: 2000 },
+    { j: 'docinhos', r: 'vitoria', nivel: 1, estrelas: 3, pontos: 4000 },
+    { j: 'docinhos', r: 'vitoria', nivel: 1, estrelas: 2, pontos: 3000 },
+    { j: 'docinhos', r: 'vitoria', nivel: 2, estrelas: 2, pontos: 3500 },
+    { j: 'docinhos', r: 'derrota', nivel: 3, estrelas: 0, pontos: 900 },
+    { j: 'velha', r: 'vitoria' },
+  ];
+  const p = doce.progresso(h);
+  assert.equal(p.liberada, 3);
+  assert.deepEqual([p.melhor[1].estrelas, p.melhor[1].pontos, p.melhor[1].vezes], [3, 4000, 3]);
+  assert.equal(p.melhor[3].estrelas, 0);
+  assert.equal(p.estrelas, 5);
+  assert.equal(doce.progresso([]).liberada, 1);
+  assert.equal(doce.progresso([{ j: 'docinhos', r: 'vitoria', nivel: 60, estrelas: 3 }]).liberada, 60, 'não passa da última fase');
+  assert.equal(doce.regiaoDa(1).nome, 'Vale do Morango');
+  assert.equal(doce.regiaoDa(60).nome, 'Castelo de Uva');
+});
