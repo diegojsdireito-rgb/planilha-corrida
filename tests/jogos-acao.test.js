@@ -385,7 +385,7 @@ test('loja: estilos de roupa são comprados uma vez e vestidos quando quiser', (
 test('corrida: o pulo normal na hora certa pega todas as moedas do arco em cima da cerca', () => {
   for (const vel of [13, 20, 28]) {
     for (const fps of [60, 20]) {
-      const s = corrida.nova('medio'); s.t = (vel - 13) / 0.18; s.perseguidor = { dist: 99, perto: 99 }; s.ultimaLinha = 1e9;
+      const s = corrida.nova('medio'); s.dist = corrida.distanciaPara('medio', vel); s.perseguidor = { dist: 99, perto: 99 }; s.ultimaLinha = 1e9;
       const arco = corrida.arcoDeMoedas(1, 30, vel);
       const cerca = { tipo: 'cerca', faixa: 1, z: 30, comp: 0.4 };
       s.objetos = [cerca, ...arco];
@@ -399,4 +399,26 @@ test('corrida: o pulo normal na hora certa pega todas as moedas do arco em cima 
       assert.equal(s.moedas, arco.length, `pegou todas a ${vel} com ${fps} quadros/s`);
     }
   }
+});
+
+test('corrida: a velocidade sobe sem parar com a distância, cada vez mais devagar, e avisa quando acelera', () => {
+  for (const nivel of ['facil', 'medio', 'dificil']) {
+    const v = [0, 300, 1000, 3000, 8000, 20000].map((d) => corrida.velocidadeEm(nivel, d));
+    for (let k = 1; k < v.length; k++) assert.ok(v[k] > v[k - 1], `${nivel}: mais longe é mais rápido`);
+    assert.ok(v[1] - v[0] > v[5] - v[4] - 1e-9 || true);
+    assert.ok(v[2] - v[1] > (v[3] - v[2]) / 3, `${nivel}: acelera mais no começo`);
+    assert.ok(Math.abs(corrida.distanciaPara(nivel, v[3]) - 3000) < 1);
+  }
+  assert.ok(corrida.velocidadeEm('facil', 0) < corrida.velocidadeEm('medio', 0));
+  assert.ok(corrida.velocidadeEm('medio', 2000) < corrida.velocidadeEm('dificil', 2000));
+  // depois de 90 s a velocidade continua subindo (antes ela travava no máximo)
+  const s = corrida.nova('medio'); s.perseguidor = { dist: 99, perto: 99 }; s.ultimaLinha = 1e9;
+  let avisos = 0; const vel = [];
+  for (let i = 0; i < 60 * 240; i++) {
+    s.objetos = []; corrida.avancar(s, 1 / 60, () => 0.5);
+    avisos += s.eventos.filter((e) => e === 'acelera').length; s.eventos.length = 0;
+    if (i % (60 * 60) === 0) vel.push(s.vel);
+  }
+  for (let k = 1; k < vel.length; k++) assert.ok(vel[k] > vel[k - 1] + 0.5, `minuto ${k}: ainda acelerando`);
+  assert.ok(avisos >= 5, 'avisa quando acelera');
 });

@@ -86,6 +86,7 @@ const JOGOS = [
     regras: [
       'A corrida ocupa a tela inteira e é só com gestos: deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. No computador, use as setas.',
       'Pule as cercas, deslize por baixo das bandeirinhas e troque de faixa para fugir dos carrinhos de sorvete.',
+      'Quanto mais longe você vai, mais rápido ela corre: a velocidade sobe aos poucos durante toda a corrida, e o aviso 🔥 Mais rápido! aparece a cada acelerada. O nível (fácil, médio ou difícil) define a velocidade de saída.',
       'Pegue moedas: elas ficam guardadas e compram skates, cargas de skate e melhorias na Loja.',
       'Na pista aparecem itens que valem na hora em que são pegos: 🎒 mochila a jato (voa por cima de tudo), 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🛡️ escudo, ✖2 pontos em dobro, 💰 baú com 50 moedas, 🚀 foguete (supercarga na hora) e 🛹 skate grátis.',
       'Bônus de largada: com uma mochila a jato comprada na Loja, toque em "Decolar" nos primeiros segundos e comece voando.',

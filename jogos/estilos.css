@@ -845,3 +845,10 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
 @keyframes mira { 50% { filter: brightness(1.12); } }
 .premio-bonus { display: block; margin-top: 4px; font-weight: 700; color: #c2185b; }
 @media (prefers-color-scheme: dark) { .doce-bonus .bonus { background: linear-gradient(#3a2430, #2c1a24); color: #ffd1e1; box-shadow: 0 2px 0 #1a0f15, var(--sombra); } }
+.aviso-acelera {
+  position: absolute; left: 50%; top: 30%; transform: translate(-50%, 0); z-index: 6; pointer-events: none; white-space: nowrap;
+  padding: 8px 18px; border-radius: 999px; font-weight: 900; font-size: 18px; color: #fff; letter-spacing: .02em;
+  background: linear-gradient(#ff8a1f, #e8452c); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); text-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+}
+.aviso-acelera.mostra { animation: acelera 1.6s ease-out forwards; }
+@keyframes acelera { 0% { opacity: 0; transform: translate(-50%, 14px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 25% { transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -12px); } }
