@@ -1,0 +1,110 @@
+/* Jogo da Memória */
+.mem { position: relative; }
+
+/* caminho de fases */
+.mem-mapa { background: linear-gradient(160deg, #efe8ff, #ffe9f3 55%, #fff4dc); border-radius: 22px; padding: 14px 12px 12px; box-shadow: var(--sombra); }
+.mem-mapa-topo { display: flex; justify-content: space-between; font-weight: 700; color: #4a3d7a; padding: 0 6px 10px; font-family: var(--titulos); }
+.mem-grade-fases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px 8px; }
+.mem-bola {
+  position: relative; aspect-ratio: 1; border: 0; border-radius: 50%; padding: 0;
+  background: radial-gradient(circle at 35% 30%, #a99cff, #6b5cf0 70%); color: #fff;
+  box-shadow: 0 4px 0 #4b3fc0, 0 6px 12px rgba(75, 63, 192, .3);
+  display: grid; place-items: center; font-family: var(--titulos); transition: transform .15s;
+}
+.mem-bola:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #4b3fc0; }
+.mem-bola .mem-num { font-size: 20px; font-weight: 800; margin-top: -8px; text-shadow: 0 1px 0 rgba(0, 0, 0, .25); }
+.mem-bola.feita { background: radial-gradient(circle at 35% 30%, #7fe0a6, #2f9e62 70%); box-shadow: 0 4px 0 #1f7a49, 0 6px 12px rgba(31, 122, 73, .3); }
+.mem-bola.atual { animation: mem-pulsa 1.6s ease-in-out infinite; }
+.mem-bola.chefe:not(.trancada) { background: radial-gradient(circle at 35% 30%, #ffd98a, #f29a1f 70%); box-shadow: 0 4px 0 #c46f0c, 0 6px 12px rgba(196, 111, 12, .3); }
+.mem-bola.trancada { background: #d8d2e8; box-shadow: 0 3px 0 #b9b1cf; cursor: default; }
+.mem-bola.trancada .mem-num { font-size: 16px; margin: 0; text-shadow: none; }
+.mem-bola.nova { animation: mem-nova .8s ease-out 2, mem-pulsa 1.6s ease-in-out 1.6s infinite; }
+.mem-est { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: -1px; line-height: 1; }
+.mem-est i, .mem-estrelas-agora i, .mem-fim-estrelas i { font-style: normal; color: rgba(255, 255, 255, .45); }
+.mem-est i.ok { color: #ffe066; text-shadow: 0 0 2px #a66b00; }
+.mem-marcas { position: absolute; top: -4px; right: -4px; display: flex; gap: 1px; }
+.mem-marca { font-size: 11px; background: #fff; border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); }
+.mem-andamento { position: absolute; top: -4px; left: -4px; font-size: 10px; background: var(--vermelho); color: #fff; border-radius: 50%; width: 18px; height: 18px; display: grid; place-items: center; }
+.mem-legenda { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 13px; color: #6b5f94; margin: 12px 0 0; }
+@keyframes mem-pulsa { 50% { transform: scale(1.07); } }
+@keyframes mem-nova { 0% { transform: scale(.6); } 60% { transform: scale(1.2); } }
+
+/* partida */
+.mem-topo { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.mem-voltar { padding: 8px 12px; font-size: 14px; }
+.mem-titulo { flex: 1; display: flex; flex-direction: column; line-height: 1.15; font-family: var(--titulos); }
+.mem-titulo b { font-size: 18px; }
+.mem-titulo span { font-size: 13px; color: var(--suave); }
+.mem-estrelas-agora { font-size: 24px; letter-spacing: -2px; }
+.mem-estrelas-agora i { color: var(--preenchido); transition: color .3s; }
+.mem-estrelas-agora i.ok { color: #f5b800; text-shadow: 0 1px 0 #c98a00; }
+.mem-info { min-height: 22px; display: flex; justify-content: center; gap: 16px; font-size: 14px; color: var(--suave); margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+.mem-info b { color: var(--texto); font-size: 16px; }
+.mem-resta.pouco b { color: var(--vermelho); }
+.mem-mesa { position: relative; display: flex; justify-content: center; min-height: 200px; }
+.mem-grade { display: grid; justify-content: center; }
+
+.mem-carta {
+  width: var(--mem-w); height: var(--mem-h); border: 0; padding: 0; background: none; perspective: 700px;
+  position: relative; animation: mem-entra .4s cubic-bezier(.3, 1.4, .5, 1) backwards; touch-action: manipulation;
+}
+.mem-carta:disabled { cursor: default; }
+.mem-giro { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .45s cubic-bezier(.4, 1.3, .5, 1); display: block; }
+.mem-carta.aberta .mem-giro { transform: rotateY(180deg); }
+.mem-verso, .mem-frente {
+  position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  display: grid; place-items: center; overflow: hidden;
+}
+.mem-verso {
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .35), transparent 50%), repeating-linear-gradient(45deg, #7a6cf5 0 8px, #6b5cf0 8px 16px);
+  border: 3px solid #fff; box-shadow: 0 3px 0 #4b3fc0, 0 4px 10px rgba(40, 30, 120, .25);
+}
+.mem-verso svg { width: 70%; height: 70%; }
+.mem-carta:not(:disabled):hover .mem-verso { filter: brightness(1.08); }
+.mem-frente { transform: rotateY(180deg); background: #fff; border: 3px solid #fff; box-shadow: 0 3px 0 #d6cfe6, 0 4px 10px rgba(0, 0, 0, .12); }
+.mem-frente svg, .mem-frente img { width: 84%; height: 84%; display: block; }
+.mem-frente img.arte { width: 100%; height: 100%; object-fit: cover; }
+.mem-frente.tema-doces { background: radial-gradient(circle at 50% 40%, #fff, #ffe3ec); --mem-fundo: #fff0f4; }
+.mem-frente.tema-bichos { background: radial-gradient(circle at 50% 40%, #fff, #dff5e5); }
+.mem-frente.tema-coisas { background: radial-gradient(circle at 50% 40%, #fff, #e2edff); }
+.mem-frente.tema-turma { background: radial-gradient(circle at 50% 40%, #fff, #ffefcf); }
+.mem-carta.achada .mem-frente { box-shadow: 0 3px 0 #2f9e62, 0 0 0 3px #7fe0a6; }
+.mem-carta.brilha .mem-frente { animation: mem-brilha .6s ease-out; }
+.mem-carta.errou .mem-frente { animation: mem-treme .4s ease-in-out; box-shadow: 0 3px 0 #c43a3e, 0 0 0 3px #ff9a9c; }
+.mem-carta.trocou .mem-verso { animation: mem-brilha-verso .7s ease-out; }
+.mem-carta.pula { animation: mem-pula .6s ease-out; }
+@keyframes mem-entra { from { transform: scale(.4) translateY(20px); opacity: 0; } }
+@keyframes mem-brilha { 0% { transform: rotateY(180deg) scale(1); } 40% { transform: rotateY(180deg) scale(1.14); filter: brightness(1.15); } 100% { transform: rotateY(180deg) scale(1); } }
+@keyframes mem-treme { 0%, 100% { transform: rotateY(180deg) translateX(0); } 25% { transform: rotateY(180deg) translateX(-5px); } 75% { transform: rotateY(180deg) translateX(5px); } }
+@keyframes mem-brilha-verso { 0% { box-shadow: 0 0 0 0 #ffd21f; } 50% { box-shadow: 0 0 0 5px #ffd21f, 0 0 20px #ffd21f; } }
+@keyframes mem-pula { 40% { transform: translateY(-14px) rotate(-4deg); } 70% { transform: translateY(2px); } }
+
+/* fim da fase */
+.mem-fim { position: absolute; inset: -6px; display: grid; place-items: center; background: color-mix(in srgb, var(--fundo) 45%, transparent); border-radius: 18px; animation: aparece .3s ease-out; z-index: 5; overflow: hidden; }
+.mem-fim-cartao { position: relative; z-index: 1; background: var(--cartao); border-radius: 22px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); text-align: center; max-width: 320px; animation: mem-sobe .45s cubic-bezier(.3, 1.4, .5, 1); }
+.mem-fim-titulo { font-family: var(--titulos); font-size: 26px; font-weight: 800; }
+.mem-fim.venceu .mem-fim-titulo { color: #6b5cf0; }
+.mem-fim-estrelas { font-size: 48px; letter-spacing: 2px; line-height: 1.1; margin: 4px 0; }
+.mem-fim-estrelas i { color: var(--preenchido); display: inline-block; }
+.mem-fim-estrelas i.ok { color: #f5b800; text-shadow: 0 2px 0 #c98a00; animation: mem-estrela .5s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+.mem-fim-cartao p { margin: 6px 0 12px; }
+.mem-fim-cartao small { color: var(--suave); }
+.mem-fim-botoes { display: flex; flex-direction: column; gap: 8px; }
+.mem-confete { position: absolute; inset: 0; pointer-events: none; }
+.mem-confete i { position: absolute; top: -12px; width: 9px; height: 14px; border-radius: 2px; animation: mem-cai 2s ease-in forwards; opacity: 0; }
+@keyframes mem-cai { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: .9; transform: translate(var(--lado), 560px) rotate(var(--giro)); } }
+@keyframes mem-estrela { from { transform: scale(0) rotate(-90deg); } }
+@keyframes mem-sobe { from { transform: translateY(30px) scale(.9); opacity: 0; } }
+
+@media (prefers-color-scheme: dark) {
+  .mem-mapa { background: linear-gradient(160deg, #2a2450, #3a2238 55%, #3a3020); }
+  .mem-mapa-topo { color: #d9d2ff; }
+  .mem-legenda { color: #b9b0e0; }
+  .mem-bola.trancada { background: #3a3550; box-shadow: 0 3px 0 #2a2640; }
+  .mem-frente { border-color: #f4f1ea; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mem-carta, .mem-carta.pula, .mem-bola.atual, .mem-bola.nova, .mem-carta.brilha .mem-frente, .mem-carta.errou .mem-frente, .mem-fim-estrelas i.ok, .mem-fim-cartao { animation: none; }
+  .mem-giro { transition-duration: .01s; }
+}
