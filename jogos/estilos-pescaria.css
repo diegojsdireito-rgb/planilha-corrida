@@ -1,31 +1,133 @@
-/* Pescaria: lago visto de lado */
+/* Pescaria: mapa de fases e lago visto de lado */
+.pesc-mapa { max-width: 480px; margin: 0 auto; position: relative; }
+.pesc-mapa[hidden], .pesc-fases[hidden], .pescaria-hud[hidden], .pescaria-palco[hidden], .pesc-bonus[hidden], .pesc-disputa[hidden] { display: none !important; }
+.pesc-mapa .mapa-topo span { white-space: nowrap; }
+/* o chão de cada lugar: água com bolhinhas, areia, neve com estrelinhas */
+.pesc-mapa .mapa-regiao {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, .65) 0 3px, transparent 4px),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, .5) 0 2px, transparent 3px),
+    radial-gradient(ellipse 30px 6px at 40% 80%, rgba(255, 255, 255, .35) 0 60%, transparent 70%),
+    linear-gradient(var(--c1), var(--c2));
+  background-size: 90px 90px, 70px 70px, 120px 60px, 100% 100%;
+}
+.pesc-mapa .pesc-regiao-mar {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, .7) 0 3px, transparent 4px),
+    radial-gradient(ellipse 34px 6px at 50% 50%, rgba(255, 255, 255, .45) 0 60%, transparent 70%),
+    linear-gradient(var(--c1), var(--c2) 70%, #ffe8b0);
+  background-size: 80px 80px, 140px 70px, 100% 100%;
+}
+.pesc-mapa .pesc-regiao-gelo {
+  background-image:
+    radial-gradient(circle at 20% 30%, #fff 0 1.4px, transparent 2px),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, .8) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 45% 85%, rgba(160, 255, 220, .6) 0 1.2px, transparent 1.8px),
+    linear-gradient(170deg, transparent 30%, rgba(90, 255, 180, .18) 45%, rgba(170, 120, 255, .2) 55%, transparent 70%),
+    linear-gradient(var(--c2), var(--c1) 70%, #7f96d8);
+  background-size: 60px 60px, 46px 46px, 90px 90px, 100% 100%, 100% 100%;
+}
+.pesc-mapa .mapa-trilha .feito { stroke: #ffb03d; }
+.pesc-mapa .mapa-trilha .fundo { stroke: #fffaf0; filter: drop-shadow(0 3px 2px rgba(20, 60, 110, .2)); }
+.pesc-mapa .mapa-fase { background: radial-gradient(circle at 35% 30%, #8fe3ff, #1f9fe0 70%); box-shadow: 0 4px 0 #1460c0, 0 6px 12px rgba(0, 0, 0, .25); }
+.pesc-mapa .mapa-fase.aberta { background: radial-gradient(circle at 35% 30%, #ffd0a0, #ff8a3d 70%); box-shadow: 0 4px 0 #d0601a, 0 6px 12px rgba(0, 0, 0, .25); }
+.pesc-mapa .mapa-fase.atual { background: radial-gradient(circle at 35% 30%, #a8f0c0, #2fb66a 70%); box-shadow: 0 4px 0 #1f8a4c, 0 0 0 6px rgba(47, 182, 106, .35), 0 6px 14px rgba(0, 0, 0, .25); }
+.pesc-mapa .mapa-fase.chefe:not(.trancada):not(.atual) { background: radial-gradient(circle at 35% 30%, #ffe08a, #f0a400 70%); box-shadow: 0 4px 0 #b57a00, 0 6px 12px rgba(0, 0, 0, .25); }
+.pesc-mapa .mapa-fase.trancada { background: #c9c3cf; box-shadow: 0 4px 0 #9a94a2; }
+.pesc-coroa { position: absolute; top: -18px; left: 50%; transform: translateX(-50%) rotate(-8deg); font-size: 20px; line-height: 1; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, .3)); pointer-events: none; }
+.pesc-mapa .mapa-enfeite.pesc-pula { width: 30px; height: 22px; opacity: .9; animation: pesc-pula 3.2s ease-in-out infinite; }
+@keyframes pesc-pula { 0%, 60%, 100% { transform: translate(-50%, 0) rotate(-10deg); } 75% { transform: translate(-50%, -16px) rotate(18deg); } 88% { transform: translate(-50%, -4px) rotate(30deg); } }
+.pesc-lua { position: absolute; right: 8%; width: 54px; height: 54px; pointer-events: none; filter: drop-shadow(0 0 12px rgba(255, 246, 200, .7)); }
+.pesc-lua svg { width: 100%; height: 100%; }
+.pesc-mapa .mapa-detalhe { background: rgba(8, 30, 60, .4); }
+.pesc-cartao .pesc-meta-grande { font-size: 16px; color: var(--texto); margin: 4px 0; }
+.pesc-cartao .recorde { color: #b86e00; }
+.pesc-dica { font-size: 13px !important; background: #e8f6ff; color: #1d5e8a !important; border-radius: 12px; padding: 6px 10px; margin: 4px 0 !important; }
+
+/* barra de cima durante a fase */
+.pesc-fases { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 4px 0 10px; font-weight: 700; color: var(--suave); }
+.pesc-melhor { color: #f2b100; letter-spacing: 1px; }
+
 .pescaria-hud { display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto 10px; background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 8px 12px; font-variant-numeric: tabular-nums; }
 .pescaria-hud b { font-family: var(--titulos); font-size: 18px; }
 .pesc-tempo { white-space: nowrap; }
 .pesc-tempo.pouco b { color: var(--vermelho); animation: pesc-pulsa 1s ease-in-out infinite; display: inline-block; }
 @keyframes pesc-pulsa { 50% { transform: scale(1.15); } }
-.pesc-pontos { white-space: nowrap; font-size: 14px; color: var(--suave); }
-.pesc-pontos b { color: var(--texto); }
-.pesc-barra { position: relative; flex: 1; height: 12px; border-radius: 99px; background: var(--preenchido); margin: 0 6px 12px; }
-.pesc-enche { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #5fd0ff, #2f9e62 55%, #f2b100); transition: width .3s ease-out; }
-.pesc-marca { position: absolute; top: -5px; transform: translateX(-50%); font-size: 15px; line-height: 1; color: var(--borda); text-shadow: 0 0 0 transparent; display: flex; flex-direction: column; align-items: center; -webkit-text-stroke: .6px var(--suave); }
-.pesc-marca small { font-size: 9px; color: var(--suave); -webkit-text-stroke: 0; margin-top: 2px; font-weight: 600; }
-.pesc-marca:last-child { transform: translateX(-80%); }
-.pesc-marca.ok { color: #ffc400; -webkit-text-stroke: .6px #c98a00; animation: pesc-ganhou .4s ease-out; }
-@keyframes pesc-ganhou { 50% { transform: translateX(-50%) scale(1.5); } }
+.pesc-meta { flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.pesc-meta .ic { font-size: 20px; line-height: 1; }
+.pesc-meta .txt { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pesc-meta .txt b { font-size: 16px; line-height: 1.05; white-space: nowrap; }
+.pesc-meta .txt small { font-size: 12px; color: var(--suave); font-family: system-ui, sans-serif; font-weight: 600; }
+.pesc-bolinha { width: 22px; height: 15px; flex: none; border-radius: 50% 60% 60% 50%; background: linear-gradient(var(--c1), var(--c2)); position: relative; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .12); }
+.pesc-bolinha::before { content: ""; position: absolute; left: -6px; top: 2px; border: 5.5px solid transparent; border-right: 7px solid var(--c2); border-left: 0; }
+.pesc-bolinha::after { content: ""; position: absolute; right: 4px; top: 4px; width: 3px; height: 3px; border-radius: 50%; background: #1b1b2a; }
+.pesc-barra { position: relative; height: 8px; border-radius: 99px; background: var(--preenchido); overflow: hidden; }
+.pesc-enche { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #5fd0ff, #2f9e62 60%, #f2b100); transition: width .3s ease-out; }
+.pesc-est { display: flex; font-size: 19px; line-height: 1; white-space: nowrap; }
+.pesc-est i { font-style: normal; color: var(--preenchido); -webkit-text-stroke: .6px var(--borda); transition: color .3s; }
+.pesc-est i.ok { color: #ffc400; -webkit-text-stroke: .6px #c98a00; }
 
 .pescaria-palco { position: relative; max-width: 480px; margin: 0 auto; border-radius: 20px; overflow: hidden; box-shadow: 0 0 0 3px #1659b8, 0 6px 0 #0d3a80, var(--sombra); background: #2b93e0; }
-@media (prefers-color-scheme: dark) { .pescaria-palco { box-shadow: 0 0 0 3px #0d3a80, 0 6px 0 #081f45, var(--sombra); } .pescaria-canvas { filter: brightness(.88) saturate(1.05); } }
+.pescaria-palco[data-lugar="rio"] { box-shadow: 0 0 0 3px #1a7f8f, 0 6px 0 #0f4f66, var(--sombra); background: #2fb0b0; }
+.pescaria-palco[data-lugar="mar"] { box-shadow: 0 0 0 3px #1460c0, 0 6px 0 #0b2f7a, var(--sombra); background: #1f9fe0; }
+.pescaria-palco[data-lugar="gelo"] { box-shadow: 0 0 0 3px #3a3f9a, 0 6px 0 #151a4f, var(--sombra); background: #1b3570; }
+@media (prefers-color-scheme: dark) { .pescaria-palco { box-shadow: 0 0 0 3px #0d3a80, 0 6px 0 #081f45, var(--sombra); } .pescaria-canvas { filter: brightness(.88) saturate(1.05); } .pescaria-palco[data-lugar="gelo"] .pescaria-canvas { filter: none; } }
 .pescaria-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; outline: none; }
 .pescaria-aviso { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 40, 90, .25); touch-action: none; cursor: pointer; }
 .pescaria-aviso[hidden] { display: none; }
-.pescaria-aviso div { background: var(--cartao); color: var(--texto); border-radius: 18px; padding: 14px 22px; text-align: center; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 4px; animation: pesc-flutua 2s ease-in-out infinite; }
-.pescaria-aviso b { font-family: var(--titulos); font-size: 22px; }
+.pescaria-aviso div { max-width: 82%; background: var(--cartao); color: var(--texto); border-radius: 18px; padding: 14px 22px; text-align: center; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 4px; animation: pesc-flutua 2s ease-in-out infinite; }
+.pescaria-aviso b { font-family: var(--titulos); font-size: 21px; line-height: 1.15; }
+.pescaria-aviso small { font-size: 12px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
 .pescaria-aviso span { font-size: 14px; color: var(--suave); }
 .pescaria-aviso div::before { content: "👆"; font-size: 30px; }
 @keyframes pesc-flutua { 50% { transform: translateY(-6px); } }
 
+/* disputa com o Peixe-Rei */
+.pesc-disputa { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(78%, 300px); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 12px 10px; border-radius: 16px; background: rgba(255, 255, 255, .92); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); touch-action: none; cursor: pointer; animation: pesc-chama .5s ease-in-out infinite alternate; }
+.pesc-disputa b { font-size: 15px; color: #7a4a00; }
+.pesc-cabo { width: 100%; height: 14px; border-radius: 99px; background: #e9e1d0; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .2); }
+.pesc-cabo span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ff6b4a, #ffc61a 50%, #2fb66a); transition: width .12s linear; }
+@keyframes pesc-chama { to { transform: translateX(-50%) scale(1.04); } }
+@media (prefers-color-scheme: dark) { .pesc-disputa { background: rgba(40, 36, 30, .92); } .pesc-disputa b { color: #ffd98a; } }
+
+/* bônus embaixo do lago */
+.pesc-bonus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 480px; margin: 12px auto 0; }
+.pesc-bonus .bonus {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px; border-radius: 14px; overflow: hidden;
+  border: 2px solid transparent; background: linear-gradient(#f0faff, #d6efff); color: #1d4e7a; box-shadow: 0 2px 0 #a8d4f0, var(--sombra); touch-action: manipulation;
+}
+.pesc-bonus .bonus .ic { font-size: 24px; line-height: 1.1; }
+.pesc-bonus .bonus .nome { font-size: 11.5px; font-weight: 800; line-height: 1.1; text-align: left; }
+.pesc-bonus .bonus .qtd { position: absolute; top: 3px; right: 4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; display: grid; place-items: center; font-size: 12px; color: #fff; background: #1f9fe0; border: 2px solid #fff; }
+.pesc-bonus .bonus:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 #a8d4f0; }
+.pesc-bonus .bonus.ativo { border-color: #ffb03d; background: linear-gradient(#fff6d6, #ffe08a); color: #7a4a00; }
+.pesc-relogio { position: absolute; left: 0; bottom: 0; height: 4px; width: var(--p); background: #ff9a1f; transition: width .25s linear; }
+.pesc-bonus .bonus:disabled { opacity: .45; }
+.pesc-bonus .bonus:disabled .qtd { background: #9a9aa6; }
+@media (prefers-color-scheme: dark) {
+  .pesc-bonus .bonus { background: linear-gradient(#1f3346, #172636); color: #cfeaff; box-shadow: 0 2px 0 #0c1620, var(--sombra); }
+  .pesc-bonus .bonus.ativo { background: linear-gradient(#4a3a18, #3a2c10); color: #ffe2a0; }
+  .pesc-dica { background: #1e3a4c; color: #bfe6ff !important; }
+  .pesc-cartao .recorde { color: #ffc861; }
+}
+
+/* cartão do fim */
+.pesc-fim > div { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 86%; }
+.pesc-fim .fim-botoes { background: none; padding: 0; box-shadow: none; border-radius: 0; margin-top: 8px; }
+.pesc-fim strong { font-size: 24px; }
+.pesc-fim small { font-family: system-ui, sans-serif; font-size: 13px; font-weight: 600; color: var(--suave); }
+.pesc-fim .estrelas-fim { font-size: 38px; letter-spacing: 4px; line-height: 1; }
+.pesc-fim .estrelas-fim i { font-style: normal; color: var(--preenchido); display: inline-block; }
+.pesc-fim .estrelas-fim i.ok { color: #f2b100; animation: pesc-estrela .5s ease-out backwards; }
+@keyframes pesc-estrela { from { transform: scale(0) rotate(-90deg); } 70% { transform: scale(1.3); } }
+.pesc-moedas { display: inline-block; margin: 2px 0; padding: 4px 14px; border-radius: 999px; background: linear-gradient(#fff3c4, #ffd76a); color: #7a4a00; font-size: 20px; font-weight: 900; box-shadow: 0 2px 0 #e0a800; animation: pesc-estrela .5s .6s ease-out backwards; }
+.pesc-sem-moedas { font-size: 12px !important; }
+.pesc-fim .premio-bonus { font-size: 13px; color: #1d6fb8; }
+.pesc-fim .pesc-dica { font-size: 13px; }
+.pesc-fim .fim-botoes .botao { font-size: 15px; }
+@media (prefers-color-scheme: dark) { .pesc-fim .premio-bonus { color: #8fd0ff; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .pesc-tempo.pouco b, .pescaria-aviso div, .pesc-marca.ok { animation: none; }
-  .pesc-enche { transition: none; }
+  .pesc-tempo.pouco b, .pescaria-aviso div, .pesc-disputa, .pesc-fim .estrelas-fim i.ok, .pesc-moedas, .pesc-mapa .mapa-enfeite.pesc-pula { animation: none; }
+  .pesc-enche, .pesc-cabo span, .pesc-relogio { transition: none; }
 }
