@@ -24,6 +24,8 @@ import * as telaCores from './telas/cores.js';
 import * as telaLabirinto from './telas/labirinto.js';
 import * as telaPescaria from './telas/pescaria.js';
 import * as telaBichinho from './telas/bichinho.js';
+import * as telaMemoria from './telas/memoria.js';
+import * as telaQuebra from './telas/quebra.js';
 import * as telaCacapalavras from './telas/cacapalavras.js';
 import * as telaForca from './telas/forca.js';
 import * as telaNumeros from './telas/numeros.js';
@@ -169,7 +171,7 @@ const JOGOS = [
 // Os jogos mais novos trazem a descrição e o ícone no próprio módulo da tela.
 const deTela = (tela) => ({ ...tela.INFO, tela, icone: tela.ICONE, ...(tela.resumo ? { resumo: tela.resumo } : {}) });
 JOGOS.splice(JOGOS.findIndex((j) => j.id === 'velha') + 1, 0, ...[telaDomino, telaMancala, telaBatalha, telaCores].map(deTela));
-JOGOS.push(...[telaCacapalavras, telaForca, telaNumeros, telaLabirinto, telaPescaria, telaBichinho].map(deTela));
+JOGOS.push(...[telaMemoria, telaQuebra, telaCacapalavras, telaForca, telaNumeros, telaLabirinto, telaPescaria, telaBichinho].map(deTela));
 for (const j of JOGOS) j.icone ??= ICONES[j.id];
 
 let sairDaTela = null;

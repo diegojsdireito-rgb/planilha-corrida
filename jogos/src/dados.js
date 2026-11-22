@@ -112,6 +112,7 @@ function montarPrefs(dados) {
     cenario: inicial.cenario ?? 'passeio',
     perseguidorFloresta: inicial.perseguidorFloresta ?? 'leao',
     bonusDocinhos: inicial.bonusDocinhos ?? null, // quantos bônus do Docinhos o jogador tem (null = ainda não ganhou os iniciais)
+    quebraTamanho: inicial.quebraTamanho ?? null, // peças do próximo quebra-cabeça
     bichinho: inicial.bichinho ?? null, // o bichinho virtual (null = ainda não adotou)
   };
   // Migra o placar da primeira versão, que não guardava histórico.
