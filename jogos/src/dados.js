@@ -112,6 +112,7 @@ function montarPrefs(dados) {
     cenario: inicial.cenario ?? 'passeio',
     perseguidorFloresta: inicial.perseguidorFloresta ?? 'leao',
     bonusDocinhos: inicial.bonusDocinhos ?? null, // quantos bônus do Docinhos o jogador tem (null = ainda não ganhou os iniciais)
+    bonusPescaria: inicial.bonusPescaria ?? null, // bônus da Pescaria (isca dourada, rede e +15 s; null = ainda não ganhou os iniciais)
     quebraTamanho: inicial.quebraTamanho ?? null, // peças do próximo quebra-cabeça
     bichinho: inicial.bichinho ?? null, // o bichinho virtual (null = ainda não adotou)
   };
@@ -180,7 +181,7 @@ export function montarCopia(jogos) {
     const s = lerSalvo(id);
     if (s) salvos[id] = s;
   }
-  return { app: MARCA, versao: 1, criada: Date.now(), perfil: perfilAtual().nome, nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, perseguidorFloresta: prefs.perseguidorFloresta, bonusDocinhos: prefs.bonusDocinhos, bichinho: prefs.bichinho, historico: prefs.historico, salvos };
+  return { app: MARCA, versao: 1, criada: Date.now(), perfil: perfilAtual().nome, nivel: prefs.nivel, som: prefs.som, personagem: prefs.personagem, carteira: prefs.carteira, perseguidorFloresta: prefs.perseguidorFloresta, bonusDocinhos: prefs.bonusDocinhos, bonusPescaria: prefs.bonusPescaria, bichinho: prefs.bichinho, historico: prefs.historico, salvos };
 }
 
 const chaveDoRegistro = (h) => `${h.j}|${h.r}|${h.t}|${h.tempo ?? ''}`;
@@ -221,6 +222,7 @@ export function restaurarCopia(texto, jogos) {
   if (copia.carteira) prefs.carteira = mesclarCarteiras(prefs.carteira, copia.carteira);
   if (copia.bichinho && !prefs.bichinho) prefs.bichinho = copia.bichinho;
   if (copia.bonusDocinhos && !prefs.bonusDocinhos) prefs.bonusDocinhos = copia.bonusDocinhos;
+  if (copia.bonusPescaria && !prefs.bonusPescaria) prefs.bonusPescaria = copia.bonusPescaria;
   guardar();
   for (const [id, s] of Object.entries(r.salvos)) {
     try { localStorage.setItem(SALVO + id, JSON.stringify(s)); } catch { /* sem armazenamento */ }

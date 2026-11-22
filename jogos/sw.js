@@ -92,6 +92,7 @@ const ARQUIVOS = [
   'src/telas/memoria.js',
   'src/telas/numeros.js',
   'src/telas/paciencia.js',
+  'src/telas/pescaria-arte.js',
   'src/telas/pescaria.js',
   'src/telas/pintar.js',
   'src/telas/quebra.js',
