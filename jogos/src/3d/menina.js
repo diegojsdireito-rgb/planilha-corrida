@@ -4,6 +4,7 @@
 import { THREE, xDe, textura, ruido, sombrear, texBrilho, desenho } from './base.js';
 import { PELES, ROUPAS } from '../personagem.js';
 import { personagemDe, usa } from '../personagens.js';
+import { montarPatinete } from './itens.js';
 import { geoCabeca, superficieDe, texRosto, texIris, criarOlho, PALPEBRA_FECHADA, tuboAfinado, geoCabelo, geoCabeleira, texCabeleira, geoCacho, geoCorpo, vPorTrechos, criarMao, criarTenis, fundirGeos } from './anatomia.js';
 
 const CABELO = ['#2c1a10', '#331e12', '#3b2316', '#46291a', '#52301f']; // castanho-escuro, com pontas um pouco mais claras
@@ -722,6 +723,17 @@ export function criarMenina() {
     return g;
   };
   const chamasSkate = [-0.1, 0.1].map((dx) => { const f = fogo(0xff7a1f); f.rotation.x = -Math.PI / 2; f.position.set(dx, 0.07, -0.48); skate.add(f); return f; });
+  // patinetes (um modelo de cada; aparece o que ela está usando) e o brilho de quando ele some
+  const patinetes = Object.fromEntries(['classico', 'luzes', 'eletrico'].map((id) => {
+    const p = montarPatinete(id); p.grupo.visible = false; raiz.add(p.grupo); return [id, p];
+  }));
+  const brilhoSumico = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0xfff3b0, transparent: true, depthWrite: false, opacity: 0 }));
+  brilhoSumico.visible = false; raiz.add(brilhoSumico);
+  const estrelinhas = Array.from({ length: 6 }, (_, k) => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: [0xffd21f, 0xff5fa2, 0x5ae6ff][k % 3], transparent: true, depthWrite: false }));
+    sp.visible = false; raiz.add(sp); return sp;
+  });
+  let dobraHaste = 0;
   // mochila a jato: mochila acolchoada, dois tanques com bocais, fogo e fumaça
   const maleta = new THREE.Group(); maleta.position.set(0, 0.25, -0.13); tronco.add(maleta);
   const { grupo: mochila, chamas: chamasMaleta } = criarMochilaJato();
@@ -856,7 +868,7 @@ export function criarMenina() {
   // j = joelho, p = tornozelo, ox/oz = ombro, c = cotovelo (0 = esquerda, 1 = direita).
   const JUNTAS = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'quadrilY', 'quadrilZ', 'troncoX', 'troncoY', 'troncoZ', 'cabecaX', 'cabecaY', 'cabecaZ', 'vento', 'balanco',
     'cx0', 'cz0', 'j0', 'p0', 'cx1', 'cz1', 'j1', 'p1', 'ox0', 'oy0', 'oz0', 'c0', 'ox1', 'oy1', 'oz1', 'c1', 'm0', 'm1', 'olhar', 'palpebra', 'esticar'];
-  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0, capturada: 0, saltitante: 0 };
+  const pesos = { parado: 1, corrida: 0, ar: 0, pouso: 0, desliza: 0, voo: 0, heroi: 0, nave: 0, skate: 0, patinete: 0, patineteAr: 0, patineteAbaixa: 0, batida: 0, vitrine: 0, comemora: 0, triste: 0, capturada: 0, saltitante: 0 };
   // ombro: primeiro torce o braço no próprio eixo (y), depois leva à frente (x) e abre para o lado (z).
   // A torção é o que permite pôr a mão na cintura com o cotovelo para fora.
   for (const b of bracos) b.ombro.rotation.order = 'ZXY';
@@ -1012,6 +1024,35 @@ export function criarMenina() {
         ox0: -0.2, oz0: -1.05 - 0.08 * b2, c0: -0.45, ox1: -0.35, oz1: 1.15 + 0.08 * b2, c1: -0.6,
       };
     },
+    patinete: (s, t, f) => {
+      // em pé no patinete, de frente, segurando o guidão com as duas mãos: o pé esquerdo fica no
+      // deck e o direito dá impulso no chão (desce, empurra para trás e volta dobrado)
+      const ph = f * 0.45;
+      const sw = Math.sin(ph); const empurra = Math.max(0, sw); const volta = Math.max(0, -sw);
+      const b = Math.sin(t * 2.6);
+      return {
+        posY: -0.045 - 0.035 * empurra, posZ: -0.02, troncoX: 0.2 + 0.06 * empurra, troncoY: 0.04, troncoZ: 0.02 * b, quadrilY: -0.06,
+        cabecaX: -0.16, cabecaY: 0.05 * b, vento: 0.4 + 0.1 * empurra, balanco: 0.07,
+        cx0: -0.2 - 0.05 * empurra, cz0: 0.0, j0: 0.42 + 0.12 * empurra, p0: -0.2,
+        cx1: 0.1 + 0.55 * sw, cz1: 0.14, j1: 0.12 + 1.1 * volta ** 0.8, p1: 0.35 * empurra + 0.2 * volta,
+        ox0: -1.05, oy0: 0, oz0: -0.5, c0: -0.3, m0: 0.2, ox1: -1.05, oy1: 0, oz1: 0.5, c1: -0.3, m1: 0.2,
+      };
+    },
+    patineteAr: (s) => {
+      // pulo de patinete: os dois pés no deck, joelhos encolhidos e as mãos firmes no guidão (o rodopio é o corpo inteiro)
+      const u = Math.max(-1, Math.min(1, (s.vy ?? 0) / 9));
+      return {
+        posY: -0.12 + 0.03 * u, troncoX: 0.28, cabecaX: -0.22, vento: 0.6, balanco: 0.12, esticar: 0.02 * u,
+        cx0: -0.62, cz0: -0.04, j0: 1.15, p0: -0.5, cx1: -0.52, cz1: 0.06, j1: 1.05, p1: -0.5,
+        ox0: -1.0, oy0: 0, oz0: -0.5, c0: -0.3, m0: 0.2, ox1: -1.0, oy1: 0, oz1: 0.5, c1: -0.3, m1: 0.2,
+      };
+    },
+    patineteAbaixa: () => ({
+      // abaixada no deck, com a haste dobrada para a frente, passando por baixo das bandeirinhas
+      posY: -0.3, posZ: -0.05, troncoX: 0.85, cabecaX: -0.6, vento: 0.5, balanco: 0.05,
+      cx0: -1.25, cz0: -0.12, j0: 2.0, p0: -0.65, cx1: -1.15, cz1: 0.14, j1: 1.95, p1: -0.6,
+      ox0: -0.75, oz0: -0.25, c0: -0.35, ox1: -0.75, oz1: 0.25, c1: -0.35,
+    }),
     vitrine: (s, t) => {
       // no saguão: mão na cintura, peso numa perna, cabeça inclinada, respirando;
       // de tempos em tempos ela acena para quem está jogando e troca o peso de perna
@@ -1076,6 +1117,7 @@ export function criarMenina() {
     ultimoTPose = t;
     const parado = s.t === 0 && s.dist === 0; // tela inicial: ela espera, parada
     const naPrancha = s.skate > 0;
+    const noPatinete = s.patinete > 0 && s.voo <= 0;
     const fase = parado ? t * 2 : s.dist * 1.55;
     if (yAntes > 0.15 && s.y <= 0.001 && s.voo <= 0) pouso = 0.26; // acabou de pousar
     yAntes = s.y;
@@ -1085,8 +1127,9 @@ export function criarMenina() {
     else if (!s.vivo) estado = 'batida';
     else if (parado) estado = 'parado';
     else if (s.voo > 0) estado = { capa: 'heroi', nave: 'nave' }[s.vooTipo] ?? 'voo';
-    else if (s.deslizando > 0 && s.y < 0.2) estado = 'desliza';
-    else if (s.y > 0.05) estado = 'ar';
+    else if (s.deslizando > 0 && s.y < 0.2) estado = noPatinete ? 'patineteAbaixa' : 'desliza';
+    else if (s.y > 0.05) estado = noPatinete ? 'patineteAr' : 'ar';
+    else if (noPatinete) estado = 'patinete';
     else if (pouso > 0) estado = 'pouso';
     else if (naPrancha) estado = 'skate';
     else if (s.superPulo > 0) estado = 'saltitante';
@@ -1136,8 +1179,14 @@ export function criarMenina() {
 
     // troca de faixa: inclina para dentro da curva e vira um pouco o corpo para o lado
     const desvio = s.x - s.faixa;
-    raiz.position.set(xDe(s.x), s.y + (naPrancha ? 0.1 : 0), 0);
-    raiz.rotation.set(0, desvio * 0.35, -desvio * 0.3);
+    raiz.position.set(xDe(s.x), s.y + (naPrancha ? 0.1 : noPatinete ? 0.075 : 0), 0);
+    raiz.rotation.set(0, desvio * 0.35, -desvio * (noPatinete ? 0.55 : 0.3)); // de patinete ela se inclina mais na curva
+    if (noPatinete && s.manobra) {
+      // manobra: rodopio inteiro, ela e o patinete juntos, que termina antes de tocar o chão
+      const u = Math.min(1, s.manobra.t / (s.manobra.dur * 0.8));
+      raiz.rotation.y += Math.PI * 2 * s.manobra.voltas * suave(u);
+      raiz.rotation.x = -0.12 * Math.sin(Math.PI * u);
+    }
     corpo.position.set(a.posX, a.posY, a.posZ);
     corpo.rotation.set(a.rotX, a.rotY, 0);
     corpo.scale.set(LARGO * (1 - a.esticar * 0.5), 1 + a.esticar, LARGO * (1 - a.esticar * 0.5)); // estica na subida do pulo, achata no pouso
@@ -1170,6 +1219,42 @@ export function criarMenina() {
       brilhoSkate.visible = s.skateTipo === 'voador';
       chamasSkate.forEach((f) => { f.visible = s.skateTipo === 'supersonico'; f.scale.setScalar(0.8 + Math.random() * 0.4); });
       skate.position.y = -0.1 + (s.skateTipo === 'voador' ? 0.05 + Math.sin(t * 5) * 0.025 : 0);
+    }
+    // patinete: rodas girando (e brilhando no Pisca-Pisca), guidão virando na curva, haste que dobra
+    // quando ela se abaixa, farol e turbo do elétrico; quando acaba, ele sai rodopiando ou some num brilho
+    const saiu = s.patineteSaiu;
+    const sumindo = !noPatinete && saiu && s.voo <= 0 && s.t - saiu.t < 0.9 ? (s.t - saiu.t) / 0.9 : null;
+    for (const [id, p] of Object.entries(patinetes)) p.grupo.visible = id === s.patineteTipo && (noPatinete || sumindo !== null);
+    brilhoSumico.visible = false; for (const e of estrelinhas) e.visible = false;
+    const pt = patinetes[s.patineteTipo];
+    if (pt && (noPatinete || sumindo !== null)) {
+      pt.grupo.position.set(0, -0.075, 0); pt.grupo.rotation.set(0, 0, 0); pt.grupo.scale.setScalar(1);
+      for (const r of pt.rodas) r.rotation.x = s.dist / 0.067;
+      dobraHaste += ((noPatinete && s.deslizando > 0 && s.y < 0.2 ? 1 : 0) - dobraHaste) * Math.min(1, dtp * 14);
+      pt.haste.rotation.set(dobraHaste * 1.2, desvio * 0.5, 0);
+      if (s.patineteTipo === 'luzes') pt.leds.forEach((m, k) => { const cor = (m.emissive ?? m.color).setHSL((t * 0.9 + k * 0.13) % 1, 1, 0.6); if (m.emissive) m.color.copy(cor); });
+      else pt.leds.forEach((m, k) => { m.emissiveIntensity = 0.8 + 0.6 * Math.max(0, Math.sin(t * 6 - k * 0.7)); });
+      if (pt.farol) pt.farol.emissiveIntensity = 1.3 + 0.3 * Math.sin(t * 9);
+      pt.chamas.forEach((f) => { f.visible = noPatinete && s.turboPatinete > 0; f.scale.set(1, 1, 0.7 + Math.random() * 0.6); });
+      if (sumindo !== null) {
+        const u = sumindo;
+        if (saiu.como === 'batida') {
+          // a batida joga o patinete para cima e para trás, girando, e ele some no ar
+          pt.grupo.position.set(1.4 * u, -0.075 + 2.2 * u - 1.3 * u * u, 1.8 * u);
+          pt.grupo.rotation.set(-u * 9, u * 2, u * 3);
+          pt.grupo.scale.setScalar(1 - 0.7 * u ** 2);
+        } else {
+          // o tempo acabou (ou ela trocou de veículo): encolhe rodopiando e vira estrelinhas
+          pt.grupo.position.set(0.6 * u, -0.075 + 0.9 * u, 0.4 * u); pt.grupo.rotation.y = u * 7; pt.grupo.scale.setScalar(Math.max(0.01, 1 - u));
+        }
+        brilhoSumico.visible = true; brilhoSumico.position.copy(pt.grupo.position).add(new THREE.Vector3(0, 0.35, 0));
+        brilhoSumico.scale.setScalar(0.4 + 1.2 * u); brilhoSumico.material.opacity = 0.9 * Math.sin(Math.PI * u);
+        estrelinhas.forEach((e, k) => {
+          const a = (k / estrelinhas.length) * Math.PI * 2 + u * 2;
+          e.visible = true; e.position.set(brilhoSumico.position.x + Math.cos(a) * 0.55 * u, brilhoSumico.position.y + Math.sin(a) * 0.45 * u, brilhoSumico.position.z);
+          e.scale.setScalar(0.16 * (1 - u) + 0.04); e.material.opacity = 1 - u;
+        });
+      }
     }
     maleta.visible = s.voo > 0 && !naNave && !deCapa;
     mochilaCostas.visible = temMochila && !maleta.visible && !deCapa; // a mochila a jato e a capa ocupam o lugar dela
@@ -1226,13 +1311,19 @@ export function criarMenina() {
       f.sp.scale.setScalar(0.18 + (0.7 - f.vida) * 0.9);
       f.sp.material.opacity = Math.max(0, f.vida) * 0.7;
     }
-    const corAura = s.supercarga > 0 ? 0xffc828 : s.escudo ? 0x50aaff : s.ima > 0 ? 0xff5a5a : null;
+    const corAura = s.turboPatinete > 0 && noPatinete ? 0x4fd8ff : s.supercarga > 0 ? 0xffc828 : s.escudo ? 0x50aaff : s.ima > 0 ? 0xff5a5a : null;
     aura.visible = corAura !== null && !naNave && !deCapa; // de capa ou na nave o ímã já vem junto: sem brilho em volta
     if (corAura !== null) { aura.material.color.setHex(corAura); aura.material.opacity = 0.45 + Math.sin(t * 8) * 0.1; }
     raiz.visible = !(s.invencivel > 0 && Math.floor(t * 12) % 2 === 0);
+    if (sumindo !== null && !raiz.visible) {
+      // piscando depois da batida: só ela pisca; o patinete que sai voando continua à vista
+      raiz.visible = true; corpo.visible = false; skate.visible = false; aura.visible = false;
+    } else corpo.visible = true;
     if (poseForcada) {
       // no saguão e na tela de fim: só ela, sem skate, mochila nem auras
-      skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true; mochilaCostas.visible = temMochila;
+      skate.visible = false; maleta.visible = false; aura.visible = false; raiz.visible = true; corpo.visible = true; mochilaCostas.visible = temMochila;
+      for (const p of Object.values(patinetes)) p.grupo.visible = false;
+      brilhoSumico.visible = false; for (const e of estrelinhas) e.visible = false;
       nave.visible = false; teleFeixe.visible = false; for (const parte of partesCapa) parte.visible = false; for (const m of molas) m.visible = false;
       for (const f of fumaca) f.sp.visible = false;
       raiz.position.y = 0;

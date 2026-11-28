@@ -85,7 +85,7 @@ const JOGOS = [
     'No nível difícil, o robô não erra: o melhor resultado possível é o empate.',
     'Quem começa alterna a cada partida.',
   ] },
-  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Mochila a jato, skates e poderes', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
+  { id: 'corrida', nome: 'Corrida dos Cachinhos', descricao: 'Mochila a jato, skates, patinetes e poderes', solo: true, rotuloNivel: 'Velocidade', tela: telaCorrida,
     resumo() {
       const n = prefs.historico.filter((h) => h.j === 'corrida').length;
       const r = telaCorrida.recorde();
@@ -99,13 +99,14 @@ const JOGOS = [
       'A corrida ocupa a tela inteira e é só com gestos: deslize para os lados para trocar de faixa, para cima para pular e para baixo para deslizar. No computador, use as setas.',
       'Pule as cercas, deslize por baixo das bandeirinhas e troque de faixa para fugir dos carrinhos de sorvete.',
       'Depois do começo da corrida aparecem obstáculos em movimento, cada cenário com os seus: na Cidade, o ônibus na contramão (desvie ou dê um super pulo), a bicicleta que troca de faixa (pisca a setinha antes) e o cachorro atravessando (pule); na Praia, o caranguejo andando de lado (pule) e a bola de praia quicando (deslize por baixo quando ela vem lá no alto, pule quando vem baixinha); na Floresta, o tronco rolando de um lado para o outro (pule) e o galho balançando (deslize); na Vila da Neve, a bola de neve que rola e cresce (desvie) e o pinguim de barriga que troca de faixa (pule). Quanto mais longe e mais rápido, mais eles aparecem.',
-      'Todo obstáculo em movimento avisa antes: ⚠️ piscando em cima dele, uma marca laranja no chão da faixa em que ele vai chegar e, no alto da tela, a faixa e o jeito de passar. Sempre sobra uma passagem, e os poderes valem contra eles também (escudo, skate, supercarga, mochila a jato, capa e nave).',
+      'Todo obstáculo em movimento avisa antes: ⚠️ piscando em cima dele, uma marca laranja no chão da faixa em que ele vai chegar e, no alto da tela, a faixa e o jeito de passar. Sempre sobra uma passagem, e os poderes valem contra eles também (escudo, skate, patinete, supercarga, mochila a jato, capa e nave).',
       'Quanto mais longe você vai, mais rápido ela corre: a velocidade sobe aos poucos durante toda a corrida, e o aviso 🔥 Mais rápido! aparece a cada acelerada. O nível (fácil, médio ou difícil) define a velocidade de saída.',
-      'Pegue moedas: elas ficam guardadas e compram skates, cargas de skate e melhorias na Loja.',
-      'Na pista aparecem itens que valem na hora em que são pegos: 🎒 mochila a jato (voa por cima de tudo), 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🛡️ escudo, ✖2 pontos em dobro, 💰 baú com 50 moedas, 🚀 foguete (supercarga na hora) e 🛹 skate grátis.',
+      'Pegue moedas: elas ficam guardadas e compram skates, patinetes, cargas e melhorias na Loja.',
+      'Na pista aparecem itens que valem na hora em que são pegos: 🎒 mochila a jato (voa por cima de tudo), 🧲 ímã, 👟 tênis de mola (super pulos, até por cima dos carrinhos), 🛡️ escudo, ✖2 pontos em dobro, 💰 baú com 50 moedas, 🚀 foguete (supercarga na hora), 🛹 skate grátis e 🛴 patinete grátis.',
       'Bônus de largada: com uma mochila a jato comprada na Loja, toque em "Decolar" nos primeiros segundos e comece voando.',
       'Os raios ⚡ enchem a barra da supercarga. Quando ela enche, a supercarga liga sozinha: corre mais rápido, pula mais alto e atravessa os obstáculos.',
       'Toque duas vezes na tela para subir no skate (gasta uma carga): ele aguenta uma batida. O voador pula mais alto; o supersônico é mais rápido e dá moedas em dobro.',
+      'Toque no botão 🛴 para subir no patinete (gasta uma carga de patinete, separada das do skate): ela vai em pé dando impulso com o pé, mais rápido, e as moedas da faixa dela vêm até a mão. Cada pulo de patinete vira um rodopio que vale pontos (com o tênis de mola, dois rodopios!). Ele dura 20 s e aguenta uma batida. O Pisca-Pisca tem rodinhas com luzes e manobras que valem o dobro; o Elétrico é o mais rápido e tem um ⚡ Turbo de 3 s que atravessa os obstáculos.',
       'Cumpra missões e abra o presente do dia na aba Prêmios para ganhar mais moedas.',
     ] },
   { id: 'docinhos', nome: 'Docinhos', descricao: 'Junte 3 doces iguais', solo: true, semNivel: true, tela: telaDocinhos,

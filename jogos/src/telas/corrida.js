@@ -38,12 +38,17 @@ export function montar(area, ctl) {
   const camada = el('div', 'corrida-camada');
   const decolarEl = el('button', 'acao-decolar');
   decolarEl.hidden = true;
+  // botão do patinete (embaixo, à direita): sobe no patinete e, no elétrico, liga o turbo
+  const patineteEl = el('button', 'acao-patinete');
+  patineteEl.hidden = true;
+  const avisoManobra = el('div', 'aviso-manobra');
+  avisoManobra.hidden = true;
   const sairEl = el('button', 'botao-icone sair-corrida', '‹');
   sairEl.setAttribute('aria-label', 'Sair da corrida');
   const somEl = el('button', 'botao-icone som-corrida');
-  const dicaGestos = el('div', 'dica-gestos', '<b>Deslize</b> ◀ ▶ troca de faixa · ▲ pula · ▼ desliza<br><b>Toque duas vezes</b> para subir no skate 🛹');
+  const dicaGestos = el('div', 'dica-gestos', '<b>Deslize</b> ◀ ▶ troca de faixa · ▲ pula · ▼ desliza<br><b>Toque duas vezes</b> para subir no skate 🛹<br><b>Botão 🛴</b> para subir no patinete');
   dicaGestos.hidden = true;
-  palco.append(tela3d, tela, hud, pausaEl, decolarEl, sairEl, somEl, dicaGestos, camada);
+  palco.append(tela3d, tela, hud, pausaEl, decolarEl, patineteEl, avisoManobra, sairEl, somEl, dicaGestos, camada);
   area.append(palco);
   sairEl.onclick = () => ctl.sair();
   const desenharSom = () => { somEl.textContent = prefs.som ? '🔊' : '🔇'; somEl.setAttribute('aria-label', prefs.som ? 'Desligar sons' : 'Ligar sons'); };
@@ -230,8 +235,8 @@ export function montar(area, ctl) {
     ctx.restore();
   }
 
-  const ICONE = { capa: '🦸‍♀️', nave: '🛸', ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹' };
-  const COR_BOLHA = { capa: '#e8344a', nave: '#2fcf9a', ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc' };
+  const ICONE = { capa: '🦸‍♀️', nave: '🛸', ima: '🧲', pulo: '👟', maleta: '🎒', escudo: '🛡️', raio: '⚡', dobro: '✖️', bau: '💰', turbo: '🚀', prancha: '🛹', patinete: '🛴' };
+  const COR_BOLHA = { capa: '#e8344a', nave: '#2fcf9a', ima: '#ff5a5a', pulo: '#35c46a', maleta: '#a2622d', escudo: '#3e8bff', raio: '#ffb800', dobro: '#ff4f81', bau: '#c98a00', turbo: '#ff7a1f', prancha: '#29b7dc', patinete: '#ff5fa2' };
   function bolha(x, y, r, tipo, t) {
     const yy = y + Math.sin(t * 4) * r * 0.12;
     const g = ctx.createRadialGradient(x - r * 0.35, yy - r * 0.4, r * 0.1, x, yy, r);
@@ -421,7 +426,7 @@ export function montar(area, ctl) {
       }
       mundo.desenhar(s ?? parado, t, visualAtual(), tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose, capturada);
       ctx.clearRect(0, 0, W, H);
-      if (s?.supercarga > 0) linhasDeVelocidade(t);
+      if (s?.supercarga > 0 || s?.turboPatinete > 0) linhasDeVelocidade(t);
       return;
     }
     const dist = s?.dist ?? 0;
@@ -439,8 +444,9 @@ export function montar(area, ctl) {
     // personagem
     const x = X(s?.x ?? 1, 0); const y = Y(0); const u = U(0);
     const naPrancha = (s?.skate ?? 0) > 0;
-    const altura = (s?.y ?? 0) + (naPrancha ? 0.14 : 0);
-    if (s?.supercarga > 0) linhasDeVelocidade(t);
+    const noPatinete = (s?.patinete ?? 0) > 0 && (s?.voo ?? 0) <= 0;
+    const altura = (s?.y ?? 0) + (naPrancha ? 0.14 : noPatinete ? 0.1 : 0);
+    if (s?.supercarga > 0 || s?.turboPatinete > 0) linhasDeVelocidade(t);
     if (s?.escudo || s?.ima || s?.supercarga > 0) {
       const g = ctx.createRadialGradient(x, y - (altura + 0.65) * u, u * 0.1, x, y - (altura + 0.65) * u, u * 0.85);
       const cor_ = s.supercarga > 0 ? '255,200,40' : s.escudo ? '80,170,255' : '255,90,90';
@@ -449,6 +455,11 @@ export function montar(area, ctl) {
       ctx.beginPath(); ctx.ellipse(x, y - (altura + 0.65) * u, u * 0.62, u * 0.9, 0, 0, Math.PI * 2); ctx.fill();
     }
     if (naPrancha) desenharSkate(x, y - altura * u + u * 0.02, u, s.skateTipo, t, (s?.y ?? 0));
+    // manobra: no 2D o rodopio aparece como ela e o patinete virando de lado e voltando
+    const giro = noPatinete && s.manobra ? Math.PI * 2 * s.manobra.voltas * Math.min(1, s.manobra.t / (s.manobra.dur * 0.8)) : 0;
+    ctx.save();
+    if (giro) { ctx.translate(x, 0); ctx.scale(Math.max(0.12, Math.abs(Math.cos(giro))) * (Math.cos(giro) < 0 ? -1 : 1), 1); ctx.translate(-x, 0); }
+    if (noPatinete) desenharPatinete(x, y - altura * u + u * 0.1, u, s, t, 'atras');
     if (s?.superPulo > 0 && altura < 0.1) {
       ctx.strokeStyle = 'rgba(53,196,106,.7)'; ctx.lineWidth = u * 0.03;
       for (const k of [0, 1]) { ctx.beginPath(); ctx.ellipse(x, y, u * (0.3 + k * 0.12 + (t * 2 % 0.12)), u * (0.08 + k * 0.03), 0, 0, Math.PI * 2); ctx.stroke(); }
@@ -461,6 +472,9 @@ export function montar(area, ctl) {
       ...prefs.personagem,
       piscando: (s?.invencivel ?? 0) > 0 && Math.floor(t * 12) % 2 === 0,
     });
+    if (noPatinete) desenharPatinete(x, y - altura * u + u * 0.1, u, s, t, 'frente');
+    ctx.restore();
+    if (s && !noPatinete && s.patineteSaiu && s.voo <= 0 && s.t - s.patineteSaiu.t < 0.9) desenharPatineteSaindo(x, y - (s.y ?? 0) * u, u, s, t);
     if ((s?.voo ?? 0) > 0) {
       if (s.vooTipo === 'mochila') desenharMaleta(x, y - altura * u, u, t);
       else {
@@ -539,6 +553,85 @@ export function montar(area, ctl) {
     }
   }
 
+  // Patinete visto de trás, em duas partes: atrás dela (deck, roda, haste e guidão) e na frente
+  // (os punhos com as fitinhas, que aparecem dos lados das mãos, e o pé dando impulso no chão).
+  const COR_PAT = { classico: ['#ff5fa2', '#c23a7a', '#8a6cff'], luzes: ['#8a6cff', '#5a3fd0', '#ff5fa2'], eletrico: ['#22c993', '#138a64', '#22c993'] };
+  function desenharPatinete(x, y, u, est, t, parte) {
+    const tipo = est.patineteTipo; const [cor, escuro, punho] = COR_PAT[tipo] ?? COR_PAT.classico;
+    const dobra = est.deslizando > 0 && est.y < 0.2;
+    const curva = (est.faixa - est.x) * 0.25; // o guidão vira na troca de faixa
+    const topoY = y - u * (dobra ? 0.45 : 0.98); const gx = x + curva * u * 0.4;
+    if (parte === 'atras') {
+      // turbo do elétrico: dois jatos azuis saindo de trás
+      if (est.turboPatinete > 0) {
+        for (const lado of [-1, 1]) {
+          const g = ctx.createLinearGradient(0, y, 0, y + u * 0.4);
+          g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, '#4fd8ff'); g.addColorStop(1, 'rgba(79,216,255,0)');
+          ctx.fillStyle = g; const flk = Math.sin(t * 40 + lado) * u * 0.05;
+          ctx.beginPath(); ctx.moveTo(x + lado * u * 0.06 - u * 0.04, y); ctx.lineTo(x + lado * u * 0.06 + u * 0.04, y); ctx.lineTo(x + lado * u * 0.06, y + u * 0.38 + flk); ctx.fill();
+        }
+      }
+      // haste: sai da ponta da frente do deck e sobe até o guidão
+      ctx.strokeStyle = tipo === 'eletrico' ? '#3a4150' : '#c9d0da'; ctx.lineWidth = u * 0.045; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y - u * 0.2); ctx.lineTo(gx, topoY); ctx.stroke();
+      ctx.lineWidth = u * 0.035;
+      ctx.beginPath(); ctx.moveTo(gx - u * 0.24, topoY + curva * u * 0.1); ctx.lineTo(gx + u * 0.24, topoY - curva * u * 0.1); ctx.stroke();
+      // deck em perspectiva (some para dentro da rua) com a lixa e a roda de trás embaixo
+      const perto = { l: u * 0.12, y: y + u * 0.02 }; const longe = { l: u * 0.09, y: y - u * 0.2 };
+      ctx.fillStyle = escuro;
+      ctx.beginPath(); ctx.moveTo(x - perto.l, perto.y + u * 0.03); ctx.lineTo(x + perto.l, perto.y + u * 0.03); ctx.lineTo(x + longe.l, longe.y + u * 0.03); ctx.lineTo(x - longe.l, longe.y + u * 0.03); ctx.fill();
+      ctx.fillStyle = cor;
+      ctx.beginPath(); ctx.moveTo(x - perto.l, perto.y); ctx.quadraticCurveTo(x, perto.y + u * 0.05, x + perto.l, perto.y); ctx.lineTo(x + longe.l, longe.y); ctx.quadraticCurveTo(x, longe.y - u * 0.04, x - longe.l, longe.y); ctx.fill();
+      ctx.fillStyle = 'rgba(30,30,50,.55)'; ctx.fillRect(x - u * 0.07, longe.y + u * 0.02, u * 0.14, perto.y - longe.y - u * 0.02);
+      // roda de trás (vista de trás é uma elipse estreita) com o paralama
+      const brilha = tipo === 'luzes' ? `hsl(${(t * 300) % 360} 100% 65%)` : tipo === 'eletrico' ? '#8ffcff' : null;
+      if (brilha) {
+        const g = ctx.createRadialGradient(x, perto.y + u * 0.09, 0, x, perto.y + u * 0.09, u * 0.16);
+        g.addColorStop(0, brilha); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, perto.y + u * 0.09, u * 0.16, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = tipo === 'eletrico' ? '#2b2f3a' : '#f4f4f4';
+      ctx.beginPath(); ctx.ellipse(x, perto.y + u * 0.09, u * 0.035, u * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = brilha ?? cor; ctx.fillRect(x - u * 0.012, perto.y + u * 0.06, u * 0.024, u * 0.06);
+      ctx.fillStyle = cor; ctx.beginPath(); ctx.ellipse(x, perto.y + u * 0.04, u * 0.06, u * 0.03, 0, Math.PI, 0); ctx.fill();
+      return;
+    }
+    // punhos e fitinhas nas pontas do guidão (aparecem dos dois lados dela)
+    for (const lado of [-1, 1]) {
+      const px = gx + lado * u * 0.24; const py = topoY - lado * curva * u * 0.1;
+      ctx.fillStyle = punho; ctx.beginPath(); ctx.ellipse(px, py, u * 0.05, u * 0.032, 0, 0, Math.PI * 2); ctx.fill();
+      ['#ffd21f', '#35c9ff', '#ff5fa2'].forEach((c, k) => {
+        ctx.strokeStyle = c; ctx.lineWidth = u * 0.016;
+        const balanca = Math.sin(t * 12 + k + lado) * u * 0.03;
+        ctx.beginPath(); ctx.moveTo(px + lado * u * 0.05, py); ctx.quadraticCurveTo(px + lado * u * 0.1, py + u * 0.03, px + lado * u * (0.14 + k * 0.02) + balanca, py + u * (0.08 + k * 0.03)); ctx.stroke();
+      });
+    }
+    // o pé dando impulso: a cada passada desce do lado do deck e solta uma poeirinha
+    if (!dobra && est.y < 0.05) {
+      const ph = (est.dist * 1.55 * 0.45) % (Math.PI * 2);
+      if (Math.sin(ph) > 0.5) {
+        ctx.fillStyle = 'rgba(255,255,255,.7)';
+        for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(x + u * (0.16 + k * 0.05), y + u * (0.08 - k * 0.02), u * (0.035 - k * 0.008), 0, Math.PI * 2); ctx.fill(); }
+      }
+    }
+  }
+  // Quando o passeio acaba: na batida ele voa girando; no fim do tempo some num brilho de estrelinhas.
+  function desenharPatineteSaindo(x, y, u, est, t) {
+    const saiu = est.patineteSaiu; const k = (est.t - saiu.t) / 0.9;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - k);
+    if (saiu.como === 'batida') { ctx.translate(x + u * 0.6 * k, y - u * (1.8 * k - 1.1 * k * k)); ctx.rotate(k * 9); ctx.scale(1 - 0.5 * k, 1 - 0.5 * k); }
+    else { ctx.translate(x, y); ctx.scale(Math.max(0.05, 1 - k), Math.max(0.05, 1 - k)); }
+    ctx.font = `${Math.round(u * 0.7)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🛴', 0, -u * 0.3);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.font = `${Math.round(u * 0.25)}px sans-serif`; ctx.textAlign = 'center';
+    for (let j = 0; j < 6; j++) { const a = (j / 6) * Math.PI * 2 + k * 2; ctx.fillText('✨', x + Math.cos(a) * u * 0.6 * k, y - u * 0.5 + Math.sin(a) * u * 0.45 * k); }
+    ctx.restore();
+  }
+
   // Maleta voadora nas costas, com dois jatos de fogo.
   function desenharMaleta(x, y, u, t) {
     const cx = x; const cy = y - u * 0.86;
@@ -566,22 +659,46 @@ export function montar(area, ctl) {
     somEl.hidden = emCorrida;
     pausaEl.hidden = !emCorrida;
     if (!emCorrida || capturada !== null) desenharAlerta();
-    if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; return; }
-    if (capturada !== null) { hud.innerHTML = ''; decolarEl.hidden = true; pausaEl.hidden = true; dicaGestos.hidden = true; return; } // a cena da captura fica limpa
+    if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; patineteEl.hidden = true; return; }
+    if (capturada !== null) { hud.innerHTML = ''; decolarEl.hidden = true; patineteEl.hidden = true; pausaEl.hidden = true; dicaGestos.hidden = true; return; } // a cena da captura fica limpa
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
     hud.innerHTML = `<span class="pts">${cor.pontos(s).toLocaleString('pt-BR')}</span><span class="est">🪙 ${s.moedas}</span>${
       s.dobro > 0 ? `<span class="poder dobro">✖2 ${Math.ceil(s.dobro)}s</span>` : ''}${
-      tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, { mochila: '🎒', capa: '🦸‍♀️', nave: '🛸' }[s.vooTipo] ?? '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
+      tempo(s.ima, '🧲')}${tempo(s.superPulo, '👟')}${tempo(s.voo, { mochila: '🎒', capa: '🦸‍♀️', nave: '🛸' }[s.vooTipo] ?? '🎒')}${tempo(s.supercarga, '⚡')}${tempo(s.skate, '🛹')}${tempo(s.patinete, s.turboPatinete > 0 ? '🛴⚡' : '🛴')}${s.escudo ? '<span class="poder">🛡️</span>' : ''}`;
     const podeDecolar = emCorrida && s.arrancadas > 0 && s.t <= cor.JANELA_ARRANCADA && s.voo <= 0;
     decolarEl.hidden = !podeDecolar;
     if (podeDecolar) decolarEl.innerHTML = `🎒 Decolar! <small>${s.arrancadas}</small><i style="width:${Math.round((1 - s.t / cor.JANELA_ARRANCADA) * 100)}%"></i>`;
-    hud.insertAdjacentHTML('beforeend', `<span class="poder">🛹 ${s.cargas}</span><span class="energia" title="Supercarga">⚡<i style="width:${Math.round(s.energia * 100)}%"></i></span>`);
+    desenharBotaoPatinete(emCorrida);
+    hud.insertAdjacentHTML('beforeend', `<span class="poder">🛹 ${s.cargas}</span><span class="poder">🛴 ${s.cargasPatinete}</span><span class="energia" title="Supercarga">⚡<i style="width:${Math.round(s.energia * 100)}%"></i></span>`);
+  }
+
+  // o botão do patinete: "subir" quando tem carga; no elétrico, vira "Turbo" uma vez por passeio
+  function desenharBotaoPatinete(emCorrida) {
+    const turbo = s.patinete > 0 && cor.PATINETES[s.patineteTipo].turbo && !s.turboUsado;
+    const subir = s.patinete <= 0 && s.cargasPatinete > 0;
+    const mostra = emCorrida && s.vivo && s.voo <= 0 && (turbo || subir);
+    patineteEl.hidden = !mostra;
+    if (!mostra) return;
+    const modo = turbo ? 'turbo' : 'subir';
+    if (patineteEl.dataset.modo === modo && patineteEl.dataset.n === String(s.cargasPatinete)) return;
+    patineteEl.dataset.modo = modo; patineteEl.dataset.n = String(s.cargasPatinete);
+    patineteEl.classList.toggle('turbo', turbo);
+    patineteEl.innerHTML = turbo ? '<b>⚡</b><span>Turbo</span>' : `<b>🛴</b><span>Patinete</span><small>${s.cargasPatinete}</small>`;
+    patineteEl.setAttribute('aria-label', turbo ? 'Ligar o turbo do patinete elétrico' : `Subir no patinete (${s.cargasPatinete} ${s.cargasPatinete === 1 ? 'carga' : 'cargas'})`);
+  }
+  function mostrarManobra() {
+    const m = s.ultimaManobra; if (!m) return;
+    avisoManobra.innerHTML = `${m.voltas > 1 ? `Rodopio ${m.voltas}×!` : 'Rodopio!'} <b>+${m.pontos}</b>`;
+    avisoManobra.hidden = false;
+    avisoManobra.classList.remove('mostra'); void avisoManobra.offsetWidth; avisoManobra.classList.add('mostra');
+    clearTimeout(mostrarManobra.relogio);
+    mostrarManobra.relogio = setTimeout(() => { avisoManobra.hidden = true; }, 1300);
   }
 
   const SOM = {
     pulo: 'passo', superpulo: 'superpulo', troca: 'clique', moeda: 'moeda', raio: 'acerto', 'carga-cheia': 'premio', poder: 'item',
     escudo: 'captura', desliza: 'carta', batida: 'erro', decolar: 'decolar', 'pouso-jato': 'pouso-jato', heroi: 'heroi', 'pouso-heroi': 'pouso-heroi', teletransporte: 'teletransporte', supercarga: 'turbo', skate: 'skate',
-    'skate-quebrou': 'quebra', quebra: 'quebra', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
+    'skate-quebrou': 'quebra', quebra: 'quebra', patinete: 'patinete', 'patinete-quebrou': 'quebra', 'patinete-fim': 'poder-fim', manobra: 'manobra', 'turbo-patinete': 'turbo', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
   };
 
   // aviso no alto da tela: o que vem em movimento, em que faixa ele chega e como passar
@@ -625,6 +742,7 @@ export function montar(area, ctl) {
       for (const e of s.eventos) {
         if (e === 'perseguidor') ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
         else if (e === 'acelera') { ctl.som('turbo'); mostrarAcelera(); }
+        else if (e === 'manobra') { ctl.som('manobra'); mostrarManobra(); }
         else if (e.startsWith?.('alerta:')) ctl.som(e === 'alerta:caranguejo' ? 'caranguejo' : 'xeque');
         else if (SOM[e]) ctl.som(SOM[e]);
       }
@@ -676,7 +794,7 @@ export function montar(area, ctl) {
     ctl.som('clique');
     ativa = ctl.ativa();
     const c = prefs.carteira;
-    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas, dom: personagemDe(c.personagem).dom, cenario: prefs.cenario ?? 'passeio' });
+    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, patinete: c.patinete, cargasPatinete: c.cargasPatinete, arrancadas: c.arrancadas, dom: personagemDe(c.personagem).dom, cenario: prefs.cenario ?? 'passeio' });
     temaVisto = null;
     pegando = 0;
     capturada = null;
@@ -719,9 +837,17 @@ export function montar(area, ctl) {
     supersonico: '<svg viewBox="0 0 60 30"><path d="M14 17 L22 17 L18 29Z M38 17 L46 17 L42 29Z" fill="#ff9a1f"/><rect x="4" y="8" width="52" height="9" rx="4.5" fill="#b8241a"/><rect x="4" y="8" width="52" height="4" rx="2" fill="#ff7a6b"/><path d="M20 12 L30 10 L28 13 L38 11" stroke="#fff3a0" stroke-width="1.6" fill="none"/></svg>',
   };
 
+  // patinetes na loja: de lado, com rodinhas, haste, guidão e fitinhas
+  const svgPatinete = (deck, haste, punho, roda, extra = '') => `<svg class="svg-patinete" viewBox="0 0 60 40"><path d="M47 33 L44 6" stroke="${haste}" stroke-width="3" stroke-linecap="round"/><path d="M39 5 H50" stroke="${haste}" stroke-width="2.6" stroke-linecap="round"/><rect x="37" y="3" width="5" height="4" rx="2" fill="${punho}"/><path d="M37 5 q-4 3 -3 8 M38 6 q-1 4 1 8" stroke="#ffd21f" stroke-width="1.2" fill="none"/><rect x="8" y="27" width="40" height="5" rx="2.5" fill="${deck}"/><path d="M8 29 q-2 -6 6 -5" stroke="${deck}" stroke-width="2.4" fill="none"/>${extra}<circle cx="13" cy="34" r="4.6" fill="${roda}" stroke="#333" stroke-width="1"/><circle cx="47" cy="34" r="4.6" fill="${roda}" stroke="#333" stroke-width="1"/><circle cx="13" cy="34" r="1.6" fill="${deck}"/><circle cx="47" cy="34" r="1.6" fill="${deck}"/><path d="M24 29.5 l1 -2 1 2 2 0 -1.6 1.3 .6 2 -2 -1.2 -2 1.2 .6 -2 -1.6 -1.3z" fill="#ffd21f"/></svg>`;
+  const PATINETE_SVG = {
+    classico: svgPatinete('#ff5fa2', '#b9c1cd', '#8a6cff', '#ffffff'),
+    luzes: svgPatinete('#8a6cff', '#e8ebf0', '#ff5fa2', '#fff', '<circle cx="13" cy="34" r="7.5" fill="#ff5fa2" opacity=".35"/><circle cx="47" cy="34" r="7.5" fill="#5ae6ff" opacity=".35"/><circle cx="18" cy="29.5" r="1" fill="#ffd21f"/><circle cx="30" cy="29.5" r="1" fill="#5ae6ff"/><circle cx="40" cy="29.5" r="1" fill="#ff5fa2"/>'),
+    eletrico: svgPatinete('#22c993', '#3a4150', '#22c993', '#2b2f3a', '<rect x="16" y="32" width="22" height="3" rx="1.5" fill="#2b2f3a"/><circle cx="45.4" cy="18" r="2" fill="#fff6c0"/><path d="M27 31 l-2 3 2 0 -1 3 3 -4 -2 0 1 -2z" fill="#ffd21f"/><path d="M5 26 h-4 M6 29 h-5" stroke="#4fd8ff" stroke-width="1.6" stroke-linecap="round"/>'),
+  };
+
   function carteiraHtml() {
     const c = prefs.carteira;
-    return `<div class="carteira"><span>🪙 <b>${fmt(c.moedas)}</b></span><span>🛹 <b>${c.cargas}</b></span><span>🎒 <b>${c.arrancadas}</b></span></div>`;
+    return `<div class="carteira"><span>🪙 <b>${fmt(c.moedas)}</b></span><span>🛹 <b>${c.cargas}</b></span><span>🛴 <b>${c.cargasPatinete}</b></span><span>🎒 <b>${c.arrancadas}</b></span></div>`;
   }
 
   function salvarCarteira(c) { prefs.carteira = c; guardar(); }
@@ -743,7 +869,7 @@ export function montar(area, ctl) {
     const eu = perfilAtual();
     const nome = eu.nome.replace(/[&<>"]/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[x]);
     const quem = temVariosPerfis() ? `<span class="pilula jogador">${eu.avatar} <b>${nome}</b></span>` : '';
-    return `<div class="lobby-topo">${quem}<span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
+    return `<div class="lobby-topo">${quem}<span class="pilula">🪙 <b>${fmt(c.moedas)}</b></span><span class="pilula">🛹 <b>${c.cargas}</b></span><span class="pilula">🛴 <b>${c.cargasPatinete}</b></span><span class="pilula">🎒 <b>${c.arrancadas}</b></span></div>`;
   };
   // Sem 3D, o retrato desenhado ocupa o lugar da menina.
   // (o retrato fica escondido pelo CSS quando o 3D carrega, mesmo que carregue depois de a tela abrir)
@@ -802,7 +928,8 @@ export function montar(area, ctl) {
         <div class="cenarios velocidade"><span>Velocidade</span>${[['facil', 'Fácil', '🐢'], ['medio', 'Médio', '🏃‍♀️'], ['dificil', 'Difícil', '⚡']].map(([id, nome, ic]) => `<button data-velocidade="${id}" aria-pressed="${prefs.nivel === id}"><b>${ic}</b>${nome}</button>`).join('')}</div>
         <div class="cenarios"><span>Cenário</span>${CENARIOS.map((c_) => `<button data-cenario="${c_.id}" aria-pressed="${(prefs.cenario ?? 'passeio') === c_.id}"><b>${c_.icone}</b>${c_.nome}</button>`).join('')}</div>
         ${['floresta', 'passeio'].includes(prefs.cenario ?? 'passeio') ? `<div class="cenarios bichos"><span>Na floresta, quem corre atrás?</span>${OPCOES_FLORESTA.map((o) => `<button data-bicho="${o.id}" aria-pressed="${prefs.perseguidorFloresta === o.id}"><b>${o.icone}</b>${o.nome}</button>`).join('')}</div>` : ''}
-        <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque duas vezes na tela para subir</small>`;
+        <small class="equipado">${SKATE_SVG[c.skate]} ${cor.SKATES[c.skate].nome}: toque duas vezes na tela para subir</small>
+        <small class="equipado">${PATINETE_SVG[c.patinete]} ${cor.PATINETES[c.patinete].nome}: toque no botão 🛴 para subir</small>`;
     } else if (aba === 'loja') {
       corpo = `
         <h4>Estilos de roupa</h4>
@@ -822,6 +949,16 @@ export function montar(area, ctl) {
         <h4>Cargas de skate</h4>
         <div class="item-loja"><span class="icone-item">🛹</span><div><b>Você tem ${c.cargas}</b><small>Cada carga liga o skate por ${cor.DURACAO_SKATE} s.</small></div>
           <span class="dupla"><button class="botao" data-cargas="1" ${c.moedas < loja.PRECO_CARGA ? 'disabled' : ''}>+1 · 🪙 ${loja.PRECO_CARGA}</button><button class="botao" data-cargas="5" ${c.moedas < loja.PRECO_CARGA * 5 ? 'disabled' : ''}>+5 · 🪙 ${fmt(loja.PRECO_CARGA * 5)}</button></span></div>
+        <h4>Patinetes</h4>
+        ${loja.PATINETES_LOJA.map((it) => {
+          const tem = c.patinetes.includes(it.id);
+          const usando = c.patinete === it.id;
+          const botao = usando ? '<span class="usando">Em uso</span>' : tem ? `<button class="botao secundario" data-usar-patinete="${it.id}">Usar</button>` : `<button class="botao" data-patinete="${it.id}" ${c.moedas < it.preco ? 'disabled' : ''}>🪙 ${fmt(it.preco)}</button>`;
+          return `<div class="item-loja">${PATINETE_SVG[it.id]}<div><b>${cor.PATINETES[it.id].nome}</b><small>${it.texto}</small></div>${botao}</div>`;
+        }).join('')}
+        <h4>Cargas de patinete</h4>
+        <div class="item-loja"><span class="icone-item">🛴</span><div><b>Você tem ${c.cargasPatinete}</b><small>São separadas das cargas de skate. Cada carga liga o patinete por ${cor.DURACAO_PATINETE} s: toque no botão 🛴 durante a corrida. O 🛴 que aparece na pista é de graça.</small></div>
+          <span class="dupla"><button class="botao" data-cargas-patinete="1" ${c.moedas < loja.PRECO_CARGA_PATINETE ? 'disabled' : ''}>+1 · 🪙 ${loja.PRECO_CARGA_PATINETE}</button><button class="botao" data-cargas-patinete="5" ${c.moedas < loja.PRECO_CARGA_PATINETE * 5 ? 'disabled' : ''}>+5 · 🪙 ${fmt(loja.PRECO_CARGA_PATINETE * 5)}</button></span></div>
         <h4>Bônus de largada</h4>
         <div class="item-loja"><span class="icone-item">🎒</span><div><b>Mochila a jato · você tem ${c.arrancadas}</b><small>Toque em "Decolar" nos primeiros ${cor.JANELA_ARRANCADA} s da corrida e comece voando.</small></div>
           <span class="dupla"><button class="botao" data-arrancadas="1" ${c.moedas < loja.PRECO_ARRANCADA ? 'disabled' : ''}>+1 · 🪙 ${loja.PRECO_ARRANCADA}</button><button class="botao" data-arrancadas="3" ${c.moedas < loja.PRECO_ARRANCADA * 3 ? 'disabled' : ''}>+3 · 🪙 ${fmt(loja.PRECO_ARRANCADA * 3)}</button></span></div>
@@ -855,7 +992,7 @@ export function montar(area, ctl) {
     desenharHud();
     desenhar(0);
     animarVitrine();
-    ctl.status(aba === 'loja' ? 'Troque suas moedas por roupas, skates e poderes' : aba === 'missoes' ? 'Cumpra missões para ganhar moedas' : 'Escolha o visual, a velocidade e o cenário', 'voce');
+    ctl.status(aba === 'loja' ? 'Troque suas moedas por roupas, skates, patinetes e poderes' : aba === 'missoes' ? 'Cumpra missões para ganhar moedas' : 'Escolha o visual, a velocidade e o cenário', 'voce');
   }
 
   // ---------- galeria de personagens ----------
@@ -940,6 +1077,9 @@ export function montar(area, ctl) {
     q('[data-skate]').forEach((b) => { b.onclick = () => resultado(loja.comprarSkate(prefs.carteira, b.dataset.skate), `${cor.SKATES[b.dataset.skate].nome} é seu!`); });
     q('[data-equipar]').forEach((b) => { b.onclick = () => resultado(loja.equipar(prefs.carteira, b.dataset.equipar), `Usando o ${cor.SKATES[b.dataset.equipar].nome}.`); });
     q('[data-cargas]').forEach((b) => { b.onclick = () => resultado(loja.comprarCargas(prefs.carteira, Number(b.dataset.cargas)), `+${b.dataset.cargas} ${b.dataset.cargas === '1' ? 'carga' : 'cargas'} de skate.`); });
+    q('[data-patinete]').forEach((b) => { b.onclick = () => resultado(loja.comprarPatinete(prefs.carteira, b.dataset.patinete), `${cor.PATINETES[b.dataset.patinete].nome} é seu!`); });
+    q('[data-usar-patinete]').forEach((b) => { b.onclick = () => resultado(loja.escolherPatinete(prefs.carteira, b.dataset.usarPatinete), `Usando o ${cor.PATINETES[b.dataset.usarPatinete].nome}.`); });
+    q('[data-cargas-patinete]').forEach((b) => { b.onclick = () => resultado(loja.comprarCargasPatinete(prefs.carteira, Number(b.dataset.cargasPatinete)), `+${b.dataset.cargasPatinete} ${b.dataset.cargasPatinete === '1' ? 'carga' : 'cargas'} de patinete.`); });
     q('[data-arrancadas]').forEach((b) => { b.onclick = () => resultado(loja.comprarArrancadas(prefs.carteira, Number(b.dataset.arrancadas)), `+${b.dataset.arrancadas} mochila${b.dataset.arrancadas === '1' ? '' : 's'} a jato de largada.`); });
     q('[data-poder]').forEach((b) => { b.onclick = () => resultado(loja.melhorar(prefs.carteira, b.dataset.poder), `${loja.PODERES[b.dataset.poder].nome} melhorou!`); });
     q('[data-presente]').forEach((b) => {
@@ -961,7 +1101,7 @@ export function montar(area, ctl) {
     if (fechado.concluidas.length) setTimeout(() => ctl.som('premio'), 600);
     const novo = res.pontos > antes;
     vitrinePose = novo ? 'comemora' : 'triste';
-    hud.innerHTML = '';
+    hud.innerHTML = ''; patineteEl.hidden = true;
     pausaEl.hidden = true;
     camada.hidden = false;
     camada.className = 'corrida-camada modo-lobby';
@@ -1013,11 +1153,12 @@ export function montar(area, ctl) {
   });
   palco.addEventListener('pointercancel', () => { toque = null; });
   decolarEl.onclick = () => agir('arrancada');
+  patineteEl.onclick = () => { agir(s?.patinete > 0 ? 'turbo-patinete' : 'patinete'); desenharHud(); };
   const teclas = (e) => {
     if (!palco.isConnected) { document.removeEventListener('keydown', teclas); observador.disconnect(); mundo?.destruir(); mundo = null; return; }
-    const mapa = { ArrowLeft: 'esquerda', a: 'esquerda', ArrowRight: 'direita', d: 'direita', ArrowUp: 'pular', w: 'pular', ' ': 'pular', ArrowDown: 'deslizar', s: 'deslizar', k: 'skate', e: 'supercarga', j: 'arrancada' };
+    const mapa = { ArrowLeft: 'esquerda', a: 'esquerda', ArrowRight: 'direita', d: 'direita', ArrowUp: 'pular', w: 'pular', ' ': 'pular', ArrowDown: 'deslizar', s: 'deslizar', k: 'skate', q: 'patinete', e: 'supercarga', j: 'arrancada' };
     const acao = mapa[e.key];
-    if (acao && rodando) { e.preventDefault(); agir(acao); }
+    if (acao && rodando) { e.preventDefault(); agir(acao === 'patinete' && s?.patinete > 0 ? 'turbo-patinete' : acao); }
     if (e.key === 'Escape' || e.key === 'p') pausar(!pausado);
   };
   document.addEventListener('keydown', teclas);
