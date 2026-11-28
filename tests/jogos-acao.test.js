@@ -288,7 +288,9 @@ test('corrida: cenário escolhido fica fixo e o Passeio troca a cada 500 m', asy
   const { cenarioDaCorrida } = await import('../jogos/src/telas/corrida.js');
   assert.equal(cenarioDaCorrida('praia', 3000), 'praia');
   assert.equal(cenarioDaCorrida('desconhecido', 0), 'cidade');
-  assert.deepEqual([0, 499, 500, 1000, 1500, 2000].map((d) => cenarioDaCorrida('passeio', d)), ['cidade', 'cidade', 'praia', 'floresta', 'neve', 'cidade']);
+  assert.equal(cenarioDaCorrida('lua', 3000), 'lua');
+  assert.deepEqual([0, 499, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000].map((d) => cenarioDaCorrida('passeio', d)),
+    ['cidade', 'cidade', 'praia', 'floresta', 'neve', 'doces', 'parque', 'deserto', 'lua', 'cidade']);
 });
 
 test('corrida: itens da pista valem na hora em que são pegos', () => {

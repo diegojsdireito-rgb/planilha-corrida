@@ -7,8 +7,9 @@
 // capa de super-heroína (voa atraindo as moedas) e nave alienígena (um feixe de luz leva a menina
 // para dentro de um disco voador, que percorre um trecho pelo alto e a devolve à pista).
 // Depois do trecho inicial aparecem também obstáculos em movimento, cada cenário com os seus
-// (ônibus na contramão, bicicleta, cachorro, caranguejo, bola de praia, tronco, galho, bola de neve
-// e pinguim): sempre com aviso antes e sempre com uma passagem possível.
+// (ônibus na contramão, bicicleta, cachorro, caranguejo, bola de praia, tronco, galho, bola de neve,
+// pinguim, jujuba, minhoca de goma, carrinho de bate-bate, bola de algodão-doce, bola de feno,
+// camelo, robozinho lunar e meteorito): sempre com aviso antes e sempre com uma passagem possível.
 
 export const LONGE = 70;
 const GRAVIDADE = 30;
@@ -74,12 +75,13 @@ export const duracao = (nivel = 0) => 8 + nivel * 2;
 const maisTempo = (s) => (s.dom === 'tempo' ? 1.25 : 1);
 const maisEnergia = (s) => (s.dom === 'explosao' ? 1.4 : 1);
 
-// Cenários: o escolhido fica fixo; no Passeio troca a cada TRECHO_PASSEIO metros.
-export const CENARIOS_IDS = ['cidade', 'praia', 'floresta', 'neve'];
+// Cenários: o escolhido fica fixo; no Passeio troca a cada TRECHO_PASSEIO metros, passando pelos oito
+// na ordem da lista (e voltando para a Cidade depois da Lua). Todos ficam liberados desde o começo.
+export const CENARIOS_IDS = ['cidade', 'praia', 'floresta', 'neve', 'doces', 'parque', 'deserto', 'lua'];
 export const TRECHO_PASSEIO = 500;
 export function cenarioDaCorrida(escolha, dist) {
   if (escolha !== 'passeio') return CENARIOS_IDS.includes(escolha) ? escolha : 'cidade';
-  return CENARIOS_IDS[Math.floor(dist / TRECHO_PASSEIO) % 4];
+  return CENARIOS_IDS[Math.floor(Math.max(0, dist) / TRECHO_PASSEIO) % CENARIOS_IDS.length];
 }
 
 // cfg.cenario: o cenário escolhido ('cidade'... ou 'passeio'). Sem ele só há obstáculos parados.
@@ -188,19 +190,32 @@ const AVISO_CONTRAMAO = 1.8; // quanto tempo o ônibus e a bola de neve levam pa
 const METROS_FAIXA = 1.6; // largura de uma faixa em metros (a mesma do 3D)
 export const GALHO = { pivo: 3.3, haste: 2.05, raio: 0.38, amplitude: 0.8, periodo: 16 };
 
+// jeito: como ele se move (atravessa, vaivem, troca, quica, pendulo, contramao ou cresce).
 export const MOVEIS = {
-  onibus: { cenario: 'cidade', comp: 6, larg: 0.55, passa: 'desviar', contramao: true, altura: 2.1 },
-  bicicleta: { cenario: 'cidade', comp: 1.5, larg: 0.5, passa: 'desviar', vz: -2.5, altura: 1.7 },
-  cachorro: { cenario: 'cidade', comp: 0.5, larg: 0.42, passa: 'pular', altura: 0.6 },
-  caranguejo: { cenario: 'praia', comp: 0.5, larg: 0.42, passa: 'pular', altura: 0.45 },
-  bola: { cenario: 'praia', comp: 0.84, larg: 0.42 },
-  tronco: { cenario: 'floresta', comp: 1.8, larg: 0.42, passa: 'pular', altura: 0.6 },
-  galho: { cenario: 'floresta', comp: 0.5, larg: 0.42, passa: 'deslizar' },
-  boladeneve: { cenario: 'neve', comp: 1.9, larg: 0.55, passa: 'desviar', contramao: true },
-  pinguim: { cenario: 'neve', comp: 0.9, larg: 0.45, passa: 'pular', altura: 0.5 },
+  onibus: { cenario: 'cidade', jeito: 'contramao', comp: 6, larg: 0.55, passa: 'desviar', contramao: true, altura: 2.1 },
+  bicicleta: { cenario: 'cidade', jeito: 'troca', comp: 1.5, larg: 0.5, passa: 'desviar', vz: -2.5, altura: 1.7, zTroca: 20, troca: 10 },
+  cachorro: { cenario: 'cidade', jeito: 'atravessa', comp: 0.5, larg: 0.42, passa: 'pular', altura: 0.6, k: 0.13, borda: 1.35 },
+  caranguejo: { cenario: 'praia', jeito: 'vaivem', comp: 0.5, larg: 0.42, passa: 'pular', altura: 0.45 },
+  bola: { cenario: 'praia', jeito: 'quica', comp: 0.84, larg: 0.42, raio: 0.42 },
+  tronco: { cenario: 'floresta', jeito: 'atravessa', comp: 1.8, larg: 0.42, passa: 'pular', altura: 0.6, k: 0.06, borda: 0.95 },
+  galho: { cenario: 'floresta', jeito: 'pendulo', comp: 0.5, larg: 0.42, passa: 'deslizar' },
+  boladeneve: { cenario: 'neve', jeito: 'cresce', comp: 1.9, larg: 0.55, passa: 'desviar', contramao: true },
+  pinguim: { cenario: 'neve', jeito: 'troca', comp: 0.9, larg: 0.45, passa: 'pular', altura: 0.5, zTroca: 18, troca: 14, longe: true },
+  // Terra dos Doces: jujuba quicando (como a bola de praia) e minhoca de goma atravessando
+  jujuba: { cenario: 'doces', jeito: 'quica', comp: 0.84, larg: 0.42, raio: 0.42 },
+  minhoca: { cenario: 'doces', jeito: 'atravessa', comp: 0.45, larg: 0.45, passa: 'pular', altura: 0.45, k: 0.1, borda: 1.4 },
+  // Parque de Diversões: carrinho de bate-bate trocando de faixa e bola de algodão-doce rolando na contramão
+  batebate: { cenario: 'parque', jeito: 'troca', comp: 1.3, larg: 0.48, passa: 'pular', altura: 0.55, zTroca: 18, troca: 12, longe: true },
+  algodao: { cenario: 'parque', jeito: 'contramao', comp: 1.5, larg: 0.55, passa: 'desviar', contramao: true, altura: 1.5, raio: 0.75 },
+  // Deserto do Oásis: bola de feno rolando de lado e camelo trocando de faixa
+  feno: { cenario: 'deserto', jeito: 'atravessa', comp: 0.7, larg: 0.42, passa: 'pular', altura: 0.6, k: 0.09, borda: 1.2 },
+  camelo: { cenario: 'deserto', jeito: 'troca', comp: 1.6, larg: 0.5, passa: 'desviar', altura: 2.2, zTroca: 22, troca: 14 },
+  // Passeio na Lua: robozinho lunar trocando de faixa e meteorito quicando devagar
+  robo: { cenario: 'lua', jeito: 'troca', comp: 0.9, larg: 0.45, passa: 'pular', altura: 0.55, zTroca: 18, troca: 14, longe: true },
+  meteorito: { cenario: 'lua', jeito: 'quica', comp: 0.9, larg: 0.42, raio: 0.45 },
 };
 export const ehObstaculo = (o) => o.movel || o.tipo === 'cerca' || o.tipo === 'faixa' || o.tipo === 'carrinho';
-export const comoPassar = (o) => (o.tipo === 'bola' ? (o.modo === 'alto' ? 'deslizar' : 'pular') : MOVEIS[o.tipo]?.passa);
+export const comoPassar = (o) => (MOVEIS[o.tipo]?.jeito === 'quica' ? (o.modo === 'alto' ? 'deslizar' : 'pular') : MOVEIS[o.tipo]?.passa);
 
 // Chance de uma linha nova trazer um obstáculo em movimento: zero no trecho inicial e,
 // depois, sobe junto com a velocidade da corrida.
@@ -217,21 +232,20 @@ const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
 // Coloca o obstáculo onde ele deve estar a essa distância (z) da menina.
 export function posicionar(o) {
   const z = o.z;
-  switch (o.tipo) {
-    case 'cachorro':
-    case 'tronco': {
+  const def = MOVEIS[o.tipo];
+  switch (def?.jeito) {
+    case 'atravessa': {
       // atravessa a pista de lado e passa pela faixa de destino bem quando chega na menina
-      const borda = o.tipo === 'tronco' ? 0.95 : 1.35;
+      const borda = def.borda;
       o.faixa = limitar(o.destino - o.dir * o.k * (z + o.comp / 2), -borda, 2 + borda);
       o.andando = o.faixa > -borda && o.faixa < 2 + borda;
       break;
     }
-    case 'caranguejo':
+    case 'vaivem':
       // anda de lado, para lá e para cá, entre duas faixas vizinhas
       o.faixa = o.base + 0.5 + 0.5 * Math.cos((2 * Math.PI * (z + o.comp / 2)) / o.periodo + o.fase);
       break;
-    case 'bicicleta':
-    case 'pinguim': {
+    case 'troca': {
       // troca de faixa entre zTroca + troca e zTroca; a bicicleta pisca a setinha antes
       const u = suave((o.zTroca + o.troca - z) / o.troca);
       o.faixa = o.origem + (o.destino - o.origem) * u;
@@ -239,21 +253,21 @@ export function posicionar(o) {
       o.trocando = u > 0 && u < 1;
       break;
     }
-    case 'bola': {
+    case 'quica': {
       // quica: o ponto mais alto (modo 'alto') ou um quiquinho baixo ('baixo') cai bem na chegada
       const zc = z + o.raio;
       o.faixa = o.destino + o.dir * limitar((zc - 8) / 26, 0, 1);
       o.h = o.raio + o.salto * Math.abs(Math.cos((Math.PI * zc) / o.periodo));
       break;
     }
-    case 'galho':
+    case 'pendulo':
       // pêndulo pendurado no meio da faixa de destino, balançando de um lado para o outro
       o.angulo = GALHO.amplitude * Math.sin((2 * Math.PI * (z + o.comp / 2)) / GALHO.periodo + o.fase);
       o.faixa = o.destino;
       o.bolaX = o.destino - (GALHO.haste * Math.sin(o.angulo)) / METROS_FAIXA;
       o.h = GALHO.pivo - GALHO.haste * Math.cos(o.angulo);
       break;
-    case 'boladeneve':
+    case 'cresce':
       // rola na direção dela e vai crescendo
       o.raio = 0.35 + 0.6 * limitar(1 - z / LONGE, 0, 1);
       o.comp = 2 * o.raio;
@@ -271,27 +285,28 @@ export function criarMovel(tipo, z, aleatorio = Math.random, vel = 13, opcoes = 
   const destino = opcoes.destino ?? Math.floor(r() * 3);
   const o = { tipo, movel: true, z, comp: def.comp, larg: def.larg, destino, faixa: destino, vz: def.vz ?? 0, nasceu: z };
   if (def.contramao) o.vz = opcoes.vz ?? limitar(LONGE / AVISO_CONTRAMAO - vel, 3, 12);
-  if (tipo === 'cachorro' || tipo === 'tronco') {
+  if (def.raio) o.raio = def.raio;
+  if (def.jeito === 'atravessa') {
     o.dir = opcoes.dir ?? (destino === 0 ? 1 : destino === 2 ? -1 : r() < 0.5 ? 1 : -1);
-    o.k = tipo === 'cachorro' ? 0.13 : 0.06; // faixas por metro
-  } else if (tipo === 'caranguejo') {
+    o.k = def.k; // faixas por metro
+  } else if (def.jeito === 'vaivem') {
     o.base = destino === 0 ? 0 : destino === 2 ? 1 : r() < 0.5 ? 0 : 1;
     o.fase = destino === o.base + 1 ? 0 : Math.PI;
     o.periodo = 9;
-  } else if (tipo === 'bicicleta' || tipo === 'pinguim') {
-    const longe = tipo === 'pinguim' && destino !== 1 && r() < 0.4;
+  } else if (def.jeito === 'troca') {
+    // alguns vêm de duas faixas de distância (o pinguim, o bate-bate e o robozinho)
+    const longe = def.longe && destino !== 1 && r() < 0.4;
     const opc = [0, 1, 2].filter((f) => Math.abs(f - destino) === (longe ? 2 : 1));
     o.origem = opcoes.origem ?? opc[Math.floor(r() * opc.length)];
-    o.zTroca = tipo === 'bicicleta' ? 20 : 18;
-    o.troca = tipo === 'bicicleta' ? 10 : 14;
-  } else if (tipo === 'bola') {
+    o.zTroca = def.zTroca;
+    o.troca = def.troca;
+  } else if (def.jeito === 'quica') {
     o.modo = opcoes.modo ?? (r() < 0.55 ? 'alto' : 'baixo');
-    o.raio = 0.42;
     o.salto = o.modo === 'alto' ? 1.15 : 0.18;
     o.periodo = o.modo === 'alto' ? 12 : 3;
     const lados = [-1, 1].filter((d) => destino + d >= 0 && destino + d <= 2);
     o.dir = lados[Math.floor(r() * lados.length)];
-  } else if (tipo === 'galho') {
+  } else if (def.jeito === 'pendulo') {
     o.fase = opcoes.fase ?? r() * Math.PI * 2;
   }
   return posicionar(o);
@@ -341,7 +356,7 @@ function soltarContramao(s, r, turbo) {
   if (s.t - s.reserva.desde > 10) { s.reserva = null; return; }
   if (s.objetos.some((o) => Math.abs(o.faixa - faixa) < 0.6 && o.z + (o.comp ?? 0) > -1)) return;
   const v = s.vel;
-  const comp = tipo === 'boladeneve' ? 1.9 : MOVEIS[tipo].comp;
+  const comp = MOVEIS[tipo].comp;
   const folga = 0.3; // segundos
   const janelas = s.objetos.filter(ehObstaculo).map((o) => [(o.z - 0.45) / v, (o.z + (o.comp ?? 0.4) + 0.45) / v]);
   const maior = Math.max(3, Math.min(12, LONGE / AVISO_CONTRAMAO - v));
@@ -457,7 +472,7 @@ function colideMovel(s, o) {
   if (o.z > 0.45 || o.z + o.comp < -0.45 - (o.passo ?? 0)) return false;
   const deitada = s.deslizando > 0 && s.y < 0.2;
   const topo = s.y + (deitada ? 0.55 : 1.4);
-  if (o.tipo === 'bola') return topo > o.h - o.raio + 0.12 && s.y < o.h + o.raio - 0.12;
+  if (MOVEIS[o.tipo].jeito === 'quica') return topo > o.h - o.raio + 0.12 && s.y < o.h + o.raio - 0.12;
   if (o.tipo === 'galho') return topo > o.h - GALHO.raio + 0.08 && s.y < o.h + GALHO.raio;
   if (o.tipo === 'boladeneve') return s.y < 2 * o.raio - 0.1;
   return s.y < MOVEIS[o.tipo].altura;
