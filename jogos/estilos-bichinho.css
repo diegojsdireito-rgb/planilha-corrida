@@ -36,7 +36,10 @@
 .bichinho-cena { position: relative; height: 300px; border-radius: 22px; overflow: hidden; border: 1px solid var(--borda); box-shadow: var(--sombra); touch-action: manipulation; isolation: isolate; }
 .bichinho-cena.esfregando, .bichinho-cena.brincando { touch-action: none; }
 .bichinho-cena.esfregando { cursor: grab; }
+.bichinho-fundo-lugar { position: absolute; inset: 0; }
 .bichinho-fundo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bichinho-cena.novidade .bichinho-fundo-lugar { animation: bichinho-novidade .7s ease; }
+@keyframes bichinho-novidade { 40% { filter: brightness(1.25) saturate(1.2); } }
 .bichinho-luz { transition: opacity .8s; }
 .bichinho-cena.escuro .bichinho-luz { opacity: 0; }
 .bichinho-escuro { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 85%, rgba(20, 22, 60, .45), rgba(10, 12, 40, .78)); opacity: 0; transition: opacity 1s ease; pointer-events: none; z-index: 2; }
@@ -44,6 +47,7 @@
 .bichinho-pet-lugar { position: absolute; left: 50%; bottom: 8px; width: 210px; transform: translateX(-50%); z-index: 1; }
 .bichinho-pet { display: block; width: 100%; padding: 0; border: 0; background: none; -webkit-tap-highlight-color: transparent; }
 .bichinho-cena.esfregando .bichinho-pet, .bichinho-cena.brincando .bichinho-pet { pointer-events: none; }
+.bichinho-pet-lugar { transition: opacity .35s ease, left .08s linear, width .3s ease; }
 .bc-svg { display: block; width: 100%; height: auto; overflow: visible; }
 
 /* balão de fala */
@@ -126,6 +130,12 @@
 .bc-dorme .bc-corpo { animation-duration: 4.5s; }
 .bc-dorme .bc-cabeca { animation: bc-cochila 4.5s ease-in-out infinite; }
 .bc-dorme .bc-rabo { animation: none; }
+.bc-estatico *, .bc-estatico { animation: none !important; }
+.bc-asas { transform-box: view-box; transform-origin: 100px 140px; animation: bc-asas 2.4s ease-in-out infinite; }
+@keyframes bc-asas { 50% { transform: scaleX(.9); } }
+.bc-capa { transform-box: fill-box; transform-origin: 50% 0; animation: bc-capa 3s ease-in-out infinite; }
+@keyframes bc-capa { 50% { transform: skewX(3deg) scaleX(1.03); } }
+.bc-braco { transform-box: fill-box; transform-origin: 50% 12%; transition: transform .25s ease; }
 @keyframes bc-cochila { 50% { transform: translateY(5px) rotate(-2deg); } }
 .bc-sujeira { opacity: var(--bc-sujo, 0); transition: opacity .3s; }
 
@@ -157,7 +167,7 @@
 .bichinho-enxaguar { align-self: center; padding: 10px 26px; border-radius: 99px; border: 0; background: var(--preenchido); color: var(--suave); font-weight: 800; font-size: 17px; }
 .bichinho-enxaguar.pronto { background: linear-gradient(180deg, #6fc3ff, #3e7bfa); color: #fff; box-shadow: 0 3px 0 #2a5fd0; animation: bichinho-chama 1s ease-in-out infinite; }
 @keyframes bichinho-chama { 50% { transform: scale(1.06); } }
-.bichinho-jogo-info { display: flex; justify-content: center; gap: 22px; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bichinho-jogo-info { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 22px; white-space: nowrap; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* loja */
 .bichinho-abas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--preenchido); padding: 4px; border-radius: 14px; }
@@ -195,8 +205,174 @@
 .bichinho-adotar { border: 0; border-radius: 99px; padding: 12px; font-size: 19px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ff8fb1, #ff5c8a); box-shadow: 0 3px 0 #d94a86; }
 .bichinho-adotar:active { transform: translateY(2px); box-shadow: none; }
 
+/* ---------- brinquedos no quarto ---------- */
+.bq-brinquedo { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bq-brinquedo-anima { transform-box: fill-box; transform-origin: 50% 100%; }
+.bq-brinquedo-anima.brinca { animation: bq-brinca .9s cubic-bezier(.3, .7, .4, 1); }
+[data-brinquedo="piao"] .bq-brinquedo-anima.brinca { animation: bq-gira .9s ease-out; transform-origin: 50% 80%; }
+[data-brinquedo="carrinho"] .bq-brinquedo-anima.brinca { animation: bq-anda 1s ease-in-out; }
+@keyframes bq-brinca { 0% { transform: scale(1.1, .85); } 35% { transform: translateY(-22px) rotate(-8deg); } 60% { transform: translateY(0) scale(1.08, .9); } 80% { transform: translateY(-6px) rotate(4deg); } }
+@keyframes bq-gira { 0% { transform: rotate(0); } 100% { transform: rotate(1080deg); } }
+@keyframes bq-anda { 30% { transform: translateX(28px); } 70% { transform: translateX(-14px); } }
+.bq-pisca { animation: bq-pisca 2.2s ease-in-out infinite; }
+.bq-pisca:nth-child(3n) { animation-delay: .7s; }
+.bq-pisca:nth-child(3n+1) { animation-delay: 1.4s; }
+@keyframes bq-pisca { 50% { opacity: .2; } }
+
+/* ---------- brincadeiras: escolha e resultado ---------- */
+.bichinho.jogando .bichinho-barras { display: none; }
+.bichinho-brincs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bichinho-brinc { position: relative; display: grid; grid-template-columns: 40px 1fr; grid-template-rows: auto auto; column-gap: 6px; align-items: center; text-align: left; padding: 9px 8px; border-radius: 16px; border: 1px solid var(--borda); background: linear-gradient(180deg, var(--cartao), var(--preenchido)); box-shadow: 0 2px 0 var(--borda); color: var(--texto); }
+.bichinho-brinc .ic { grid-row: 1 / 3; font-size: 30px; text-align: center; }
+.bichinho-brinc b { font-size: 14px; line-height: 1.15; }
+.bichinho-brinc small { font-size: 11.5px; color: var(--suave); line-height: 1.2; }
+.bichinho-brinc .rec { position: absolute; top: -7px; right: 6px; font-size: 11px; font-weight: 800; background: #fff3c4; color: #6b4a00; border: 1px solid #f2b100; border-radius: 99px; padding: 0 6px; }
+.bichinho-brinc:active { transform: translateY(2px); box-shadow: none; }
+.bichinho-fim { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px; border-radius: 16px; background: linear-gradient(180deg, #fff6d6, #ffe6f0); color: #5a2a44; border: 2px solid #ffd36e; animation: bichinho-entra .4s cubic-bezier(.3, 1.6, .5, 1); }
+.bichinho-fim-ic { font-size: 34px; line-height: 1; }
+.bichinho-fim-tit { font-family: var(--titulos); font-weight: 800; font-size: 22px; }
+.bichinho-fim-estrelas { font-size: 24px; letter-spacing: 2px; color: #f2b100; }
+.bichinho-fim-pts { font-weight: 700; }
+.bichinho-fim-moedas { font-family: var(--titulos); font-weight: 800; font-size: 20px; color: #8a5a00; }
+.bichinho-fim-dica { font-size: 13px; color: #7a5a6e; }
+.bichinho-de-novo { margin-top: 6px; border: 0; border-radius: 99px; padding: 8px 18px; font-weight: 800; font-size: 15px; color: #fff; background: linear-gradient(180deg, #ff8fb1, #ff5c8a); box-shadow: 0 3px 0 #d94a86; }
+
+/* camada do jogo dentro da cena */
+.bichinho-jogo-camada { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.bichinho-jogo-camada > * { pointer-events: auto; }
+.bichinho-efeito.pontinho { font-family: var(--titulos); font-weight: 800; font-size: 22px; color: #2a5fd0; text-shadow: 0 0 3px #fff, 0 2px 0 #fff; animation-duration: .9s; }
+.bichinho-efeito.aviso { font-family: var(--titulos); font-weight: 800; font-size: 17px; background: #fff; color: #2a2135; padding: 4px 10px; border-radius: 99px; box-shadow: 0 3px 10px rgba(0, 0, 0, .2); }
+.bichinho-efeito.conta { font-family: var(--titulos); font-weight: 900; font-size: 84px; color: #fff; text-shadow: 0 4px 0 #ff5c8a, 0 0 24px rgba(255, 92, 138, .6); animation: bichinho-conta .7s ease-out forwards; z-index: 6; }
+@keyframes bichinho-conta { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+
+/* 🫧 bolhas */
+.bichinho-bolhinha { position: absolute; left: 0; top: 0; padding: 0; border: 0; border-radius: 50%; touch-action: none; background: radial-gradient(circle at 30% 26%, #fff 0 9%, rgba(255, 255, 255, .55) 16%, rgba(200, 235, 255, .35) 42%, rgba(255, 160, 220, .5) 70%, rgba(150, 120, 255, .75) 100%); box-shadow: inset 0 0 0 2.5px rgba(255, 255, 255, .95), inset -5px -7px 12px rgba(110, 200, 255, .6), 0 0 0 1.5px rgba(120, 140, 220, .45), 0 3px 8px rgba(80, 100, 200, .25); -webkit-tap-highlight-color: transparent; }
+.bichinho-bolhinha::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; }
+.bichinho-bolhinha.dourada { background: radial-gradient(circle at 32% 28%, #fff 0 12%, #fff3b0 24%, #ffd84d 60%, #f2a900 100%); box-shadow: inset 0 0 0 2px #fff6c4, 0 0 14px 4px rgba(255, 210, 60, .65); }
+.bichinho-bolhinha.estoura { animation: bichinho-bolhinha-estoura .3s ease-out forwards; }
+@keyframes bichinho-bolhinha-estoura { to { opacity: 0; filter: blur(2px); scale: 1.6; } }
+.bc-sopra .bc-boca { display: none !important; }
+.bc-sopra .bc-boca-comendo { display: inline !important; transform-box: fill-box; transform-origin: 50% 50%; transform: scale(.7); }
+.bc-sopro .bc-cabeca { animation: bc-sopro .35s ease-out; }
+@keyframes bc-sopro { 40% { transform: scale(1.04, .98) translateY(1px); } }
+
+/* 🙈 esconde-esconde */
+.bichinho-esconde { z-index: 3; }
+.bichinho-cena.escondendo .bq-brinquedo { display: none; }
+.bichinho-esconde[hidden] { display: none; }
+.bq-esconde { position: absolute; inset: 0; width: 100%; height: 100%; animation: bichinho-aparecer .4s ease-out; }
+@keyframes bichinho-aparecer { from { opacity: 0; } }
+.bq-esc { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bq-esc-obj { transform-box: fill-box; transform-origin: 50% 100%; transition: transform .45s cubic-bezier(.3, 1.4, .5, 1), opacity .3s; }
+.bq-esc.mexe .bq-esc-obj { animation: bq-mexe .6s ease-in-out; }
+.bq-esc.nao .bq-esc-obj { animation: bq-nao .45s ease-in-out; }
+.bq-esc.olhou .bq-esc-obj { opacity: .7; }
+.bq-esc.achou .bq-esc-obj { transform: translateY(14px) rotate(-6deg) scale(.95); opacity: .85; }
+@keyframes bq-mexe { 25% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scaleY(1.03); } 75% { transform: rotate(-2deg); } }
+@keyframes bq-nao { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.bq-espia { opacity: 0; transition: opacity .25s, transform .35s cubic-bezier(.3, 1.4, .5, 1); transform-box: fill-box; }
+.bq-espia-cima { transform: translateY(22px); }
+.bq-espia-rabo { transform-origin: 0 100%; transform: rotate(-20deg) scale(.6); }
+.bq-espia.ve { opacity: 1; transform: none; }
+.bq-espia-rabo.ve { animation: bq-abana .5s ease-in-out 2; }
+@keyframes bq-abana { 50% { transform: rotate(-14deg); } }
+.bc-sumiu { opacity: 0; pointer-events: none; }
+.bc-conta .bc-olhos { display: none; }
+.bc-conta .bc-olhos-fechados { display: inline; }
+.bc-conta .bc-braco-e { transform: rotate(150deg); }
+.bc-conta .bc-braco-d { transform: rotate(-150deg); }
+.bichinho-aparece { position: absolute; z-index: 4; pointer-events: none; animation: bichinho-aparece .6s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes bichinho-aparece { 0% { transform: translateY(50px) scale(.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+/* 💃 dança */
+.bichinho-pista { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); height: 168px; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, #2a1f4f, #4a2f6e); }
+.bichinho-faixa { position: relative; border-left: 1px solid rgba(255, 255, 255, .12); }
+.bichinho-faixa:first-child { border-left: 0; }
+.bichinho-alvo { position: absolute; left: 6px; right: 6px; bottom: 16px; height: 36px; border-radius: 12px; border: 3px dashed rgba(255, 255, 255, .55); pointer-events: none; }
+.bichinho-seta { position: absolute; left: 50%; top: 0; font-size: 26px; line-height: 36px; width: 42px; height: 36px; margin-top: -2px; text-align: center; border-radius: 12px; will-change: transform; box-shadow: 0 2px 0 rgba(0, 0, 0, .25); }
+.bichinho-seta.f0 { background: #ff6fa5; } .bichinho-seta.f1 { background: #ffd23f; } .bichinho-seta.f2 { background: #5fd38d; } .bichinho-seta.f3 { background: #5bb6ff; }
+.bichinho-seta.pegou { animation: bichinho-seta-pega .25s ease-out forwards; }
+.bichinho-seta.perdeu { opacity: .25; filter: grayscale(1); transition: opacity .3s; }
+@keyframes bichinho-seta-pega { to { scale: 1.6; opacity: 0; } }
+.bichinho-julga { position: absolute; left: 50%; bottom: 58px; transform: translateX(-50%); font-family: var(--titulos); font-weight: 800; font-size: 13px; color: #fff; white-space: nowrap; animation: bichinho-julga .6s ease-out forwards; pointer-events: none; }
+.bichinho-julga.perfeito { color: #ffe066; text-shadow: 0 0 8px #ff8fb1; }
+@keyframes bichinho-julga { to { transform: translate(-50%, -26px); opacity: 0; } }
+.bichinho-pads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.bichinho-pad { height: 60px; border: 0; border-radius: 16px; font-size: 30px; touch-action: none; -webkit-tap-highlight-color: transparent; box-shadow: 0 4px 0 rgba(0, 0, 0, .25); }
+.bichinho-pad.f0 { background: #ff8fb8; } .bichinho-pad.f1 { background: #ffe066; } .bichinho-pad.f2 { background: #7fe0a6; } .bichinho-pad.f3 { background: #7fc6ff; }
+.bichinho-pad.bate { animation: bichinho-pad .18s ease-out; }
+.bichinho-pad.ops { filter: grayscale(.8) brightness(.9); }
+@keyframes bichinho-pad { 50% { transform: translateY(3px) scale(.95); box-shadow: 0 1px 0 rgba(0, 0, 0, .25); filter: brightness(1.15); } }
+.bichinho-cena.discoteca .bichinho-escuro { opacity: .55; background: radial-gradient(circle at 20% 20%, rgba(255, 111, 165, .55), transparent 40%), radial-gradient(circle at 80% 25%, rgba(91, 182, 255, .55), transparent 40%), radial-gradient(circle at 50% 80%, rgba(255, 224, 102, .35), transparent 45%), rgba(30, 16, 60, .45); animation: bichinho-luzes 1.1s linear infinite alternate; }
+@keyframes bichinho-luzes { to { filter: hue-rotate(120deg); } }
+.bichinho-globo { position: absolute; left: 50%; top: 4px; z-index: 3; font-size: 40px; transform: translateX(-50%); transition: transform .3s; filter: drop-shadow(0 0 10px rgba(255, 255, 255, .8)); }
+.bichinho-globo.vira { transform: translateX(-50%) rotate(25deg); }
+.bc-danca-0 .bc-pet { transform-origin: 50% 100%; animation: bc-d0 .45s ease-out; }
+.bc-danca-1 .bc-pet { transform-origin: 50% 100%; animation: bc-d1 .45s ease-out; }
+.bc-danca-2 .bc-pet { transform-origin: 50% 100%; animation: bc-d2 .45s ease-out; }
+.bc-danca-3 .bc-pet { transform-origin: 50% 100%; animation: bc-d3 .45s ease-out; }
+.bc-danca-0 .bc-braco-e, .bc-danca-1 .bc-braco-e { transform: rotate(140deg); }
+.bc-danca-3 .bc-braco-d, .bc-danca-1 .bc-braco-d { transform: rotate(-140deg); }
+.bc-danca-2 .bc-braco-e { transform: rotate(70deg); }
+.bc-danca-2 .bc-braco-d { transform: rotate(-70deg); }
+.bc-danca-0 .bc-boca-contente, .bc-danca-1 .bc-boca-contente, .bc-danca-2 .bc-boca-contente, .bc-danca-3 .bc-boca-contente { display: none; }
+.bc-danca-0 .bc-boca-feliz, .bc-danca-1 .bc-boca-feliz, .bc-danca-2 .bc-boca-feliz, .bc-danca-3 .bc-boca-feliz { display: inline; }
+@keyframes bc-d0 { 50% { transform: rotate(-12deg) translateX(-10px); } }
+@keyframes bc-d1 { 50% { transform: translateY(-30px) scale(.96, 1.06); } }
+@keyframes bc-d2 { 50% { transform: scale(1.12, .86); } }
+@keyframes bc-d3 { 50% { transform: rotate(12deg) translateX(10px); } }
+.bc-balanca .bc-pet { transform-origin: 50% 100%; transform: rotate(3deg); transition: transform .2s; }
+
+/* 🦴 pega o petisco */
+.bichinho-cena.pegando { touch-action: none; cursor: ew-resize; }
+.bc-pequeno { width: 132px; }
+.bichinho-cai { position: absolute; left: 0; top: 0; font-size: 34px; line-height: 1; pointer-events: none !important; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .2)); }
+.bc-eca .bc-pet { animation: bc-eca .45s ease-in-out; }
+.bc-eca .bc-boca { display: none !important; }
+.bc-eca .bc-boca-triste { display: inline !important; }
+@keyframes bc-eca { 25%, 75% { transform: translateX(-6px) rotate(-4deg); } 50% { transform: translateX(6px) rotate(4deg); } }
+
+/* 🧩 siga o bichinho */
+.bichinho-siga button { position: absolute; width: 78px; height: 78px; border-radius: 50%; border: 4px solid rgba(255, 255, 255, .9); font-size: 32px; display: grid; place-items: center; touch-action: none; box-shadow: 0 4px 0 rgba(0, 0, 0, .2), inset 0 -6px 0 rgba(0, 0, 0, .12); filter: saturate(.85) brightness(.96); opacity: .9; transition: filter .12s, transform .12s; -webkit-tap-highlight-color: transparent; }
+.bichinho-siga .p0 { left: 12px; top: 14px; } .bichinho-siga .p1 { right: 12px; top: 14px; }
+.bichinho-siga .p2 { left: 12px; bottom: 18px; } .bichinho-siga .p3 { right: 12px; bottom: 18px; }
+.bichinho-siga .vermelho { background: #ff6f8f; } .bichinho-siga .amarelo { background: #ffd23f; }
+.bichinho-siga .azul { background: #5bb6ff; } .bichinho-siga .verde { background: #5fd38d; }
+.bichinho-siga button.aceso { opacity: 1; filter: saturate(1.3) brightness(1.2); transform: scale(1.14); box-shadow: 0 0 0 6px rgba(255, 255, 255, .6), 0 0 26px 8px rgba(255, 255, 255, .8); }
+.bichinho-siga.olhando button { pointer-events: none; }
+.bc-aponta-0 .bc-pet, .bc-aponta-2 .bc-pet { transform-origin: 50% 100%; transform: rotate(-7deg); transition: transform .2s; }
+.bc-aponta-1 .bc-pet, .bc-aponta-3 .bc-pet { transform-origin: 50% 100%; transform: rotate(7deg); transition: transform .2s; }
+.bc-aponta-0 .bc-braco-e { transform: rotate(135deg); }
+.bc-aponta-1 .bc-braco-d { transform: rotate(-135deg); }
+.bc-aponta-2 .bc-braco-e { transform: rotate(80deg); }
+.bc-aponta-3 .bc-braco-d { transform: rotate(-80deg); }
+.bc-aponta-0 .bc-boca-contente, .bc-aponta-1 .bc-boca-contente, .bc-aponta-2 .bc-boca-contente, .bc-aponta-3 .bc-boca-contente { display: none; }
+.bc-aponta-0 .bc-boca-comendo, .bc-aponta-1 .bc-boca-comendo, .bc-aponta-2 .bc-boca-comendo, .bc-aponta-3 .bc-boca-comendo { display: inline; }
+.bc-h-triste-temp .bc-boca { display: none !important; }
+.bc-h-triste-temp .bc-boca-triste, .bc-h-triste-temp .bc-sobrancelhas { display: inline !important; }
+
+/* ---------- loja ---------- */
+.bichinho-abas { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.bichinho-abas button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; font-size: 12px; color: var(--texto); }
+.bichinho-abas button span { font-size: 22px; line-height: 1.1; }
+.bichinho-grupo { font-family: var(--titulos); font-weight: 800; font-size: 15px; margin: 6px 2px -2px; }
+.bichinho-grupo-dica { font-size: 12.5px; color: var(--suave); text-align: center; margin: 2px 4px; }
+.bichinho-loja-itens { display: flex; flex-direction: column; gap: 8px; }
+.bichinho-item { position: relative; }
+.bichinho-item-arte { width: 100%; height: 64px; }
+.bichinho-item-arte.vitrine-costas, .bichinho-item-arte.vitrine-corpo, .bichinho-item-arte.vitrine-fantasia { height: 86px; }
+.bichinho-item-arte.quarto-tema { height: 70px; border-radius: 10px; overflow: hidden; }
+.bichinho-item-arte .bq-mini { border-radius: 8px; }
+.bichinho-item-arte, .bichinho-item-arte .bc-svg { overflow: hidden; }
+.bichinho-item-arte .bc-svg { width: 100%; height: 100%; }
+.bichinho-selo { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); background: #ff5c8a; color: #fff; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 99px; z-index: 1; white-space: nowrap; }
+.bichinho-falta { font-size: 11px; font-weight: 700; color: var(--vermelho, #e5484d); margin-top: -2px; }
+.bichinho-tem { font-size: 12.5px; font-weight: 800; color: #2f9e62; padding: 4px 0; }
+.bichinho-item.tem:not(.usando) { border-color: #ffb3c9; }
+
 @media (prefers-reduced-motion: reduce) {
   .bichinho *, .bichinho *::before, .bichinho *::after { animation: none !important; transition: none !important; }
   .bichinho-zzz span { opacity: 1; position: static; display: inline; }
-  .bichinho-efeito.sobe, .bichinho-efeito.brilho { opacity: 1; }
+  .bichinho-efeito.sobe, .bichinho-efeito.brilho, .bichinho-efeito.conta { opacity: 1; }
+  .bq-espia.ve { opacity: 1; }
 }
