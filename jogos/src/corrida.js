@@ -3,7 +3,7 @@
 // Obstáculos: cerca (pular), bandeirinhas (deslizar) e carrinho de sorvete (trocar de faixa ou super pulo).
 // Na pista: moedas e itens que valem na hora em que são pegos: ímã, tênis de mola (super pulo),
 // mochila a jato (id 'maleta', para não perder as melhorias já compradas), escudo, pontos em dobro,
-// baú de moedas, foguete (supercarga na hora), skate grátis, raio (enche a barra da supercarga),
+// baú de moedas, foguete (supercarga na hora), skate grátis, patinete grátis, raio (enche a barra da supercarga),
 // capa de super-heroína (voa atraindo as moedas) e nave alienígena (um feixe de luz leva a menina
 // para dentro de um disco voador, que percorre um trecho pelo alto e a devolve à pista).
 // Depois do trecho inicial aparecem também obstáculos em movimento, cada cenário com os seus
@@ -19,6 +19,10 @@ const TROCA_DE_FAIXA = 11; // faixas por segundo
 const COMPRIMENTO_CARRINHO = 5;
 const ALTURA_VOO = 3.6;
 export const DURACAO_SKATE = 30;
+export const DURACAO_PATINETE = 20;
+export const DURACAO_TURBO_PATINETE = 3;
+export const PONTOS_MANOBRA = 50; // por volta completa do rodopio no ar
+export const TEMPO_VOLTA = 0.42; // segundos no ar para cada volta do rodopio
 export const DURACAO_DOBRO = 10;
 export const DURACAO_CAPA = 9;
 export const DURACAO_NAVE = 11;
@@ -54,6 +58,16 @@ export const SKATES = {
   supersonico: { nome: 'Skate Supersônico', pulo: 1.1, gravidade: 1, velocidade: 1.22, moedas: 2 },
 };
 
+// Patinetes: a menina vai em pé, dando impulso com o pé. Mais rápido que correr, puxa as moedas
+// da faixa em que ela está (em qualquer altura) e cada pulo vira uma manobra (rodopio) que vale pontos.
+// Aguenta uma batida, como o skate. manobra: multiplica os pontos do rodopio; turbo: o elétrico
+// tem um turbo curto (uma vez por passeio) que corre ainda mais e atravessa os obstáculos.
+export const PATINETES = {
+  classico: { nome: 'Patinete Clássico', velocidade: 1.12, manobra: 1, turbo: false },
+  luzes: { nome: 'Patinete Pisca-Pisca', velocidade: 1.15, manobra: 2, turbo: false },
+  eletrico: { nome: 'Patinete Elétrico', velocidade: 1.2, manobra: 1, turbo: true },
+};
+
 // Duração de cada poder pelo nível comprado na loja (0 a 5).
 export const duracao = (nivel = 0) => 8 + nivel * 2;
 // dons: o que cada um muda na corrida
@@ -79,12 +93,15 @@ export function nova(nivel = 'medio', cfg = {}) {
     ima: dom === 'ima' ? 10 : 0, superPulo: 0, voo: 0, vooTipo: 'mochila', supercarga: 0, energia: dom === 'turbo' ? 0.6 : 0, escudo: dom === 'escudo', invencivel: 0, dobro: 0, bonus: 0,
     arrancadas: cfg.arrancadas ?? 0,
     skate: 0, skateTipo: SKATES[cfg.skate] ? cfg.skate : 'classico', cargas: cfg.cargas ?? 0,
+    patinete: 0, patineteTipo: PATINETES[cfg.patinete] ? cfg.patinete : 'classico', cargasPatinete: cfg.cargasPatinete ?? 0,
+    turboPatinete: 0, turboUsado: false, manobra: null, pontosManobra: 0, patineteSaiu: null,
     poderes,
     // dom do personagem escolhido (cada um da turma tem o seu)
     dom: cfg.dom ?? null, puloNoAr: false,
     vivo: true, eventos: ['perseguidor'],
     perseguidor: { dist: PERSEGUIDOR.perto, perto: PERSEGUIDOR.largada },
-    contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0, capas: 0, naves: 0 },
+    contagem: { pulos: 0, deslizes: 0, maletas: 0, supercargas: 0, skates: 0, superPulos: 0, arrancadas: 0, itens: 0, cargasUsadas: 0, capas: 0, naves: 0,
+      patinetes: 0, cargasPatineteUsadas: 0, manobras: 0, metrosPatinete: 0, turbosPatinete: 0 },
   };
 }
 
@@ -151,7 +168,7 @@ export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false,
 // Itens da pista, com a chance de cada um aparecer (somam 1).
 export const ITENS = [
   ['raio', 0.15], ['ima', 0.12], ['pulo', 0.11], ['escudo', 0.1], ['maleta', 0.1],
-  ['dobro', 0.09], ['bau', 0.09], ['turbo', 0.06], ['prancha', 0.07], ['capa', 0.06], ['nave', 0.05],
+  ['dobro', 0.09], ['bau', 0.09], ['turbo', 0.06], ['prancha', 0.03], ['patinete', 0.04], ['capa', 0.06], ['nave', 0.05],
 ];
 export function sortearItem(x) {
   let soma = 0;
@@ -342,6 +359,28 @@ function soltarContramao(s, r, turbo) {
 }
 
 const skateAtivo = (s) => (s.skate > 0 ? SKATES[s.skateTipo] : null);
+export const patineteAtivo = (s) => (s.patinete > 0 ? PATINETES[s.patineteTipo] : null);
+
+// Sobe no patinete (da pista ou gastando uma carga). Quem estava de skate desce dele: um veículo de cada vez.
+function subirNoPatinete(s) {
+  if (s.patinete <= 0) { s.contagem.patinetes++; s.turboUsado = false; }
+  s.patinete = DURACAO_PATINETE;
+  s.patineteSaiu = null;
+  if (s.skate > 0) s.skate = 0;
+  s.eventos.push('patinete');
+}
+
+// Fim do passeio de patinete: na batida ele sai rodopiando; no fim do tempo, some num brilho.
+function descerDoPatinete(s, como) {
+  s.patinete = 0;
+  s.turboPatinete = 0;
+  s.manobra = null;
+  s.patineteSaiu = { como, t: s.t, x: s.x, y: s.y };
+  s.eventos.push(como === 'batida' ? 'patinete-quebrou' : 'patinete-fim');
+}
+
+// Quantas voltas cabem num pulo, pelo tempo que ela vai ficar no ar.
+export const voltasDoPulo = (tempoNoAr) => Math.max(1, Math.min(3, Math.floor(tempoNoAr / TEMPO_VOLTA)));
 
 export function comando(s, acao) {
   if (!s.vivo) return;
@@ -353,11 +392,20 @@ export function comando(s, acao) {
     const forte = s.superPulo > 0 || s.supercarga > 0;
     s.vy = PULO * (forte ? SUPER_PULO : 1) * (sk?.pulo ?? 1) * (s.dom === 'superpulo' ? 1.15 : s.dom === 'agil' ? 1.05 : 1);
     s.deslizando = 0;
+    if (s.patinete > 0) {
+      // de patinete, todo pulo vira manobra: o rodopio dura o tempo que ela fica no ar
+      const g = GRAVIDADE * (sk?.gravidade ?? 1);
+      const dur = (s.vy + Math.sqrt(s.vy * s.vy + 2 * g * s.y)) / g;
+      const antes = s.manobra ? s.manobra.voltas : 0; // salto duplo: o rodopio continua e ganha voltas
+      s.manobra = { voltas: antes + voltasDoPulo(dur), dur: (s.manobra?.t ?? 0) + dur, t: s.manobra?.t ?? 0 };
+      s.eventos.push('manobra-inicio');
+    }
     s.contagem.pulos++;
     if (forte) s.contagem.superPulos++;
     s.eventos.push(forte ? 'superpulo' : 'pulo');
   } else if (acao === 'deslizar' && s.voo <= 0) {
     if (s.y > 0.001) s.vy = -PULO * 1.6; // desce rápido e já desliza
+    if (s.manobra) s.manobra.falhou = true; // desceu antes de completar o rodopio: não vale
     s.deslizando = DESLIZE;
     s.contagem.deslizes++;
     s.eventos.push('desliza');
@@ -367,6 +415,17 @@ export function comando(s, acao) {
     s.contagem.skates++;
     s.contagem.cargasUsadas++;
     s.eventos.push('skate');
+    if (s.patinete > 0) descerDoPatinete(s, 'troca');
+  } else if (acao === 'patinete' && s.patinete <= 0 && s.cargasPatinete > 0 && s.voo <= 0) {
+    s.cargasPatinete--;
+    s.contagem.cargasPatineteUsadas++;
+    subirNoPatinete(s);
+  } else if (acao === 'turbo-patinete' && s.patinete > 0 && PATINETES[s.patineteTipo].turbo && !s.turboUsado && s.voo <= 0) {
+    // turbo do patinete elétrico: uma vez por passeio
+    s.turboUsado = true;
+    s.turboPatinete = DURACAO_TURBO_PATINETE;
+    s.contagem.turbosPatinete++;
+    s.eventos.push('turbo-patinete');
   } else if (acao === 'arrancada' && s.arrancadas > 0 && s.t <= JANELA_ARRANCADA && s.voo <= 0) {
     // bônus de largada: começa voando com a mochila a jato, por mais tempo que a da pista
     s.arrancadas--;
@@ -409,14 +468,16 @@ export function avancar(s, dt, aleatorio = Math.random) {
   dt = Math.min(dt, 0.05);
   const sk = skateAtivo(s);
   s.t += dt;
-  const turbo = (s.supercarga > 0 ? 1.4 : 1) * (s.voo > 0 && s.vooTipo === 'nave' ? 1.25 : 1);
+  const pt = s.voo > 0 ? null : patineteAtivo(s); // voando, o patinete fica guardado
+  const turbo = (s.supercarga > 0 ? 1.4 : 1) * (s.voo > 0 && s.vooTipo === 'nave' ? 1.25 : 1) * (s.turboPatinete > 0 ? 1.3 : 1);
   const corrida = velocidadeEm(s.nivel, s.dist);
   const degrau = Math.floor((corrida - VELOCIDADE[s.nivel].base) / DEGRAU_ACELERA);
   if (degrau > (s.degrau ?? 0)) { s.degrau = degrau; s.eventos.push('acelera'); }
-  s.vel = corrida * turbo * (sk?.velocidade ?? 1);
+  s.vel = corrida * turbo * (sk?.velocidade ?? 1) * (pt?.velocidade ?? 1);
   const dz = s.vel * dt;
   s.dist += dz;
   if (s.dobro > 0) s.bonus += dz;
+  if (pt) s.contagem.metrosPatinete += dz;
 
   // personagem
   const passo = TROCA_DE_FAIXA * dt * (s.dom === 'desvio' ? 1.6 : s.dom === 'agil' ? 1.25 : 1);
@@ -427,14 +488,22 @@ export function avancar(s, dt, aleatorio = Math.random) {
   } else if (s.y > 0 || s.vy > 0) {
     s.vy -= GRAVIDADE * (sk?.gravidade ?? 1) * dt;
     s.y = Math.max(0, s.y + s.vy * dt);
-    if (s.y === 0) { s.vy = 0; s.puloNoAr = false; s.eventos.push('pouso'); }
+    if (s.y === 0) { s.vy = 0; s.puloNoAr = false; s.eventos.push('pouso'); pousarManobra(s); }
   }
+  if (s.manobra) s.manobra.t += dt;
   const voava = s.voo > 0;
+  const carregada = s.supercarga > 0;
   s.deslizando = Math.max(0, s.deslizando - dt);
   for (const k of ['ima', 'superPulo', 'voo', 'supercarga', 'invencivel', 'dobro']) {
     const antes = s[k];
     s[k] = Math.max(0, s[k] - dt);
     if (antes > 0 && s[k] === 0 && ['ima', 'superPulo', 'supercarga', 'dobro'].includes(k)) s.eventos.push('poder-fim');
+  }
+  if (carregada && s.supercarga === 0 && s.voo <= 0 && s.y > 0.05) {
+    // a supercarga acabou no meio de um super pulo: fica protegida até pousar e mais um pouquinho,
+    // para não cair em cima de algo que ela não tinha como ver chegando
+    const g = GRAVIDADE * (skateAtivo(s)?.gravidade ?? 1);
+    s.invencivel = Math.max(s.invencivel, (s.vy + Math.sqrt(s.vy * s.vy + 2 * g * s.y)) / g + 0.5);
   }
   if (voava && s.voo === 0) {
     s.vy = 0;
@@ -446,6 +515,12 @@ export function avancar(s, dt, aleatorio = Math.random) {
   if (s.skate > 0) {
     s.skate = Math.max(0, s.skate - dt);
     if (s.skate === 0) s.eventos.push('skate-fim');
+  }
+  if (pt) {
+    // o tempo do patinete só corre com ele no chão da pista (voando, ele espera guardado)
+    s.turboPatinete = Math.max(0, s.turboPatinete - dt);
+    s.patinete = Math.max(0, s.patinete - dt);
+    if (s.patinete === 0) descerDoPatinete(s, 'tempo');
   }
 
   // supercarga: liga sozinha quando a barra enche (o jogo é só por gestos, sem botão)
@@ -468,6 +543,9 @@ export function avancar(s, dt, aleatorio = Math.random) {
     if (s.ima > 0 && o.tipo === 'moeda' && o.z < 10 && o.z > -1) {
       o.faixa += (s.x - o.faixa) * Math.min(1, dt * 10);
       o.h += (s.y + 0.6 - o.h) * Math.min(1, dt * 10);
+    } else if (pt && o.tipo === 'moeda' && o.z < 8 && o.z > -1 && Math.abs(o.faixa - s.x) < 0.5) {
+      // de patinete: as moedas da faixa dela descem (ou sobem) até a mão
+      o.h += (s.y + 0.6 - o.h) * Math.min(1, dt * 8);
     }
   }
   s.objetos = s.objetos.filter((o) => o.z + (o.comp ?? 0) > -6 && !o.pego && !o.quebrado);
@@ -501,13 +579,16 @@ export function avancar(s, dt, aleatorio = Math.random) {
     }
     if (o.atingido || !colide(s, o)) continue;
     o.atingido = true;
-    if (s.supercarga > 0) { o.quebrado = true; s.eventos.push('quebra'); continue; } // a supercarga atravessa
+    if (s.supercarga > 0 || s.turboPatinete > 0) { o.quebrado = true; s.eventos.push('quebra'); continue; } // a supercarga e o turbo atravessam
     if (s.invencivel > 0) continue;
-    if (s.escudo || s.skate > 0) tropecar(s);
+    if (s.escudo || s.skate > 0 || s.patinete > 0) tropecar(s);
     if (s.escudo) {
       s.escudo = false;
       s.invencivel = 1.2;
       s.eventos.push('escudo');
+    } else if (s.patinete > 0) {
+      descerDoPatinete(s, 'batida');
+      s.invencivel = 1.5;
     } else if (s.skate > 0) {
       s.skate = 0;
       s.invencivel = 1.5;
@@ -519,6 +600,18 @@ export function avancar(s, dt, aleatorio = Math.random) {
     }
   }
   return s;
+}
+
+// Pousou: se o rodopio completou, a manobra vale pontos (o Pisca-Pisca vale o dobro).
+function pousarManobra(s) {
+  const m = s.manobra;
+  s.manobra = null;
+  if (!m || m.falhou || s.patinete <= 0 || m.t < m.dur * 0.8) return;
+  const ganho = PONTOS_MANOBRA * m.voltas * PATINETES[s.patineteTipo].manobra;
+  s.pontosManobra += ganho;
+  s.ultimaManobra = { voltas: m.voltas, pontos: ganho, t: s.t };
+  s.contagem.manobras++;
+  s.eventos.push('manobra');
 }
 
 function tropecar(s) {
@@ -536,6 +629,8 @@ function voar(s, segundos, tipo = 'mochila') {
   s.voo = segundos;
   s.vooTipo = tipo;
   s.deslizando = 0;
+  s.manobra = null;
+  s.turboPatinete = 0;
   if (tipo === 'capa') {
     s.contagem.capas++;
     s.ima = Math.max(s.ima, segundos); // a super-heroína puxa as moedas para perto
@@ -580,15 +675,18 @@ function coletar(s, o) {
       if (s.skate <= 0) { s.skate = DURACAO_SKATE; s.contagem.skates++; }
       else s.skate = DURACAO_SKATE; // já estava no skate: renova o tempo
       s.eventos.push('skate');
+      if (s.patinete > 0) descerDoPatinete(s, 'troca');
       break;
+    case 'patinete': subirNoPatinete(s); break; // patinete da pista: não gasta carga
     case 'escudo': s.escudo = true; s.eventos.push('poder'); break;
     default:
   }
 }
 
-// Pontos: distância (em dobro enquanto vale o ×2) mais 5 por moeda. As moedas também vão para a carteira.
-export const pontos = (s) => Math.floor(s.dist + s.bonus) + s.moedas * 5;
+// Pontos: distância (em dobro enquanto vale o ×2) mais 5 por moeda e as manobras de patinete.
+// As moedas também vão para a carteira.
+export const pontos = (s) => Math.floor(s.dist + s.bonus) + s.moedas * 5 + (s.pontosManobra ?? 0);
 
 export const resumo = (s) => ({
-  pontos: pontos(s), moedas: s.moedas, metros: Math.floor(s.dist), ...s.contagem,
+  pontos: pontos(s), moedas: s.moedas, metros: Math.floor(s.dist), ...s.contagem, metrosPatinete: Math.floor(s.contagem.metrosPatinete ?? 0),
 });

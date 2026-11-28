@@ -1,4 +1,4 @@
-// Itens da pista em 3D (ímã, tênis de mola, escudo, raio, ×2, baú, foguete, skate e capa),
+// Itens da pista em 3D (ímã, tênis de mola, escudo, raio, ×2, baú, foguete, skate, patinete e capa),
 // no mesmo jeito da mochila a jato: objetos de verdade girando e brilhando, sem bolhas.
 // Cada modelo é montado uma vez; os itens da pista são cópias que dividem geometria e material.
 import { THREE, textura, texBrilho, sombrear } from './base.js';
@@ -31,6 +31,114 @@ class Mola extends THREE.Curve {
     const a = t * Math.PI * 2 * this.voltas;
     return alvo.set(Math.cos(a) * this.raio, -t * this.altura, Math.sin(a) * this.raio);
   }
+}
+
+
+// ---------- Patinete ----------
+// Montado de frente para +z (para onde a menina corre), com o deck a 0,075 do chão.
+// Devolve as peças que se mexem: rodas (giram), haste (dobra e vira o guidão), luzes, farol e turbo.
+const CORES_PATINETE = {
+  classico: { deck: 0xff5fa2, lixa: 0x3a3d4a, haste: 0xdfe4ec, punho: 0x8a6cff, fita: [0xffd21f, 0x35c9ff, 0xff5fa2], roda: 0xfafafa, cubo: 0xff5fa2 },
+  luzes: { deck: 0x8a6cff, lixa: 0x2e2a4a, haste: 0xffffff, punho: 0xff5fa2, fita: [0xff5fa2, 0xffd21f, 0x5ae6ff], roda: 0xffffff, cubo: 0xffd21f },
+  eletrico: { deck: 0x22c993, lixa: 0x24303a, haste: 0x3a4150, punho: 0x22c993, fita: [0x8ffcff, 0x22c993, 0xffffff], roda: 0x2b2f3a, cubo: 0x8ffcff },
+};
+export function montarPatinete(tipo = 'classico') {
+  const c = CORES_PATINETE[tipo] ?? CORES_PATINETE.classico;
+  const g = new THREE.Group();
+  const corDeck = mat(c.deck, { roughness: 0.35 });
+  const corHaste = tipo === 'eletrico' ? mat(c.haste, { roughness: 0.35, metalness: 0.4 }) : metal(c.haste);
+  const leds = [];
+  // deck arredondado, com lixa escura em cima e adesivos de estrela e coração
+  const forma = new THREE.Shape();
+  const [L, C2, R] = [0.1, 0.37, 0.08];
+  forma.moveTo(-L + R, -C2); forma.lineTo(L - R, -C2); forma.quadraticCurveTo(L, -C2, L, -C2 + R);
+  forma.lineTo(L, C2 - R); forma.quadraticCurveTo(L, C2, L - R, C2); forma.lineTo(-L + R, C2);
+  forma.quadraticCurveTo(-L, C2, -L, C2 - R); forma.lineTo(-L, -C2 + R); forma.quadraticCurveTo(-L, -C2, -L + R, -C2);
+  const deck = malha(extrudar(forma, 0.03, 0.01), corDeck); deck.rotation.x = -Math.PI / 2; deck.position.set(0, 0.06, 0.02); g.add(deck);
+  const lixa = malha(extrudar(forma, 0.004, 0.002), mat(c.lixa, { roughness: 1 })); lixa.rotation.x = -Math.PI / 2; lixa.scale.set(0.86, 0.9, 1); lixa.position.set(0, 0.083, 0.02); g.add(lixa);
+  const est = malha(extrudar(estrela(0.035, 0.016), 0.004, 0.002), ouro()); est.rotation.x = -Math.PI / 2; est.position.set(0, 0.087, -0.24); g.add(est);
+  const coracao = new THREE.Shape();
+  coracao.moveTo(0, -0.02); coracao.bezierCurveTo(-0.04, 0.005, -0.02, 0.035, 0, 0.018); coracao.bezierCurveTo(0.02, 0.035, 0.04, 0.005, 0, -0.02);
+  const cor = malha(extrudar(coracao, 0.004, 0.002), mat(0xffffff, { roughness: 0.5 })); cor.rotation.x = -Math.PI / 2; cor.rotation.z = Math.PI; cor.position.set(0, 0.087, 0.2); g.add(cor);
+  // faixinhas de luz nas laterais do deck (o Pisca-Pisca muda de cor; o elétrico brilha verde-água)
+  if (tipo !== 'classico') {
+    for (const lado of [-1, 1]) for (let k = 0; k < 5; k++) {
+      const m = mat(tipo === 'luzes' ? 0xff5fa2 : 0x8ffcff, { emissive: tipo === 'luzes' ? 0xff5fa2 : 0x8ffcff, emissiveIntensity: 1.2 });
+      const led = malha(new THREE.SphereGeometry(0.011, 8, 6), m); led.position.set(lado * 0.103, 0.065, -0.22 + k * 0.13); g.add(led);
+      leds.push(m);
+    }
+  }
+  // rodas: pneu, cubo colorido e raios (para ver que giram); a de trás tem paralama
+  const rodas = [];
+  const geoPneu = new THREE.TorusGeometry(0.047, 0.02, 10, 22);
+  const geoCubo = new THREE.CylinderGeometry(0.03, 0.03, 0.03, 16);
+  const matPneu = mat(c.roda, { roughness: 0.6, ...(tipo === 'luzes' ? { emissive: 0xffffff, emissiveIntensity: 0.6 } : {}) });
+  if (tipo === 'luzes') leds.push(matPneu);
+  const matCubo = mat(c.cubo, { roughness: 0.3, metalness: 0.3, ...(tipo !== 'classico' ? { emissive: c.cubo, emissiveIntensity: 0.6 } : {}) });
+  for (const z of [-0.3, 0.46]) {
+    const r = new THREE.Group(); r.position.set(0, 0.067, z); g.add(r);
+    const pneu = malha(geoPneu, matPneu); pneu.rotation.y = Math.PI / 2; r.add(pneu);
+    const cubo = malha(geoCubo, matCubo); cubo.rotation.z = Math.PI / 2; r.add(cubo);
+    for (let k = 0; k < 3; k++) { const raio = malha(new THREE.BoxGeometry(0.034, 0.008, 0.075), matCubo); raio.rotation.x = (k * Math.PI) / 3; r.add(raio); }
+    if (tipo === 'luzes') {
+      const luz = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrilho(), color: 0xff8ad8, transparent: true, depthWrite: false, opacity: 0.9 }));
+      luz.scale.set(0.26, 0.26, 1); r.add(luz); leds.push(luz.material);
+    }
+    rodas.push(r);
+  }
+  const paralama = malha(new THREE.TorusGeometry(0.075, 0.014, 6, 16, Math.PI * 0.75), corDeck);
+  paralama.rotation.set(0, -Math.PI / 2, Math.PI * 0.2); paralama.position.set(0, 0.07, -0.3); g.add(paralama);
+  // lanterninha de coração atrás do paralama (é o que mais aparece de quem vê de trás)
+  const lanterna = malha(extrudar(coracao, 0.012, 0.004), mat(0xff3b6b, { emissive: 0xff2a5a, emissiveIntensity: 0.9 }));
+  lanterna.scale.setScalar(1.4); lanterna.rotation.set(0, Math.PI, 0); lanterna.position.set(0, 0.13, -0.375); g.add(lanterna);
+  // garfo da roda da frente e o pescoço que liga o deck à haste
+  const pescoco = malha(new THREE.BoxGeometry(0.07, 0.05, 0.07), corDeck); pescoco.position.set(0, 0.085, 0.4); g.add(pescoco);
+  for (const lado of [-1, 1]) {
+    const garfo = malha(new THREE.BoxGeometry(0.012, 0.09, 0.022), corHaste); garfo.position.set(lado * 0.03, 0.09, 0.45); garfo.rotation.x = -0.25; g.add(garfo);
+  }
+  // haste: articulada na frente do deck (dobra quando ela se abaixa e vira o guidão nas curvas)
+  const haste = new THREE.Group(); haste.position.set(0, 0.11, 0.44); g.add(haste);
+  const coluna = new THREE.Group(); coluna.rotation.x = -0.12; haste.add(coluna); // inclinada para trás, na direção dela
+  const H = 0.64;
+  const tubo = malha(new THREE.CylinderGeometry(0.02, 0.024, H, 14), corHaste); tubo.position.y = H / 2; coluna.add(tubo);
+  const anel = malha(new THREE.TorusGeometry(0.026, 0.008, 6, 14), corDeck); anel.rotation.x = Math.PI / 2; anel.position.y = 0.32; coluna.add(anel);
+  const guidao = new THREE.Group(); guidao.position.y = H; coluna.add(guidao);
+  const barra = malha(new THREE.CylinderGeometry(0.016, 0.016, 0.68, 12), corHaste); barra.rotation.z = Math.PI / 2; guidao.add(barra);
+  const matPunho = mat(c.punho, { roughness: 0.8 });
+  for (const lado of [-1, 1]) {
+    const punho = malha(new THREE.CapsuleGeometry(0.028, 0.085, 4, 12), matPunho); punho.rotation.z = Math.PI / 2; punho.position.x = lado * 0.31; guidao.add(punho);
+    // fitinhas coloridas saindo das pontas do guidão
+    c.fita.forEach((cf, k) => {
+      const fita = malha(new THREE.BoxGeometry(0.01, 0.15, 0.02), mat(cf, { roughness: 0.6, side: THREE.DoubleSide }));
+      fita.geometry.translate(0, -0.075, 0);
+      fita.position.set(lado * 0.37, 0, (k - 1) * 0.012); fita.rotation.set(0.5 + k * 0.15, 0, lado * (0.5 + k * 0.25));
+      guidao.add(fita);
+    });
+  }
+  // campainha dourada no lado esquerdo e uma plaquinha com estrela na frente da haste
+  const sino = malha(new THREE.SphereGeometry(0.024, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), ouro()); sino.position.set(-0.09, 0.016, 0); guidao.add(sino);
+  const placa = malha(new THREE.CylinderGeometry(0.045, 0.045, 0.012, 20), corDeck); placa.rotation.x = Math.PI / 2; placa.position.set(0, H - 0.14, 0.027); coluna.add(placa);
+  const estPlaca = malha(extrudar(estrela(0.028, 0.012), 0.006, 0.002), tipo === 'eletrico' ? brilhante(0x8ffcff) : ouro()); estPlaca.position.set(0, H - 0.14, 0.036); coluna.add(estPlaca);
+  let farol = null; const chamas = [];
+  if (tipo === 'eletrico') {
+    // bateria embaixo do deck, farol na haste, telinha no guidão e jatinhos de turbo atrás
+    const bateria = malha(new THREE.BoxGeometry(0.11, 0.035, 0.34), mat(0x2b2f3a, { roughness: 0.5 })); bateria.position.set(0, 0.035, 0); g.add(bateria);
+    const raioB = malha(extrudar((() => { const r = new THREE.Shape(); r.moveTo(0.01, 0.05); r.lineTo(-0.02, 0); r.lineTo(0.004, 0); r.lineTo(-0.01, -0.05); r.lineTo(0.025, 0.01); r.lineTo(0, 0.01); r.closePath(); return r; })(), 0.004, 0.002), brilhante(0xffd21f));
+    raioB.rotation.y = Math.PI / 2; raioB.position.set(0.057, 0.035, 0); g.add(raioB);
+    const raioB2 = raioB.clone(); raioB2.position.x = -0.057; raioB2.rotation.y = -Math.PI / 2; g.add(raioB2);
+    farol = mat(0xffffff, { emissive: 0xfff6c0, emissiveIntensity: 1.5 });
+    const lente = malha(new THREE.CylinderGeometry(0.026, 0.026, 0.02, 16), farol); lente.rotation.x = Math.PI / 2; lente.position.set(0, 0.2, 0.028); coluna.add(lente);
+    const tela = malha(new THREE.BoxGeometry(0.07, 0.012, 0.04), brilhante(0x8ffcff)); tela.position.set(0, 0.018, 0); guidao.add(tela);
+    for (const dx of [-0.04, 0.04]) {
+      const fogo = new THREE.Group();
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.42, 10), new THREE.MeshBasicMaterial({ color: 0x4fd8ff, transparent: true, opacity: 0.85 }));
+      cone.rotation.x = -Math.PI / 2; cone.position.z = -0.21; fogo.add(cone);
+      const miolo = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.16, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      miolo.rotation.x = -Math.PI / 2; miolo.position.z = -0.08; fogo.add(miolo);
+      fogo.position.set(dx * 2.2, 0.07, -0.36); fogo.visible = false; g.add(fogo); chamas.push(fogo);
+    }
+  }
+  return { grupo: g, rodas, haste, coluna, guidao, leds, farol, chamas };
 }
 
 const MODELOS = {
@@ -165,6 +273,13 @@ const MODELOS = {
     g.rotation.x = -0.5;
     const embrulho = new THREE.Group(); embrulho.add(g);
     return { g: embrulho, cor: 0x4fd0ff };
+  },
+  patinete() {
+    // patinete rosa de lado, com as fitinhas no guidão
+    const { grupo } = montarPatinete('classico');
+    grupo.scale.setScalar(0.7); grupo.rotation.y = Math.PI / 2; grupo.rotation.z = 0.15; grupo.position.y = -0.3;
+    const embrulho = new THREE.Group(); embrulho.add(grupo);
+    return { g: embrulho, cor: 0xff7fc0 };
   },
   capa() {
     // capa vermelha de super-heroína, aberta como se estivesse num cabide, com a estrela dourada

@@ -16,6 +16,14 @@ export const SKATES_LOJA = [
   { id: 'voador', preco: 2000, texto: 'Protege de uma batida e flutua: pulos mais altos e mais longos.' },
   { id: 'supersonico', preco: 5000, texto: 'Protege de uma batida, corre mais rápido e vale moedas em dobro.' },
 ];
+// Patinetes: um veículo à parte do skate, com cargas próprias (botão 🛴 na tela da corrida).
+export const PATINETES_LOJA = [
+  { id: 'classico', preco: 0, texto: 'Mais rápido que correr, puxa as moedas da faixa e cada pulo vira um rodopio que vale pontos. Aguenta uma batida.' },
+  { id: 'luzes', preco: 2500, texto: 'Rodinhas com luzinhas coloridas: tudo o que o clássico faz, e as manobras valem o dobro de pontos.' },
+  { id: 'eletrico', preco: 6000, texto: 'O mais rápido, com um turbo de 3 s (toque em ⚡ Turbo) que atravessa os obstáculos.' },
+];
+export const PRECO_CARGA_PATINETE = 350;
+
 // Estilos de roupa da menina: comprados uma vez, usados quando quiser.
 export const ESTILOS = [
   { id: 'moletom', nome: 'Moletom Estrela', icone: '⭐', preco: 0, texto: 'Moletom branco com mangas azul-marinho, estrelas e número, e calça com listra.' },
@@ -40,6 +48,9 @@ export function carteiraNova() {
     personagens: ['antonella'],
     personagem: 'antonella',
     cargas: 2,
+    patinetes: ['classico'],
+    patinete: 'classico',
+    cargasPatinete: 1,
     arrancadas: 1,
     poderes: { ima: 0, pulo: 0, maleta: 0, supercarga: 0 },
     missoes: [],
@@ -57,6 +68,10 @@ export function normalizar(c) {
     ...c,
     poderes: { ...base.poderes, ...(c.poderes ?? {}) },
     skates: Array.from(new Set(['classico', ...(c.skates ?? [])])),
+    // carteiras de antes do patinete ganham o clássico e uma carga para experimentar
+    patinetes: Array.from(new Set(['classico', ...(Array.isArray(c.patinetes) ? c.patinetes : [])])).filter((p) => PATINETES_LOJA.some((x) => x.id === p)),
+    patinete: PATINETES_LOJA.some((x) => x.id === c.patinete) && (c.patinetes ?? []).includes(c.patinete) ? c.patinete : 'classico',
+    cargasPatinete: Number.isFinite(c.cargasPatinete) && c.cargasPatinete >= 0 ? c.cargasPatinete : base.cargasPatinete,
     estilos: Array.from(new Set(['moletom', 'esportiva', 'corredor', ...(c.estilos ?? [])])).filter((e) => ESTILOS.some((x) => x.id === e)),
     // quem já jogava antes do moletom passa a vestir ele uma vez; depois, vale a escolha da pessoa
     estilo: !(c.estilos ?? []).includes('moletom') ? 'moletom' : (ESTILOS.some((x) => x.id === c.estilo) ? c.estilo : 'moletom'),
@@ -74,6 +89,25 @@ export function comprarSkate(c, id) {
   if (c.skates.includes(id)) return erro('Você já tem este skate.');
   if (c.moedas < item.preco) return erro(`Faltam ${item.preco - c.moedas} moedas.`);
   return { carteira: { ...c, moedas: c.moedas - item.preco, skates: [...c.skates, id], skate: id } };
+}
+
+export function comprarPatinete(c, id) {
+  const item = PATINETES_LOJA.find((s) => s.id === id);
+  if (!item) return erro('Patinete desconhecido.');
+  if (c.patinetes.includes(id)) return erro('Você já tem este patinete.');
+  if (c.moedas < item.preco) return erro(`Faltam ${item.preco - c.moedas} moedas.`);
+  return { carteira: { ...c, moedas: c.moedas - item.preco, patinetes: [...c.patinetes, id], patinete: id } };
+}
+
+export function escolherPatinete(c, id) {
+  if (!c.patinetes.includes(id)) return erro('Compre este patinete primeiro.');
+  return { carteira: { ...c, patinete: id } };
+}
+
+export function comprarCargasPatinete(c, n = 1) {
+  const preco = PRECO_CARGA_PATINETE * n;
+  if (c.moedas < preco) return erro(`Faltam ${preco - c.moedas} moedas.`);
+  return { carteira: { ...c, moedas: c.moedas - preco, cargasPatinete: c.cargasPatinete + n } };
 }
 
 export function comprarEstilo(c, id) {
@@ -142,6 +176,8 @@ const MODELOS = [
   { tipo: 'supercargas', alvos: [1, 2], texto: (n) => (n === 1 ? 'Ative a supercarga' : `Ative a supercarga ${n} vezes`) },
   { tipo: 'superPulos', alvos: [5, 12], texto: (n) => `Dê ${n} super pulos` },
   { tipo: 'skates', alvos: [1], texto: () => 'Ande de skate numa corrida' },
+  { tipo: 'metrosPatinete', alvos: [200, 500, 1000], texto: (n) => `Ande ${n} m de patinete` },
+  { tipo: 'manobras', alvos: [2, 5, 10], texto: (n) => `Faça ${n} manobras de patinete numa corrida` },
 ];
 
 // A missão fica um pouco mais difícil a cada uma concluída; o prêmio acompanha.
@@ -168,6 +204,7 @@ export function fecharCorrida(c, resultado, aleatorio = Math.random) {
     ...carteira,
     moedas: carteira.moedas + resultado.moedas + premio,
     cargas: Math.max(0, carteira.cargas - (resultado.cargasUsadas ?? 0)),
+    cargasPatinete: Math.max(0, carteira.cargasPatinete - (resultado.cargasPatineteUsadas ?? 0)),
     arrancadas: Math.max(0, carteira.arrancadas - (resultado.arrancadas ?? 0)),
     feitas: carteira.feitas + concluidas.length,
     missoes: carteira.missoes.filter((m) => !concluidas.includes(m)),
@@ -204,7 +241,9 @@ export function mesclarCarteiras(a, b) {
     moedas: Math.max(x.moedas, y.moedas),
     cargas: Math.max(x.cargas, y.cargas),
     arrancadas: Math.max(x.arrancadas, y.arrancadas),
+    cargasPatinete: Math.max(x.cargasPatinete, y.cargasPatinete),
     skates: [...x.skates, ...y.skates],
+    patinetes: [...x.patinetes, ...y.patinetes],
     estilos: [...x.estilos, ...y.estilos],
     personagens: [...x.personagens, ...y.personagens],
     poderes: Object.fromEntries(Object.keys(PODERES).map((k) => [k, Math.max(x.poderes[k], y.poderes[k])])),

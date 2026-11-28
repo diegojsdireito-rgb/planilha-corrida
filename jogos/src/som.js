@@ -102,6 +102,9 @@ const SONS = {
   turbo: (c) => { tom(c, 220, 0, 0.45, { tipo: 'sawtooth', vol: 0.07, ate: 880 }); tom(c, 660, 0.3, 0.3, { tipo: 'triangle', vol: 0.12 }); },
   skate: (c) => { ruido(c, 0, 0.2, { vol: 0.2, freq: 1200 }); tom(c, 520, 0, 0.15, { tipo: 'triangle', vol: 0.12, ate: 780 }); },
   quebra: (c) => ruido(c, 0, 0.18, { vol: 0.4, freq: 500 }),
+  // patinete: a campainha do guidão (trim-trim) e o rodopio da manobra (vento subindo e plim)
+  patinete: (c) => { for (const ini of [0, 0.13]) { tom(c, 2350, ini, 0.12, { tipo: 'sine', vol: 0.12 }); tom(c, 3130, ini, 0.1, { tipo: 'sine', vol: 0.05 }); } ruido(c, 0.26, 0.18, { vol: 0.15, freq: 1500 }); },
+  manobra: (c) => { ruido(c, 0, 0.3, { vol: 0.22, freq: 2200 }); [988, 1319, 1760].forEach((f, k) => tom(c, f, 0.12 + k * 0.06, 0.13, { tipo: 'triangle', vol: 0.12 })); },
   decolar: (c) => { ruido(c, 0, 0.6, { vol: 0.35, freq: 900 }); tom(c, 120, 0, 0.6, { tipo: 'sawtooth', vol: 0.08, ate: 420 }); tom(c, 660, 0.15, 0.25, { tipo: 'triangle', vol: 0.1, ate: 990 }); },
   // capa: fanfarra de super-heroína subindo
   heroi: (c) => {
