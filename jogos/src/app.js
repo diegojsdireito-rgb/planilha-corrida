@@ -121,15 +121,16 @@ const JOGOS = [
       };
     },
     regras: [
-      'O jogo abre no mapa: um caminho de 60 fases por quatro lugares (Vale do Morango, Floresta de Menta, Lago de Mirtilo e Castelo de Uva). Toque numa fase para ver a meta e jogar; nas que você já passou, dá para jogar de novo e ganhar mais estrelas. O botão 🗺️ Mapa volta para o caminho e guarda a partida.',
+      'O jogo abre no mapa: um caminho de 120 fases por oito lugares (Vale do Morango, Floresta de Menta, Lago de Mirtilo, Castelo de Uva, Praia de Caramelo, Vulcão de Chocolate, Nuvens de Algodão-doce e Galáxia de Jujuba), com uma fase chefe a cada 15. Toque numa fase para ver a meta e jogar; nas que você já passou, dá para jogar de novo e ganhar mais estrelas. O botão 🗺️ Mapa volta para o caminho e guarda a partida.',
       'Arraste um doce para o lado, ou toque nele e depois no vizinho, para trocar os dois de lugar.',
       'A troca só vale se formar uma linha de 3 ou mais doces iguais. Os doces somem e outros caem de cima.',
       '4 em linha vira um doce listrado, que limpa a linha ou a coluna. L ou T vira uma bomba. 5 em linha vira o arco-íris, que limpa todos de uma cor.',
       'Faça a meta de pontos antes de acabarem os movimentos. Mais pontos dão até 3 estrelas.',
       'A partir da fase 3 aparecem obstáculos, e para passar é preciso também quebrar todos: 🧊 doce congelado (não sai do lugar; quebra formando trinca com ele ou estourando um doce ao lado) e 🪨 pedra (não forma trinca; quebra quando um doce estoura ao lado). Os mais escuros aguentam duas batidas. O placar mostra quanto falta.',
+      'Cada lugar novo traz uma novidade: na Praia de Caramelo, ⛓️ corrente de alcaçuz (o doce preso não troca nem cai, mas forma trinca; a trinca solta); no Vulcão de Chocolate, 🍫 chocolate (quebra com doce estourando ao lado, mas cresce para uma casa vizinha se numa jogada nenhum chocolate quebrar); nas Nuvens de Algodão-doce, 🍒 cerejas para levar até a fileira de baixo (a cereja troca com qualquer vizinho, mesmo sem trinca); e na Galáxia de Jujuba, 🎀 caixas de presente que aguentam 2 ou 3 batidas e, quando abrem, soltam um doce especial.',
       'Ficou parado? O robô mostra uma troca possível.',
-      'Bônus (embaixo da mesa), que não gastam movimento: 🔨 Martelo quebra um doce, 🔄 Troca livre troca dois vizinhos mesmo sem trinca, 🧹 Vassoura limpa uma linha, 🌈 Arco-íris transforma um doce em arco-íris, 🔀 Misturar embaralha a mesa e ➕ dá 5 movimentos a mais. Toque no bônus e depois no doce; toque de novo no bônus para desistir.',
-      'Você começa com 3 de cada. Cada fase vencida dá um bônus sorteado por estrela.',
+      'Bônus (embaixo da mesa), que não gastam movimento: 🔨 Martelo quebra um doce, 🔄 Troca livre troca dois vizinhos mesmo sem trinca, 🧹 Vassoura limpa uma linha, 🌈 Arco-íris transforma um doce em arco-íris, 🔀 Misturar embaralha a mesa, ➕ dá 5 movimentos a mais, 💣 Bomba estoura um quadrado 3 × 3, 🚀 Foguete limpa a linha e a coluna de um doce, 🍭 Listrado transforma um doce em listrado, ❄️ Descongelar derrete uma camada de todo o gelo, solta as correntes e derrete até 3 chocolates, 🎨 Pincel troca a cor de todos os doces de uma cor (toque no doce e depois na cor nova) e 🎁 Presente espalha 3 doces especiais. Toque no bônus e depois no doce; toque de novo no bônus para desistir.',
+      'Você começa com 3 de cada (quem já jogava ganhou 2 de cada bônus novo). Cada fase vencida dá um bônus sorteado por estrela.',
     ] },
   { id: 'pintar', nome: 'Pintar', descricao: 'Canetinhas, pincéis e purpurina', solo: true, semNivel: true, tela: telaPintar, rotuloNovo: 'Escolher outro desenho',
     resumo() {
