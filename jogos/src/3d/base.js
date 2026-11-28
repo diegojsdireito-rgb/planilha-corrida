@@ -36,6 +36,18 @@ export function toon(cor, extra = {}) {
   return new THREE.MeshToonMaterial({ color: cor, gradientMap: GRADIENTE, ...extra });
 }
 
+// Mesmo material, mas reaproveitado entre todas as peças da mesma cor: os cenários têm milhares
+// de peças, e um material para cada uma deixava a troca de cenário travando. Só para quem não
+// muda o material depois (cor, transparência...) e não usa textura própria.
+const TOONS = new Map();
+export function toonFixo(cor, extra = {}) {
+  if (extra.map || extra.alphaMap || extra.emissiveMap) return toon(cor, extra);
+  const chave = `${cor}|${JSON.stringify(extra)}`;
+  let m = TOONS.get(chave);
+  if (!m) { m = toon(cor, extra); m.userData.compartilhado = true; TOONS.set(chave, m); }
+  return m;
+}
+
 // Material dos personagens: desenho animado de cores chapadas, com luz e sombra em três faixas suaves.
 let GRADIENTE_P = null;
 export function desenho({ roughness, metalness, ...params } = {}) {
@@ -65,7 +77,7 @@ export function descartar(obj, manter = new Set()) {
     if (x.geometry && !manter.has(x.geometry)) x.geometry.dispose();
     const mats = Array.isArray(x.material) ? x.material : x.material ? [x.material] : [];
     for (const m of mats) {
-      if (manter.has(m)) continue;
+      if (manter.has(m) || m.userData.compartilhado) continue;
       if (m.map && !manter.has(m.map)) m.map.dispose();
       m.dispose();
     }

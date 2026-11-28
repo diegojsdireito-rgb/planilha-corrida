@@ -127,15 +127,63 @@ export function criarMundo(canvas) {
     objetos.clear();
   }
 
+  // Cenários já montados ficam guardados: no Passeio, o próximo é montado antes da troca e as
+  // peças vão para a placa de vídeo com antecedência, para a troca não travar a corrida.
+  const montados = new Map();
+  function montado(id) {
+    let m = montados.get(id);
+    if (!m) {
+      const c = montarCenario(id);
+      m = { cenario: c, ceu: ceuTextura(c.ceu) };
+      montados.set(id, m);
+    }
+    return m;
+  }
+  // Desenha o cenário uma vez, no mesmo quadro e logo antes do desenho de verdade (que cobre
+  // tudo), sem cortar o que está fora da câmera: assim as peças, as texturas e os sombreadores
+  // já estão na placa de vídeo na hora da troca.
+  let aquecerNoQuadro = null;
+  function aquecer(m) {
+    if (!m.aquecido) aquecerNoQuadro = m;
+  }
+  function aquecerAgora() {
+    const m = aquecerNoQuadro; aquecerNoQuadro = null;
+    if (!m || m.aquecido || m.cenario === cenario) return;
+    m.aquecido = true;
+    const g = m.cenario.grupo;
+    const soltos = [];
+    g.traverse((x) => { if (x.isMesh && x.frustumCulled) { x.frustumCulled = false; soltos.push(x); } });
+    cena.add(g);
+    try {
+      renderer.initTexture(m.ceu);
+      renderer.render(cena, camera);
+    } catch { /* sem pré-aquecimento: a troca só fica um pouco mais lenta */ } finally {
+      cena.remove(g);
+      for (const x of soltos) x.frustumCulled = true;
+    }
+  }
+  // Monta e aquece um cenário que vai entrar logo (chamado fora do quadro, sem pressa).
+  function preparar(id) {
+    if (!id || id === temaAtual) return;
+    aquecer(montado(id));
+    // guarda só o atual e os que estão para chegar: os outros saem da memória
+    if (montados.size > 3) {
+      for (const [k, m] of montados) {
+        if (montados.size <= 3) break;
+        if (k !== temaAtual && k !== id) { descartar(m.cenario.grupo); m.ceu.dispose(); montados.delete(k); }
+      }
+    }
+  }
+
   function trocarCenario(id) {
     if (id === temaAtual) return;
-    if (cenario) { cena.remove(cenario.grupo); descartar(cenario.grupo); }
+    if (cenario) cena.remove(cenario.grupo);
     limparObjetos();
     temaAtual = id;
-    cenario = montarCenario(id);
+    const m = montado(id);
+    cenario = m.cenario;
     cena.add(cenario.grupo);
-    cena.background?.dispose?.();
-    cena.background = ceuTextura(cenario.ceu);
+    cena.background = m.ceu;
     cena.fog.color.setHex(cenario.neblina);
     hemi.color.setHex(cenario.hemi[0]);
     hemi.groundColor.setHex(cenario.hemi[1]);
@@ -256,18 +304,20 @@ export function criarMundo(canvas) {
     preenche.target.position.set(px, 0.8, 0);
     recorte.position.set(px + 2, 3, 8);
     recorte.target.position.set(px, 1, 0);
+    aquecerAgora();
     renderer.render(cena, camera);
   }
 
   function destruir() {
     limparObjetos();
-    if (cenario) descartar(cenario.grupo);
+    for (const m of montados.values()) { descartar(m.cenario.grupo); m.ceu.dispose(); }
+    montados.clear();
     if (perseguidor) descartar(perseguidor.raiz);
     renderer.dispose();
     renderer.forceContextLoss?.();
   }
 
-  return { redimensionar, desenhar, destruir };
+  return { redimensionar, desenhar, destruir, preparar };
 }
 
 export { LISTA as CENARIOS } from './3d/cenarios.js';

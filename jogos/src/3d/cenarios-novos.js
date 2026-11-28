@@ -2,7 +2,7 @@
 // Passeio na Lua. Cada um tem chão, céu, enfeites dos lados e a sua versão dos três obstáculos parados
 // (o de pular, o de deslizar por baixo e o comprido, de trocar de faixa). Os obstáculos usam cores
 // fortes contra o chão de cada cenário, para dar para ver de longe.
-import { THREE, FAIXA, LARG_RUA, CALCADA, COMP_CENA, INICIO, textura, ruido, toon, sombrear, texBrilho } from './base.js';
+import { THREE, FAIXA, LARG_RUA, CALCADA, COMP_CENA, INICIO, textura, ruido, toonFixo as toon, sombrear, texBrilho } from './base.js';
 import { veiculo, bandeirinhas, texPano, coqueiro, montanha } from './cenarios.js';
 
 const LARG_OBST = FAIXA * 0.86;

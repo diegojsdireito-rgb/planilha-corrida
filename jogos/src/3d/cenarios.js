@@ -2,7 +2,7 @@
 // Parque de Diversões, Deserto do Oásis e Passeio na Lua (em cenarios-novos.js).
 // Cada um tem chão, céu, enfeites dos lados e a sua versão dos três obstáculos
 // (o de pular, o de deslizar por baixo e o comprido, de trocar de faixa).
-import { THREE, FAIXA, LARG_RUA, CALCADA, COMP_CENA, INICIO, textura, ruido, toon, sombrear } from './base.js';
+import { THREE, FAIXA, LARG_RUA, CALCADA, COMP_CENA, INICIO, textura, ruido, toonFixo as toon, sombrear } from './base.js';
 import { CHAO_NOVOS, enfeitarNovo, obstaculoNovo } from './cenarios-novos.js';
 
 export const LISTA = [

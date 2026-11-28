@@ -620,6 +620,9 @@ export function montar(area, ctl) {
           ctl.status(`Chegando: ${CENARIOS.find((c) => c.id === tema).nome}!`, 'voce');
         }
         temaVisto = tema;
+        // o próximo cenário do Passeio já é montado agora, escondido pelo clarão da troca
+        const proximo = cenarioDaCorrida(prefs.cenario ?? 'passeio', s.dist + cor.TRECHO_PASSEIO);
+        if (proximo !== tema) setTimeout(() => mundo?.preparar?.(proximo), 200);
       }
       mundo.desenhar(s ?? parado, t, visualAtual(), tema, prefs.perseguidorFloresta, rodando ? null : vitrinePose, capturada);
       ctx.clearRect(0, 0, W, H);
