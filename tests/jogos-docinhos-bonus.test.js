@@ -5,9 +5,12 @@ import * as doce from '../jogos/src/docinhos.js';
 let semente = 7;
 const sorteio = () => { semente = (semente * 16807) % 2147483647; return semente / 2147483647; };
 
-test('bônus: a lista tem os seis com nome, ícone e explicação', () => {
-  assert.equal(doce.BONUS.length, 6);
+test('bônus: a lista tem os doze com nome, ícone e explicação, sem repetir', () => {
+  assert.equal(doce.BONUS.length, 12);
   for (const b of doce.BONUS) assert.ok(b.id && b.icone && b.nome && b.texto);
+  assert.equal(new Set(doce.BONUS.map((b) => b.id)).size, 12);
+  assert.equal(new Set(doce.BONUS.map((b) => b.icone)).size, 12);
+  for (const id of doce.BONUS_NOVOS) assert.ok(doce.BONUS.some((b) => b.id === id), id);
 });
 
 test('martelo quebra o doce tocado e a mesa continua cheia', () => {
@@ -121,7 +124,9 @@ test('mapa: progresso guarda a melhor nota de cada fase e libera a próxima', ()
   assert.equal(p.melhor[3].estrelas, 0);
   assert.equal(p.estrelas, 5);
   assert.equal(doce.progresso([]).liberada, 1);
-  assert.equal(doce.progresso([{ j: 'docinhos', r: 'vitoria', nivel: 60, estrelas: 3 }]).liberada, 60, 'não passa da última fase');
+  assert.equal(doce.progresso([{ j: 'docinhos', r: 'vitoria', nivel: 60, estrelas: 3 }]).liberada, 61, 'quem terminou o Castelo de Uva segue para a Praia de Caramelo');
+  assert.equal(doce.progresso([{ j: 'docinhos', r: 'vitoria', nivel: 120, estrelas: 3 }]).liberada, 120, 'não passa da última fase');
+  assert.equal(doce.progresso([]).maxEstrelas, 360);
   assert.equal(doce.regiaoDa(1).nome, 'Vale do Morango');
   assert.equal(doce.regiaoDa(60).nome, 'Castelo de Uva');
 });

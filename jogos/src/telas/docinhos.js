@@ -36,9 +36,50 @@ const GELO_SVG = (camadas) => `<rect x="6" y="6" width="88" height="88" rx="16" 
   ${camadas > 1 ? '<rect x="15" y="15" width="70" height="70" rx="10" fill="none" stroke="#e8f8ff" stroke-width="3"/>' : ''}
   <path d="M18 34 L34 18 M18 50 L50 18" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".85"/>`;
 
+// corrente de alcaçuz: duas cordinhas torcidas vermelhas cruzando o doce, com um cadeado de bala no meio
+const CORRENTE_SVG = `<g stroke-linecap="round">
+  <path d="M8 22 L92 78 M8 78 L92 22" stroke="#7a0f26" stroke-width="15"/>
+  <path d="M8 22 L92 78 M8 78 L92 22" stroke="#e0284d" stroke-width="10"/>
+  <path d="M8 22 L92 78 M8 78 L92 22" stroke="#ff9db0" stroke-width="3.5" stroke-dasharray="5 7"/></g>
+  <rect x="36" y="44" width="28" height="24" rx="6" fill="#ffd34d" stroke="#b57a00" stroke-width="3"/>
+  <path d="M42 45 v-6 a8 8 0 0 1 16 0 v6" fill="none" stroke="#b57a00" stroke-width="4"/><circle cx="50" cy="55" r="3.5" fill="#7a4a00"/>`;
+// chocolate: tablete com gomos e uma gota escorrendo
+const CHOCOLATE_SVG = `<rect x="8" y="8" width="84" height="84" rx="14" fill="#5a2e17"/>
+  <rect x="8" y="8" width="84" height="80" rx="14" fill="#7a4124"/>
+  ${[[14, 14], [52, 14], [14, 50], [52, 50]].map(([x, y]) => `<rect x="${x}" y="${y}" width="34" height="32" rx="7" fill="#8e4f2c"/><path d="M${x + 5} ${y + 6} h22" stroke="#b97a52" stroke-width="4" stroke-linecap="round" opacity=".8"/>`).join('')}
+  <path d="M66 88 q2 8 6 8 q4 0 4 -8 Z" fill="#5a2e17"/>`;
+// caixa de presente: a cor muda conforme as camadas que faltam
+const COR_CAIXA = { 3: ['#8a4fd6', '#b98cff'], 2: ['#e0457b', '#ff8fb5'], 1: ['#2fb6a6', '#8be8dc'] };
+const CAIXA_SVG = (camadas) => {
+  const [c1, c2] = COR_CAIXA[Math.min(3, camadas)] ?? COR_CAIXA[1];
+  return `<rect x="12" y="34" width="76" height="58" rx="8" fill="${c1}"/><rect x="8" y="26" width="84" height="20" rx="6" fill="${c2}"/>
+  <rect x="44" y="26" width="12" height="66" fill="#ffd34d"/><path d="M50 26 C36 6 20 14 30 26 Z M50 26 C64 6 80 14 70 26 Z" fill="#ffd34d" stroke="#e0a000" stroke-width="2"/>
+  <circle cx="50" cy="26" r="6" fill="#ffc61a" stroke="#e0a000" stroke-width="2"/>
+  ${Array.from({ length: camadas }, (_, k) => `<circle cx="${24 + k * 9}" cy="80" r="3.4" fill="#fff" opacity=".9"/>`).join('')}
+  <path d="M18 52 q4 -6 10 -6" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" opacity=".5"/>`;
+};
+// cereja: duas cerejinhas com cabinho e folha
+const CEREJA_SVG = `<path d="M34 62 Q42 30 58 14 M66 64 Q62 36 58 14" stroke="#4d8a2a" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M58 14 q16 -6 26 4 q-14 8 -26 -4 Z" fill="#4fc46a"/>
+  <circle cx="32" cy="68" r="20" fill="#d6143c"/><circle cx="68" cy="70" r="20" fill="#e8264e"/>
+  <circle cx="25" cy="61" r="6" fill="#fff" opacity=".7"/><circle cx="61" cy="63" r="6" fill="#fff" opacity=".7"/>`;
+
+const corpo = (svg) => svg.replace(/^<svg[^>]*>|<\/svg>$/g, '');
+function rotulo(d) {
+  if (d.pedra) return `pedra${d.pedra > 1 ? ' dura' : ''}`;
+  if (d.chocolate) return 'chocolate';
+  if (d.caixa) return `caixa de presente, ${d.caixa} ${d.caixa === 1 ? 'batida' : 'batidas'}`;
+  if (d.cereja) return 'cereja';
+  return `${d.especial ? NOME_ESPECIAL[d.especial] : ''} ${d.especial === 'arcoiris' ? '' : NOME_TIPO[d.tipo]}${d.gelo ? ' congelado' : ''}${d.corrente ? ' acorrentado' : ''}`.trim();
+}
+
 function svgDoce(d) {
   if (d.pedra) return `<svg viewBox="0 0 100 100">${PEDRA_SVG(d.pedra)}</svg>`;
-  if (d.gelo) return `<svg viewBox="0 0 100 100">${svgDoce({ ...d, gelo: 0 }).replace(/^<svg[^>]*>|<\/svg>$/g, '')}${GELO_SVG(d.gelo)}</svg>`;
+  if (d.chocolate) return `<svg viewBox="0 0 100 100">${CHOCOLATE_SVG}</svg>`;
+  if (d.caixa) return `<svg viewBox="0 0 100 100">${CAIXA_SVG(d.caixa)}</svg>`;
+  if (d.cereja) return `<svg viewBox="0 0 100 100">${CEREJA_SVG}</svg>`;
+  if (d.gelo) return `<svg viewBox="0 0 100 100">${corpo(svgDoce({ ...d, gelo: 0 }))}${GELO_SVG(d.gelo)}</svg>`;
+  if (d.corrente) return `<svg viewBox="0 0 100 100">${corpo(svgDoce({ ...d, corrente: 0 }))}${CORRENTE_SVG}</svg>`;
   if (d.especial === 'arcoiris') return `<svg viewBox="0 0 100 100">${ARCOIRIS}</svg>`;
   let extra = '';
   if (d.especial === 'linha') extra = '<path d="M14 44 H86 M14 56 H86" stroke="#fff" stroke-width="6" opacity=".9" stroke-linecap="round"/>';
@@ -48,12 +89,21 @@ function svgDoce(d) {
 }
 
 // Bônus guardados (por jogador). Quem nunca jogou com bônus ganha alguns de cada para começar.
+// Quem já tinha o estoque antigo ganha 2 de cada bônus novo (veja doce.estoqueBonus).
 function estoque() {
-  prefs.bonusDocinhos ??= Object.fromEntries(doce.BONUS.map((b) => [b.id, doce.BONUS_INICIAL]));
-  for (const b of doce.BONUS) prefs.bonusDocinhos[b.id] ??= doce.BONUS_INICIAL;
-  return prefs.bonusDocinhos;
+  const e = doce.estoqueBonus(prefs.bonusDocinhos);
+  if (e !== prefs.bonusDocinhos) prefs.bonusDocinhos = e;
+  return e;
 }
 
+// O que o placar mostra de cada obstáculo.
+const META_OB = [
+  { id: 'gelo', icone: '🧊', titulo: 'Gelo para quebrar', nome: 'congelados' },
+  { id: 'pedra', icone: '🪨', titulo: 'Pedras para quebrar', nome: 'pedras' },
+  { id: 'corrente', icone: '⛓️', titulo: 'Correntes para soltar', nome: 'correntes' },
+  { id: 'chocolate', icone: '🍫', titulo: 'Chocolates para derreter', nome: 'chocolates' },
+  { id: 'caixa', icone: '🎀', titulo: 'Camadas das caixas de presente', nome: 'caixas de presente' },
+];
 const ELOGIOS = ['Doce!', 'Uau!', 'Que delícia!', 'Incrível!', 'Demais!'];
 
 export const nivelLiberado = () => doce.progresso(prefs.historico).liberada;
@@ -79,15 +129,17 @@ export function montar(area, ctl) {
   let noMapa = false;
   mascote.append(fala);
 
-  let f; let grade; let pontos; let movimentos; let ocupado = false; let acabou = false;
+  let f; let grade; let pontos; let movimentos; let coletadas = 0; let ocupado = false; let acabou = false;
   let selecionada = null; let ocioso = null;
   let bonusAtivo = null; let trocaA = null; // bônus escolhido, esperando o toque na mesa
+  let paleta = null; // pincel: a casa escolhida, esperando a cor
 
   function desenharBonus() {
     const est = estoque();
     barraBonus.innerHTML = '';
     for (const b of doce.BONUS) {
-      const botao = el('button', `bonus${bonusAtivo === b.id ? ' ativo' : ''}`, `<span class="ic">${b.icone}</span><span class="nome">${b.nome}</span><b class="qtd">${est[b.id]}</b>`);
+      const botao = el('button', `bonus${bonusAtivo === b.id ? ' ativo' : ''}${doce.BONUS_NOVOS.includes(b.id) ? ' novo' : ''}`, `<span class="ic">${b.icone}</span><span class="nome">${b.curto ?? b.nome}</span><b class="qtd">${est[b.id]}</b>`);
+      botao.dataset.bonus = b.id;
       botao.disabled = !est[b.id] || acabou || (ocupado && bonusAtivo !== b.id);
       botao.title = b.texto; botao.setAttribute('aria-label', `${b.nome}: ${b.texto} Você tem ${est[b.id]}.`);
       botao.setAttribute('aria-pressed', String(bonusAtivo === b.id));
@@ -103,6 +155,7 @@ export function montar(area, ctl) {
     if (ocupado || acabou) return;
     pararDica();
     selecionada = null;
+    fecharPaleta();
     if (bonusAtivo === b.id) { bonusAtivo = null; trocaA = null; ctl.som('clique'); falar('Bônus guardado.'); desenharBonus(); desenharGrade(false); return; }
     ctl.som('clique');
     if (b.id === 'mais5') {
@@ -119,9 +172,85 @@ export function montar(area, ctl) {
       tabuleiro.classList.remove('mistura'); salvar(); agendarDica();
       return;
     }
+    if (b.id === 'descongelar') {
+      const r = doce.descongelar(grade, f.tipos);
+      if (!r) { ctl.som('erro'); falar('Não tem gelo, corrente nem chocolate para derreter.'); return; }
+      gastar(b.id); desenharBonus();
+      ctl.som('derrete'); falar('Derretendo!');
+      efeito('calor', null);
+      const derreteu = r.etapas[0].derreteu;
+      for (const i of derreteu) elementos.get(grade[i].id)?.classList.add('derrete');
+      ocupado = true;
+      if (!await ctl.esperar(420)) return;
+      tabuleiro.querySelectorAll('.derrete').forEach((e) => e.classList.remove('derrete'));
+      await animar(r);
+      return;
+    }
+    if (b.id === 'presente') {
+      const r = doce.presente(grade);
+      if (!r) { ctl.som('erro'); return; }
+      gastar(b.id); desenharBonus();
+      ctl.som('presente'); falar('Surpresa!');
+      ocupado = true;
+      for (const i of r.casas) efeito('presente', i);
+      if (!await ctl.esperar(380)) return;
+      for (const i of r.casas) { elementos.get(grade[i].id)?.remove(); elementos.delete(grade[i].id); }
+      grade = r.grade;
+      desenharGrade(false);
+      for (const i of r.casas) elementos.get(grade[i].id)?.classList.add('surge');
+      ocupado = false; desenharBonus(); salvar(); agendarDica();
+      return;
+    }
     bonusAtivo = b.id; trocaA = null;
     falar(b.texto);
     desenharBonus();
+  }
+
+  // Efeitos por cima da mesa: explosão, raios do foguete, calor, pincel, presente.
+  function efeito(tipo, i, extra = '') {
+    const e = el('span', `doce-efeito ${tipo}`, extra);
+    if (i !== null) { e.style.left = `${(i % doce.LADO) * 12.5 + 6.25}%`; e.style.top = `${Math.floor(i / doce.LADO) * 12.5 + 6.25}%`; }
+    tabuleiro.append(e);
+    setTimeout(() => e.remove(), 1100);
+    return e;
+  }
+
+  // Pincel: depois do doce, uma paleta com as outras cores.
+  function abrirPaleta(i) {
+    fecharPaleta();
+    paleta = i;
+    const caixa = el('div', 'doce-paleta');
+    caixa.setAttribute('role', 'group'); caixa.setAttribute('aria-label', 'Escolha a nova cor');
+    caixa.append(el('span', 'titulo', '🎨 Nova cor:'));
+    for (let t = 0; t < f.tipos; t++) {
+      if (t === grade[i].tipo) continue;
+      const b = el('button', 'cor', svgDoce({ tipo: t, especial: null }));
+      b.setAttribute('aria-label', NOME_TIPO[t]);
+      b.dataset.cor = t;
+      b.onclick = (ev) => { ev.stopPropagation(); pintar(t); };
+      caixa.append(b);
+    }
+    tabuleiro.append(caixa);
+    elementos.get(grade[i].id)?.classList.add('sel');
+  }
+  function fecharPaleta() {
+    paleta = null;
+    tabuleiro.querySelectorAll('.doce-paleta').forEach((x) => x.remove());
+  }
+  async function pintar(cor) {
+    const i = paleta;
+    fecharPaleta();
+    const r = doce.pincel(grade, i, cor, f.tipos);
+    if (!r) { ctl.som('erro'); return; }
+    gastar('pincel'); bonusAtivo = null; desenharBonus();
+    ctl.som('pincel'); falar('Pintando!');
+    efeito('pincelada', i, '🖌️');
+    ocupado = true;
+    const pintados = r.etapas[0].pintados;
+    pintados.forEach((k, n) => { const e = elementos.get(grade[k].id); if (e) { e.style.setProperty('--atraso', `${n * 40}ms`); e.classList.add('pinta'); } });
+    if (!await ctl.esperar(300 + pintados.length * 40)) return;
+    await animar(r);
+    tabuleiro.querySelectorAll('.pinta').forEach((e) => e.classList.remove('pinta'));
   }
 
   // O toque na mesa com um bônus escolhido.
@@ -139,8 +268,29 @@ export function montar(area, ctl) {
       posicionar(ea, i); posicionar(eb, a);
     } else if (id === 'martelo') r = doce.martelo(grade, i, f.tipos);
     else if (id === 'vassoura') r = doce.vassoura(grade, i, f.tipos);
-    else if (id === 'arcoiris') {
-      if (grade[i].especial === 'arcoiris' || grade[i].pedra) { ctl.som('erro'); falar('Escolha um doce, não uma pedra.'); return; }
+    else if (id === 'bomba') r = doce.explodir(grade, i, f.tipos);
+    else if (id === 'foguete') r = doce.foguete(grade, i, f.tipos);
+    else if (id === 'pincel') {
+      if (!(grade[i].tipo >= 0)) { ctl.som('erro'); falar('Escolha um doce colorido.'); return; }
+      ctl.som('clique'); abrirPaleta(i); falar('Agora escolha a nova cor!');
+      return;
+    } else if (id === 'listrado') {
+      const g = doce.virarListrado(grade, i);
+      if (!g) { ctl.som('erro'); falar('Escolha um doce comum.'); return; }
+      gastar(id); bonusAtivo = null;
+      ctl.som('listra');
+      elementos.get(grade[i].id)?.classList.add('vira');
+      ocupado = true;
+      if (!await ctl.esperar(260)) return;
+      elementos.get(grade[i].id)?.remove(); elementos.delete(grade[i].id);
+      grade = g;
+      desenharGrade(false);
+      elementos.get(grade[i].id)?.classList.add('surge');
+      ocupado = false; desenharBonus(); salvar(); agendarDica();
+      falar('Doce listrado!');
+      return;
+    } else if (id === 'arcoiris') {
+      if (!doce.virarArcoiris(grade, i)) { ctl.som('erro'); falar('Escolha um doce solto, sem gelo nem corrente.'); return; }
       gastar(id); bonusAtivo = null;
       elementos.get(grade[i].id)?.classList.add('estoura');
       ctl.som('estrela');
@@ -154,10 +304,13 @@ export function montar(area, ctl) {
       agendarDica();
       return;
     }
-    if (!r) return;
+    if (!r) { ctl.som('erro'); if (grade[i]?.cereja) falar('A cereja não quebra: leve até o chão!'); return; }
     gastar(id); bonusAtivo = null;
     desenharBonus();
-    ctl.som(id === 'martelo' ? 'captura' : id === 'vassoura' ? 'captura' : 'clique');
+    if (id === 'bomba') { ctl.som('explosao'); efeito('explosao', i); tabuleiro.classList.add('treme'); setTimeout(() => tabuleiro.classList.remove('treme'), 400); }
+    else if (id === 'foguete') { ctl.som('foguete'); efeito('raio-h', i); efeito('raio-v', i); efeito('foguetinho esq', i, '🚀'); efeito('foguetinho dir', i, '🚀'); }
+    else ctl.som(id === 'martelo' || id === 'vassoura' ? 'captura' : 'clique');
+    if (id === 'bomba' || id === 'foguete') await ctl.esperar(160);
     await animar(r);
     desenharBonus();
   }
@@ -178,12 +331,13 @@ export function montar(area, ctl) {
     const pct = Math.min(1, pontos / (f.meta * 2));
     const marcas = [1, 1.5, 2].map((m) => `<i style="left:${(m / 2) * 100}%" class="${pontos >= f.meta * m ? 'ok' : ''}">★</i>`).join('');
     const ob = doce.obstaculos(grade);
-    const metaOb = (f.gelo ? `<span class="meta-ob ${ob.gelo ? '' : 'ok'}" title="Gelo para quebrar">🧊 ${ob.gelo || '✓'}</span>` : '')
-      + (f.pedra ? `<span class="meta-ob ${ob.pedra ? '' : 'ok'}" title="Pedras para quebrar">🪨 ${ob.pedra || '✓'}</span>` : '');
+    const metaOb = META_OB.filter((m) => f[m.id] || ob[m.id]).map((m) => `<span class="meta-ob ${ob[m.id] ? '' : 'ok'}" title="${m.titulo}">${m.icone} ${ob[m.id] || '✓'}</span>`).join('')
+      + (f.cerejas ? `<span class="meta-ob cereja ${coletadas >= f.cerejas ? 'ok' : ''}" title="Cerejas levadas até o chão">🍒 ${Math.min(coletadas, f.cerejas)}/${f.cerejas}</span>` : '');
     placar.innerHTML = `
-      <div class="linha-placar"><span>Pontos ${metaOb}</span><span>Movimentos <b class="${movimentos <= 3 ? 'poucos' : ''}">${movimentos}</b></span></div>
+      <div class="linha-placar"><span>Pontos</span><span>Movimentos <b class="${movimentos <= 3 ? 'poucos' : ''}">${movimentos}</b></span></div>
       <div class="pontos-doce">${pontos.toLocaleString('pt-BR')}<small> / meta ${f.meta.toLocaleString('pt-BR')}</small></div>
-      <div class="barra-meta"><span style="width:${pct * 100}%"></span>${marcas}</div>`;
+      <div class="barra-meta"><span style="width:${pct * 100}%"></span>${marcas}</div>
+      ${metaOb ? `<div class="metas-ob">${metaOb}</div>` : ''}`;
   }
 
   function desenharFases() {
@@ -215,7 +369,7 @@ export function montar(area, ctl) {
       const porRegiao = doce.TOTAL_FASES / doce.REGIOES.length;
       const topo = (doce.TOTAL_FASES - (k + 1) * porRegiao) * ESPACO + BORDA - ESPACO / 2;
       const alto = porRegiao * ESPACO;
-      return `<div class="mapa-regiao" style="top:${Math.max(0, topo)}px;height:${alto + (k === 0 ? BORDA : 0) + (k === doce.REGIOES.length - 1 ? BORDA : 0)}px;background-color:${r.cor[0]};--c1:${r.cor[1]};--c2:${r.cor[0]}"></div>`;
+      return `<div class="mapa-regiao lugar-${k}" style="top:${Math.max(0, topo)}px;height:${alto + (k === 0 ? BORDA : 0) + (k === doce.REGIOES.length - 1 ? BORDA : 0)}px;background-color:${r.cor[0]};--c1:${r.cor[1]};--c2:${r.cor[0]}"></div>`;
     }).join('');
     // docinhos espalhados pelos lados do caminho
     // cenário: dos lados do caminho, desenhos do lugar; nuvens passando e estrelinhas piscando
@@ -288,13 +442,14 @@ export function montar(area, ctl) {
     ctl.som('clique');
     const fz = doce.fase(n); const m = p.melhor[n]; const est = m?.estrelas ?? 0;
     const andamento = salvo?.grade && salvo.nivel === n;
-    const obst = [fz.gelo ? `🧊 ${fz.gelo} congelados` : '', fz.pedra ? `🪨 ${fz.pedra} pedras` : ''].filter(Boolean).join(' · ');
+    const obst = [...META_OB.filter((m) => fz[m.id]).map((m) => `${m.icone} ${fz[m.id]} ${m.nome}`), fz.cerejas ? `🍒 leve ${fz.cerejas} cerejas até o chão` : ''].filter(Boolean).join(' · ');
     caixa.innerHTML = `<div class="mapa-cartao">
       <button class="botao-icone fechar" aria-label="Fechar">✕</button>
       <small>${doce.regiaoDa(n).icone} ${doce.regiaoDa(n).nome}</small>
       <strong>Fase ${n}</strong>
       <span class="estrelas-fim">${'★'.repeat(est)}${'☆'.repeat(3 - est)}</span>
       <p>Meta: <b>${fz.meta.toLocaleString('pt-BR')}</b> pontos em ${fz.movimentos} movimentos${obst ? `<br>Quebre: ${obst}` : ''}</p>
+      ${doce.novidade(n) ? `<p class="novidade-mini">✨ Novidade: ${doce.novidade(n).icone} ${doce.novidade(n).nome}</p>` : ''}
       ${m?.pontos ? `<p class="recorde">Seu recorde: <b>${m.pontos.toLocaleString('pt-BR')}</b> pontos${est < 3 ? ` · ★★★ com ${(fz.meta * 2).toLocaleString('pt-BR')}` : ''}</p>` : ''}
       ${andamento ? '<button class="botao" data-continuar>▶ Continuar de onde parou</button><button class="botao secundario" data-jogar>Começar de novo</button>' : `<button class="botao" data-jogar>${m?.estrelas ? 'Jogar de novo' : 'Jogar'}</button>`}
     </div>`;
@@ -331,26 +486,26 @@ export function montar(area, ctl) {
           e.style.transition = '';
         }
       }
-      const chave = `${d.tipo}${d.especial}${d.gelo ?? 0}${d.pedra ?? 0}`;
+      const chave = `${d.tipo}${d.especial}${d.gelo ?? 0}${d.pedra ?? 0}${d.corrente ?? 0}${d.caixa ?? 0}${d.chocolate ? 'c' : ''}${d.cereja ? 'z' : ''}`;
       if (e.dataset.desenho !== chave) {
         e.innerHTML = svgDoce(d);
         e.dataset.desenho = chave;
       }
       e.dataset.i = i;
       e.classList.toggle('sel', i === selecionada);
-      e.setAttribute('aria-label', d.pedra ? `pedra${d.pedra > 1 ? ' dura' : ''}` : `${d.especial ? NOME_ESPECIAL[d.especial] : ''} ${d.especial === 'arcoiris' ? '' : NOME_TIPO[d.tipo]}${d.gelo ? ' congelado' : ''}`.trim());
+      e.setAttribute('aria-label', rotulo(d));
       posicionar(e, i);
     });
     for (const [id, e] of elementos) if (!vivos.has(id)) { e.remove(); elementos.delete(id); }
   }
 
-  const salvar = () => ctl.salvar({ nivel: f.nivel, grade, pontos, movimentos });
+  const salvar = () => ctl.salvar({ nivel: f.nivel, grade, pontos, movimentos, coletadas });
 
   async function tentar(a, b) {
     if (ocupado || acabou || !doce.vizinhas(a, b)) return;
     pararDica();
     selecionada = null;
-    const r = doce.trocar(grade, a, b, f.tipos);
+    const r = doce.trocar(grade, a, b, f.tipos, Math.random, { cerejas: f.cerejas - coletadas });
     ocupado = true;
     const ea = elementos.get(grade[a].id); const eb = elementos.get(grade[b].id);
     posicionar(ea, b); posicionar(eb, a);
@@ -359,7 +514,8 @@ export function montar(area, ctl) {
     if (!r) {
       posicionar(ea, a); posicionar(eb, b);
       ctl.som('erro');
-      if (doce.preso(grade[a]) || doce.preso(grade[b])) falar('Esse não sai do lugar: estoure doces ao lado!');
+      const p = doce.preso(grade[a]) ? grade[a] : doce.preso(grade[b]) ? grade[b] : null;
+      if (p) falar(p.corrente ? 'Acorrentado não troca: faça uma trinca com ele!' : 'Esse não sai do lugar: estoure doces ao lado!');
       await ctl.esperar(220);
       ocupado = false;
       desenharGrade(false);
@@ -380,13 +536,20 @@ export function montar(area, ctl) {
         falar('Sem jogadas: misturando!');
         tabuleiro.classList.add('mistura');
       }
-      for (const id of etapa.removidos) elementos.get(id)?.classList.add('estoura');
-      if (etapa.removidos.length) ctl.som(passo === 0 ? (etapa.removidos.length > 4 ? 'captura' : 'estrela') : 'acerto');
+      const especial = etapa.espalhou !== undefined ? 'espalha' : etapa.cereja !== undefined ? 'chega' : etapa.coletadas ? 'colhe' : 'estoura';
+      for (const id of etapa.removidos) elementos.get(id)?.classList.add(especial);
+      if (etapa.espalhou !== undefined) { ctl.som('chocolate'); falar('O chocolate cresceu!'); }
+      else if (etapa.coletadas) { ctl.som('cereja'); falar(etapa.coletadas > 1 ? 'Cerejas no chão!' : 'Uma cereja no chão!'); }
+      else if (etapa.cereja === undefined && etapa.removidos.length) ctl.som(passo === 0 ? (etapa.removidos.length > 4 ? 'captura' : 'estrela') : 'acerto');
+      if (etapa.quebrados?.corrente) ctl.som('corrente');
+      if (etapa.quebrados?.caixa) ctl.som('caixa');
       if (!await ctl.esperar(etapa.removidos.length ? 230 : 0)) return;
       for (const id of etapa.removidos) { elementos.get(id)?.remove(); elementos.delete(id); }
       grade = etapa.grade;
       pontos += etapa.pontos;
+      coletadas += etapa.coletadas ?? 0;
       desenharGrade();
+      if (etapa.espalhou !== undefined) elementos.get(grade[etapa.espalhou].id)?.classList.add('cresce');
       desenharPlacar();
       if (passo === 1) { falar(ELOGIOS[Math.floor(Math.random() * ELOGIOS.length)]); desenharMascote('uau'); }
       if (!await ctl.esperar(300)) return;
@@ -407,19 +570,20 @@ export function montar(area, ctl) {
   function terminar() {
     acabou = true;
     pararDica();
-    const sobra = doce.obstaculos(grade).total;
-    const venceu = doce.venceu(pontos, f, grade);
+    const faltamCerejas = Math.max(0, (f.cerejas ?? 0) - coletadas);
+    const sobra = doce.obstaculos(grade).total + faltamCerejas;
+    const venceu = doce.venceu(pontos, f, grade, coletadas);
     const est = venceu ? doce.estrelas(pontos, f.meta) : 0;
     desenharMascote(venceu ? 'uau' : 'feliz');
     const cartao = el('div', 'faixa-fim doce-fim', `<div>
       <strong>${venceu ? `Fase ${f.nivel} concluída!` : 'Quase lá!'}</strong>
       <span class="estrelas-fim">${'★'.repeat(est)}${'☆'.repeat(3 - est)}</span>
-      <small>${pontos.toLocaleString('pt-BR')} pontos · meta ${f.meta.toLocaleString('pt-BR')}${sobra ? ` · faltou quebrar ${sobra}` : ''}</small>
+      <small>${pontos.toLocaleString('pt-BR')} pontos · meta ${f.meta.toLocaleString('pt-BR')}${sobra - faltamCerejas ? ` · faltou quebrar ${sobra - faltamCerejas}` : ''}${faltamCerejas ? ` · faltou levar ${faltamCerejas} 🍒` : ''}</small>
     </div>`);
     cartao.style.pointerEvents = 'auto';
     // prêmio: um bônus sorteado por estrela
     if (venceu) {
-      const ganhos = Array.from({ length: est }, () => doce.BONUS[Math.floor(Math.random() * doce.BONUS.length)]);
+      const ganhos = doce.sortearPremio(est);
       for (const g of ganhos) estoque()[g.id]++;
       guardar();
       cartao.firstChild.append(el('small', 'premio-bonus', `Você ganhou: ${ganhos.map((g) => `${g.icone} ${g.nome}`).join(' · ')}`));
@@ -446,7 +610,7 @@ export function montar(area, ctl) {
   }
   function mostrarDica() {
     pararDica();
-    const j = doce.encontrarJogada(grade);
+    const j = doce.encontrarJogada(grade, true);
     if (!j) return;
     j.forEach((i) => elementos.get(grade[i].id)?.classList.add('dica'));
   }
@@ -462,6 +626,7 @@ export function montar(area, ctl) {
   tabuleiro.addEventListener('pointerdown', (e) => {
     const alvo = e.target.closest('.doce');
     if (!alvo || ocupado || acabou) return;
+    if (paleta !== null) { ctl.som('clique'); fecharPaleta(); desenharGrade(false); falar('Escolha outro doce para pintar.'); return; }
     if (bonusAtivo) { usarBonus(Number(alvo.dataset.i)); return; }
     inicio = { i: Number(alvo.dataset.i), x: e.clientX, y: e.clientY };
     tabuleiro.setPointerCapture?.(e.pointerId);
@@ -494,27 +659,52 @@ export function montar(area, ctl) {
     for (const e of telaJogo) e.hidden = false;
     pararDica();
     acabou = false; ocupado = false; selecionada = null; bonusAtivo = null; trocaA = null;
-    tabuleiro.querySelectorAll('.faixa-fim').forEach((x) => x.remove());
+    fecharPaleta();
+    tabuleiro.querySelectorAll('.faixa-fim, .doce-novidade, .doce-efeito').forEach((x) => x.remove());
     for (const e of elementos.values()) e.remove();
     elementos.clear();
     if (salvo?.grade) {
       f = doce.fase(salvo.nivel);
       ({ grade, pontos, movimentos } = salvo);
+      coletadas = salvo.coletadas ?? 0;
     } else {
       f = doce.fase(nivel ?? nivelLiberado());
       grade = doce.comObstaculos(doce.novaGrade(f.tipos), f);
-      pontos = 0;
+      pontos = 0; coletadas = 0;
       movimentos = f.movimentos;
       ctl.apagar();
     }
+    // a mesa ganha a cara do lugar (nos lugares novos)
+    const lugar = doce.REGIOES.indexOf(doce.regiaoDa(f.nivel));
+    tabuleiro.className = `doce-grade${lugar >= 4 ? ` mesa-lugar-${lugar}` : ''}`;
     desenharMascote();
     desenharPlacar();
     desenharFases();
     desenharGrade();
     desenharBonus();
-    ctl.status(salvo ? 'Partida retomada' : `Faça ${f.meta.toLocaleString('pt-BR')} pontos${f.gelo || f.pedra ? ` e quebre ${[f.gelo ? 'o gelo' : '', f.pedra ? 'as pedras' : ''].filter(Boolean).join(' e ')}` : ''} em ${f.movimentos} movimentos`, 'voce');
-    falar(salvo ? 'Vamos continuar!' : f.nivel === 1 ? 'Arraste um doce para trocar!' : f.nivel === 3 ? 'Estoure doces perto do gelo para quebrar!' : f.nivel === 4 ? 'Estoure doces ao lado das pedras!' : `Fase ${f.nivel}!`);
+    const tarefas = [f.gelo ? 'o gelo' : '', f.pedra ? 'as pedras' : '', f.corrente ? 'as correntes' : '', f.chocolate ? 'o chocolate' : '', f.caixa ? 'as caixas' : ''].filter(Boolean);
+    const lista = tarefas.length > 1 ? `${tarefas.slice(0, -1).join(', ')} e ${tarefas.at(-1)}` : tarefas[0];
+    const pedidos = [`faça ${f.meta.toLocaleString('pt-BR')} pontos`, lista ? `quebre ${lista}` : '', f.cerejas ? `leve ${f.cerejas} 🍒 até o chão` : ''].filter(Boolean);
+    const frase = pedidos.length > 1 ? `${pedidos.slice(0, -1).join(', ')} e ${pedidos.at(-1)}` : pedidos[0];
+    ctl.status(salvo ? 'Partida retomada' : `${frase[0].toUpperCase()}${frase.slice(1)} em ${f.movimentos} movimentos`, 'voce');
+    falar(salvo ? 'Vamos continuar!' : f.nivel === 1 ? 'Arraste um doce para trocar!' : f.nivel === 3 ? 'Estoure doces perto do gelo para quebrar!' : f.nivel === 4 ? 'Estoure doces ao lado das pedras!' : f.chefe ? `Fase chefe ${f.nivel}!` : `Fase ${f.nivel}!`);
+    if (!salvo && doce.novidade(f.nivel)) mostrarNovidade(doce.novidade(f.nivel));
     agendarDica();
+  }
+
+  // Faixa "Novidade!" na primeira fase em que um obstáculo aparece.
+  function mostrarNovidade(nv) {
+    const amostra = { gelo: { tipo: 4, especial: null, gelo: 1 }, pedra: { tipo: -2, pedra: 1 }, corrente: { tipo: 0, especial: null, corrente: 1 }, chocolate: { tipo: -3, chocolate: 1 }, cerejas: { tipo: -5, cereja: true }, caixa: { tipo: -4, caixa: 3 } }[nv.id];
+    const caixa = el('div', 'doce-novidade', `<div class="cartao-novidade">
+      <span class="fita">✨ Novidade!</span>
+      <span class="amostra">${svgDoce(amostra)}</span>
+      <strong>${nv.icone} ${nv.nome}</strong>
+      <p>${nv.texto}</p>
+      <button class="botao">Entendi!</button>
+    </div>`);
+    caixa.querySelector('button').onclick = () => { ctl.som('clique'); caixa.remove(); };
+    tabuleiro.append(caixa);
+    ctl.som('item');
   }
 
   // Abre no mapa; "Nova partida" joga de novo a fase aberta (ou a próxima, a partir do mapa).
