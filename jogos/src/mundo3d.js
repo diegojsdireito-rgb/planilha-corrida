@@ -168,7 +168,10 @@ export function criarMundo(canvas) {
     const dist = s.dist;
     menina.vestir(visual.pele, visual.roupa, visual.estilo, visual.personagem);
     const kc = captura === null ? 0 : suave(Math.min(1, captura / 0.8)); // vira para a tela aos poucos
-    menina.posar(s, t, vitrine ?? (captura !== null ? 'capturada' : null));
+    // na Lua o pulo parece mais flutuante: só no desenho ela sobe um tiquinho mais e desce devagar
+    // (a física e as batidas continuam as mesmas da corrida)
+    const sv = tema === 'lua' && s.y > 0.05 && s.voo <= 0 ? { ...s, y: s.y * 1.12 + Math.sin(Math.min(1, s.y / 1.9) * Math.PI) * 0.06 } : s;
+    menina.posar(sv, t, vitrine ?? (captura !== null ? 'capturada' : null));
     if (vitrine) menina.raiz.rotation.set(0, Math.PI + (visual.palco === 'galeria' ? 0.12 + Math.sin(t * 0.7) * 0.3 : 0.28 + Math.sin(t * 0.4) * 0.05), 0);
     else if (captura !== null) menina.raiz.rotation.set(0, Math.PI * kc - 0.12 * kc, 0);
 
@@ -178,7 +181,7 @@ export function criarMundo(canvas) {
     perseguidor.raiz.visible = (dp < 1.9 || captura !== null) && !vitrine;
     if (captura !== null) {
       // ele dá a volta e fica ao lado dela, de frente para a tela, segurando-a
-      const quadrupede = ['leao', 'panda', 'urso'].includes(perseguidorId);
+      const quadrupede = ['leao', 'panda', 'urso', 'raposa'].includes(perseguidorId);
       const alvoX = xDe(s.x) + (quadrupede ? 0.45 : 0.5); const alvoZ = quadrupede ? 0.5 : 0.18;
       const de = { x: perX + 0.18, z: -dp };
       perseguidor.raiz.position.set(de.x + (alvoX - de.x) * kc, 0, de.z + (alvoZ - de.z) * kc);

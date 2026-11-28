@@ -1,16 +1,18 @@
 // Quem corre atrás da menina em cada cenário: policial (cidade), caranguejo (praia),
-// leão ou panda (floresta, à escolha) e urso-polar (neve). Todos olham para a frente (+z),
+// leão ou panda (floresta, à escolha) e urso-polar (neve); os dos cenários novos (ursinho de goma,
+// coelho mascote, raposa-do-deserto e etezinho) ficam em perseguidores-novos.js. Todos olham para a frente (+z),
 // na mesma direção dela; a câmera vê as costas deles.
 import { THREE, sombrear, textura, desenho } from './base.js';
 import { geoCabeca, superficieDe, texIris, criarOlho, tuboAfinado, geoCabelo, geoCorpo, criarMao, criarTenis } from './anatomia.js';
 
 export { quemPersegue } from '../perseguidores.js';
+import { CRIAR_NOVOS } from './perseguidores-novos.js';
 
 // cores chapadas de desenho animado; só o que é metal continua brilhando como metal
-const mat = (cor, extra = {}) => (extra.metalness ? new THREE.MeshStandardMaterial({ color: cor, roughness: 0.75, ...extra }) : desenho({ color: cor, ...extra }));
-const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
-const bola = (r, m, seg = 16) => peca(new THREE.SphereGeometry(r, seg, Math.max(8, seg * 0.7)), m);
-const capsula = (r, l, m) => peca(new THREE.CapsuleGeometry(r, l, 6, 14), m);
+export const mat = (cor, extra = {}) => (extra.metalness ? new THREE.MeshStandardMaterial({ color: cor, roughness: 0.75, ...extra }) : desenho({ color: cor, ...extra }));
+export const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
+export const bola = (r, m, seg = 16) => peca(new THREE.SphereGeometry(r, seg, Math.max(8, seg * 0.7)), m);
+export const capsula = (r, l, m) => peca(new THREE.CapsuleGeometry(r, l, 6, 14), m);
 const torneada = (perfil, m, seg = 18) => peca(new THREE.LatheGeometry(perfil.map(([r, y]) => new THREE.Vector2(r, y)), seg), m);
 
 // Pelo: risquinhos claros e escuros que dão cor e relevo de pelagem.
@@ -28,7 +30,7 @@ function texPelo() {
   }, true);
   return TEX_PELO;
 }
-const pelo = (cor, rep = 3) => { const t = texPelo().clone(); t.repeat.set(rep, rep); t.needsUpdate = true; return desenho({ color: cor, map: t }); };
+export const pelo = (cor, rep = 3) => { const t = texPelo().clone(); t.repeat.set(rep, rep); t.needsUpdate = true; return desenho({ color: cor, map: t }); };
 
 // Junta várias peças numa malha só (uma chamada de desenho em vez de dezenas).
 function fundir(pecas, material) {
@@ -44,10 +46,10 @@ function fundir(pecas, material) {
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   return peca(geo, material);
 }
-const MAT_OLHO = () => ({ matBranco: mat(0xf4f1ea, { roughness: 0.2 }), matCilio: mat(0x16100c) });
+export const MAT_OLHO = () => ({ matBranco: mat(0xf4f1ea, { roughness: 0.2 }), matCilio: mat(0x16100c) });
 
 // ---------- Acessórios estilosos ----------
-function bandana(pescoco, cor) {
+export function bandana(pescoco, cor) {
   const m = mat(cor);
   const anel = peca(new THREE.TorusGeometry(0.2, 0.045, 8, 24), m); anel.rotation.x = Math.PI / 2; anel.position.set(0, -0.2, -0.05); pescoco.add(anel);
   const no = peca(new THREE.ConeGeometry(0.1, 0.2, 3), m); no.rotation.x = -Math.PI / 2 - 0.4; no.position.set(0, -0.24, -0.26); no.scale.z = 0.4; pescoco.add(no);
@@ -77,7 +79,7 @@ function oculosEscuros(cabeca, largura, y, z, raio = 0.05) {
 }
 
 // ---------- Bicho de quatro patas (leão, panda, urso) ----------
-function quadrupede({ corpo, barriga, patas, cabeca, focinho, orelhas, nariz = 0x222222, iris = '#a86a1c', escala = 1, extras }) {
+export function quadrupede({ corpo, barriga, patas, cabeca, focinho, orelhas, nariz = 0x222222, iris = '#a86a1c', escala = 1, extras }) {
   const raiz = new THREE.Group();
   const tronco = new THREE.Group(); tronco.position.y = 0.72; raiz.add(tronco);
   const mCorpoMat = pelo(corpo); const mPatas = pelo(patas, 2); const mCab = pelo(cabeca, 2); const mFoc = pelo(focinho, 2);
@@ -421,7 +423,7 @@ const CRIAR = { policial, caranguejo, leao, panda, urso };
 // O modelo vai dentro de um grupo de fora: o motor posiciona e escala o de fora
 // sem mexer no tamanho próprio de cada bicho nem nas animações.
 export function criarPerseguidor(id) {
-  const modelo = (CRIAR[id] ?? policial)();
+  const modelo = (CRIAR[id] ?? CRIAR_NOVOS[id] ?? policial)();
   const raiz = new THREE.Group();
   raiz.add(modelo.raiz);
   return { raiz, animar: modelo.animar, segurar: modelo.segurar };

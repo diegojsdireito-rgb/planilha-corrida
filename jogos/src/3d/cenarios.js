@@ -1,14 +1,21 @@
-// Os cenários da corrida: Cidade, Praia, Floresta e Vila da Neve.
+// Os cenários da corrida: Cidade, Praia, Floresta e Vila da Neve (aqui) e Terra dos Doces,
+// Parque de Diversões, Deserto do Oásis e Passeio na Lua (em cenarios-novos.js).
 // Cada um tem chão, céu, enfeites dos lados e a sua versão dos três obstáculos
 // (o de pular, o de deslizar por baixo e o comprido, de trocar de faixa).
 import { THREE, FAIXA, LARG_RUA, CALCADA, COMP_CENA, INICIO, textura, ruido, toon, sombrear } from './base.js';
+import { CHAO_NOVOS, enfeitarNovo, obstaculoNovo } from './cenarios-novos.js';
 
 export const LISTA = [
   { id: 'cidade', nome: 'Cidade', icone: '🏙️' },
   { id: 'praia', nome: 'Praia', icone: '🏖️' },
   { id: 'floresta', nome: 'Floresta', icone: '🌲' },
   { id: 'neve', nome: 'Vila da Neve', icone: '❄️' },
+  { id: 'doces', nome: 'Terra dos Doces', icone: '🍭' },
+  { id: 'parque', nome: 'Parque de Diversões', icone: '🎡' },
+  { id: 'deserto', nome: 'Deserto do Oásis', icone: '🏜️' },
+  { id: 'lua', nome: 'Passeio na Lua', icone: '🌙' },
 ];
+const NOVOS = new Set(['doces', 'parque', 'deserto', 'lua']);
 
 const LARG_OBST = FAIXA * 0.86;
 const malha = (geo, mat) => sombrear(new THREE.Mesh(geo, mat));
@@ -137,7 +144,7 @@ function poste(lado, corLuz = 0xfff1b0) {
   return g;
 }
 
-function coqueiro() {
+export function coqueiro() {
   const g = new THREE.Group();
   const curva = 0.5 + Math.random() * 0.4;
   for (let k = 0; k < 8; k++) {
@@ -216,7 +223,7 @@ function cogumelo() {
   return g;
 }
 
-function montanha(x, z, alt, cor, topoNeve) {
+export function montanha(x, z, alt, cor, topoNeve) {
   const m = new THREE.Mesh(new THREE.ConeGeometry(alt * 0.9, alt, 7), toon(cor, { flatShading: true, fog: true }));
   m.position.set(x, alt / 2 - 1, z);
   if (topoNeve) { const t = new THREE.Mesh(new THREE.ConeGeometry(alt * 0.3, alt * 0.33, 7), toon(0xffffff, { flatShading: true })); t.position.y = alt * 0.34; m.add(t); }
@@ -226,7 +233,7 @@ function montanha(x, z, alt, cor, topoNeve) {
 // ---------- Monta o cenário ----------
 // Devolve um grupo com tudo, a lista de enfeites que se repetem e as texturas que correm com a distância.
 export function montarCenario(id) {
-  const c = CHAO[id] ?? CHAO.cidade;
+  const c = CHAO[id] ?? CHAO_NOVOS[id] ?? CHAO.cidade;
   const grupo = new THREE.Group();
   const itens = [];
   const rolar = [];
@@ -291,6 +298,8 @@ export function montarCenario(id) {
       for (let k = 0; k < COMP_CENA / 13; k++) { const m = cogumelo(); m.position.x = lado * (LARG_RUA / 2 + 0.6); add(m, INICIO + k * 13 + 2); }
     }
     for (const lado of [-1, 1]) for (let k = 0; k < 5; k++) grupo.add(montanha(lado * (32 + k * 6), 60 + k * 18, 22 + Math.random() * 14, sorteio([0x5c8a6a, 0x6a9a78, 0x4e7d5d]), false));
+  } else if (NOVOS.has(id)) {
+    atualizar = enfeitarNovo(id, { grupo, add, rolar, xBorda });
   } else {
     // vila da neve
     for (const lado of [-1, 1]) {
@@ -325,9 +334,9 @@ export function montarCenario(id) {
 
 // ---------- Obstáculos de cada cenário ----------
 const PANO = {};
-function texPano(chave, desenho, w = 256, h = 64) { PANO[chave] ??= textura(w, h, desenho); return PANO[chave]; }
+export function texPano(chave, desenho, w = 256, h = 64) { PANO[chave] ??= textura(w, h, desenho); return PANO[chave]; }
 
-function veiculo({ corCabine, corTeto, texto, emoji, corTexto, topo, comp }) {
+export function veiculo({ corCabine, corTeto, texto, emoji, corTexto, topo, comp }) {
   const g = new THREE.Group();
   const lados = toon(0xffffff, { map: texPano(`lado-${texto}`, (ctx, w, h) => {
     ctx.fillStyle = '#fffaf2'; ctx.fillRect(0, 0, w, h);
@@ -354,7 +363,7 @@ function veiculo({ corCabine, corTeto, texto, emoji, corTexto, topo, comp }) {
   return g;
 }
 
-function bandeirinhas(g, larg, cores, alturas = [[1.62, 0], [1.3, 1]]) {
+export function bandeirinhas(g, larg, cores, alturas = [[1.62, 0], [1.3, 1]]) {
   for (const [altura, desloc] of alturas) {
     for (let k = 0; k < 7; k++) {
       const b = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 3), toon(cores[(k + desloc) % cores.length], { side: THREE.DoubleSide }));
@@ -366,6 +375,7 @@ function bandeirinhas(g, larg, cores, alturas = [[1.62, 0], [1.3, 1]]) {
 
 export function criarObstaculo(o, tema) {
   const g = new THREE.Group();
+  if (NOVOS.has(tema)) return obstaculoNovo(o, tema, g);
   const L = LARG_OBST;
   if (o.tipo === 'cerca') {
     if (tema === 'floresta') {

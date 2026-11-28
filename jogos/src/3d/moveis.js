@@ -1,29 +1,31 @@
 // Obstáculos em movimento da corrida, em 3D: ônibus na contramão e bicicleta que troca de faixa
 // (cidade), caranguejo e bola de praia (praia), tronco rolando e galho balançando (floresta),
-// bola de neve que cresce e pinguim de barriga (neve). Cada um traz o aviso: ⚠️ piscando em cima
+// bola de neve que cresce e pinguim de barriga (neve); os dos cenários novos ficam em moveis-novos.js.
+// Cada um traz o aviso: ⚠️ piscando em cima
 // e uma marca no chão da faixa em que ele vai chegar. A posição vem da lógica (corrida.js);
 // aqui só se desenha e se anima (patas, rodas, rolar, balançar).
 import { THREE, FAIXA, LARG_RUA, xDe, textura, toon, desenho, sombrear } from './base.js';
 import { GALHO } from '../corrida.js';
+import { FABRICAS_NOVAS } from './moveis-novos.js';
 
-const L = FAIXA * 0.86;
-const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
-const bola = (r, m, seg = 16) => peca(new THREE.SphereGeometry(r, seg, Math.max(8, Math.round(seg * 0.7))), m);
-const cil = (r1, r2, h, m, seg = 14) => peca(new THREE.CylinderGeometry(r1, r2, h, seg), m);
-const caixa = (x, y, z, m) => peca(new THREE.BoxGeometry(x, y, z), m);
-const luz = (cor) => new THREE.MeshBasicMaterial({ color: cor });
-const pele = (cor) => desenho({ color: cor });
+export const L = FAIXA * 0.86;
+export const peca = (geo, m) => sombrear(new THREE.Mesh(geo, m));
+export const bola = (r, m, seg = 16) => peca(new THREE.SphereGeometry(r, seg, Math.max(8, Math.round(seg * 0.7))), m);
+export const cil = (r1, r2, h, m, seg = 14) => peca(new THREE.CylinderGeometry(r1, r2, h, seg), m);
+export const caixa = (x, y, z, m) => peca(new THREE.BoxGeometry(x, y, z), m);
+export const luz = (cor) => new THREE.MeshBasicMaterial({ color: cor });
+export const pele = (cor) => desenho({ color: cor });
 
 // ---------- Texturas compartilhadas (não são liberadas quando o obstáculo sai da pista) ----------
 const TEX = {};
 const recursos = new Set();
-function tex(chave, w, h, fazer, repetir = false) {
+export function tex(chave, w, h, fazer, repetir = false) {
   if (!TEX[chave]) { TEX[chave] = textura(w, h, fazer, repetir); recursos.add(TEX[chave]); }
   return TEX[chave];
 }
 export const recursosDosMoveis = () => recursos;
 
-const texAlerta = () => tex('alerta', 128, 128, (ctx) => {
+export const texAlerta = () => tex('alerta', 128, 128, (ctx) => {
   ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(64, 10); ctx.lineTo(120, 112); ctx.lineTo(8, 112); ctx.closePath();
   ctx.fillStyle = '#ffd21f'; ctx.fill();
@@ -32,7 +34,7 @@ const texAlerta = () => tex('alerta', 128, 128, (ctx) => {
   ctx.fillStyle = '#2b2118'; ctx.beginPath(); ctx.roundRect(57, 40, 14, 44, 7); ctx.fill();
   ctx.beginPath(); ctx.arc(64, 97, 8, 0, 7); ctx.fill();
 });
-const texSeta = () => tex('seta', 128, 128, (ctx) => {
+export const texSeta = () => tex('seta', 128, 128, (ctx) => {
   ctx.fillStyle = '#ff9a1f'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 9; ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(116, 64); ctx.lineTo(64, 14); ctx.lineTo(64, 42); ctx.lineTo(12, 42); ctx.lineTo(12, 86); ctx.lineTo(64, 86); ctx.lineTo(64, 114); ctx.closePath();
   ctx.stroke(); ctx.fill();
@@ -55,7 +57,7 @@ const texFaixa = () => tex('chao-faixa', 128, 256, (ctx, w, h) => {
 });
 
 // ---------- Aviso: ⚠️ em cima e a marca no chão da faixa de destino ----------
-function avisos(g, altura) {
+export function avisos(g, altura) {
   const placa = new THREE.Sprite(new THREE.SpriteMaterial({ map: texAlerta(), transparent: true, depthWrite: false, fog: false }));
   placa.scale.set(0.85, 0.85, 1); placa.position.y = altura + 0.7; placa.renderOrder = 3;
   const marca = new THREE.Mesh(new THREE.PlaneGeometry(FAIXA * 0.8, 2.6), new THREE.MeshBasicMaterial({ map: texChao(), transparent: true, depthWrite: false, fog: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }));
@@ -65,7 +67,7 @@ function avisos(g, altura) {
 }
 
 // Os da contramão: a marca vira uma faixa comprida do obstáculo até perto da menina.
-function faixaComprida(av) {
+export function faixaComprida(av) {
   const t = texFaixa().clone(); t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true;
   av.marca.material.map = t;
   return (o) => {
@@ -145,7 +147,7 @@ function brilhoTex() {
 }
 
 // ---------- Olhinhos fofos ----------
-function olho(r = 0.07, pupila = 0.55) {
+export function olho(r = 0.07, pupila = 0.55) {
   const g = new THREE.Group();
   const branco = bola(r, pele(0xffffff), 14); g.add(branco);
   const p = bola(r * pupila, pele(0x1d1410), 12); p.position.z = -r * 0.62; g.add(p);
@@ -304,7 +306,7 @@ const texSombra = () => tex('sombra', 64, 64, (ctx) => {
   const gr = ctx.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,0,0,0.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = gr; ctx.fillRect(0, 0, 64, 64);
 });
-function sombraChao(raio) {
+export function sombraChao(raio) {
   const s = new THREE.Mesh(new THREE.PlaneGeometry(raio * 2.4, raio * 2.4), new THREE.MeshBasicMaterial({ map: texSombra(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
   s.rotation.x = -Math.PI / 2; s.position.y = 0.03;
   return s;
@@ -486,7 +488,7 @@ const FABRICAS = { onibus, bicicleta, cachorro, caranguejo, bola: bolaDePraia, t
 // Monta o obstáculo em movimento. Quem chama posiciona o grupo em (xDe(o.faixa), 0, o.z) e
 // chama userData.animar(o, t) a cada quadro.
 export function criarMovel(o) {
-  const { g, av } = FABRICAS[o.tipo](o);
+  const { g, av } = (FABRICAS[o.tipo] ?? FABRICAS_NOVAS[o.tipo])(o);
   const animar = g.userData.animar;
   g.userData.animar = (ob, t) => {
     animar(ob, t);

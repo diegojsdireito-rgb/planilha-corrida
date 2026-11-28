@@ -128,6 +128,11 @@ const SONS = {
   rugido: (c) => { ruido(c, 0, 0.9, { vol: 0.4, freq: 260 }); tom(c, 160, 0, 0.9, { tipo: 'sawtooth', vol: 0.12, ate: 75 }); tom(c, 110, 0.05, 0.8, { tipo: 'square', vol: 0.05, ate: 60 }); },
   urso: (c) => { ruido(c, 0, 0.6, { vol: 0.35, freq: 200 }); tom(c, 120, 0, 0.6, { tipo: 'sawtooth', vol: 0.1, ate: 70 }); },
   panda: (c) => { tom(c, 520, 0, 0.18, { tipo: 'triangle', vol: 0.16, ate: 760 }); tom(c, 640, 0.2, 0.22, { tipo: 'triangle', vol: 0.14, ate: 480 }); },
+  // quem persegue nos cenários novos: ursinho de goma (boing), coelho (buzininha), raposa (latidinho) e etezinho (bip-bop)
+  goma: (c) => { tom(c, 220, 0, 0.35, { tipo: 'sine', vol: 0.2, ate: 520 }); tom(c, 520, 0.18, 0.3, { tipo: 'sine', vol: 0.14, ate: 260 }); tom(c, 330, 0.3, 0.2, { tipo: 'triangle', vol: 0.08, ate: 440 }); },
+  coelho: (c) => { for (const [ini, f] of [[0, 740], [0.16, 990]]) { tom(c, f, ini, 0.12, { tipo: 'square', vol: 0.06, ate: f * 0.85 }); tom(c, f * 1.5, ini, 0.1, { tipo: 'triangle', vol: 0.05 }); } },
+  raposa: (c) => { for (const ini of [0, 0.17]) { tom(c, 900, ini, 0.11, { tipo: 'triangle', vol: 0.16, ate: 1500 }); ruido(c, ini, 0.05, { vol: 0.12, freq: 2200 }); } },
+  alien: (c) => [1320, 880, 1760, 1175].forEach((f, k) => tom(c, f, k * 0.08, 0.09, { tipo: 'sine', vol: 0.13, ate: f * (k % 2 ? 0.8 : 1.25) })),
   caranguejo: (c) => { for (let k = 0; k < 4; k++) { ruido(c, k * 0.09, 0.03, { vol: 0.45, freq: 2600 }); tom(c, 1400, k * 0.09, 0.03, { tipo: 'square', vol: 0.05 }); } },
   // Docinhos: bônus e obstáculos novos
   explosao: (c) => { ruido(c, 0, 0.5, { vol: 0.5, freq: 380 }); tom(c, 140, 0, 0.45, { tipo: 'sawtooth', vol: 0.1, ate: 45 }); tom(c, 880, 0.05, 0.12, { tipo: 'triangle', vol: 0.08, ate: 1500 }); },
@@ -239,6 +244,38 @@ const LACOS = {
     oscilar(c, f.frequency, 0.2, 350, partes); // vento assoviando
     timers.push(setInterval(() => { if (Math.random() < 0.25) tocarNo(c, saida, sininho); }, 3500));
   }),
+  // Terra dos Doces: caixinha de música tocando notinhas e um zumbido doce bem baixinho
+  doces: (c) => montarLaco(c, 0.09, (saida, partes, timers) => {
+    const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 262; const g = c.createGain(); g.gain.value = 0.12;
+    o.connect(g).connect(saida); o.start(); partes.push(o);
+    oscilar(c, g.gain, 0.25, 0.08, partes);
+    timers.push(setInterval(() => { if (Math.random() < 0.8) tocarNo(c, saida, caixinhaDeMusica); }, 1400));
+  }),
+  // Parque de Diversões: o órgão do carrossel e o burburinho do povo, com sininhos de vez em quando
+  parque: (c) => montarLaco(c, 0.08, (saida, partes, timers) => {
+    const r = ruidoEmLaco(c, 3); const g = c.createGain(); g.gain.value = 0.35;
+    r.connect(filtro(c, 'bandpass', 900, 0.5)).connect(g).connect(saida); r.start(); partes.push(r);
+    oscilar(c, g.gain, 0.3, 0.12, partes);
+    let k = 0;
+    timers.push(setInterval(() => { tocarNo(c, saida, (cc, s2) => orgao(cc, s2, k++)); }, 1600));
+  }),
+  // Deserto: vento quente e arrastado, com o sino do camelo de vez em quando
+  deserto: (c) => montarLaco(c, 0.11, (saida, partes, timers) => {
+    const r = ruidoEmLaco(c, 3); const f = filtro(c, 'bandpass', 420, 0.7); const g = c.createGain(); g.gain.value = 0.8;
+    r.connect(f).connect(g).connect(saida); r.start(); partes.push(r);
+    oscilar(c, f.frequency, 0.12, 200, partes);
+    oscilar(c, g.gain, 0.18, 0.35, partes); // rajadas
+    timers.push(setInterval(() => { if (Math.random() < 0.35) tocarNo(c, saida, sinoDeCamelo); }, 2600));
+  }),
+  // Lua: zumbido grave do espaço e os bipes do rádio da base
+  lua: (c) => montarLaco(c, 0.1, (saida, partes, timers) => {
+    const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 55; const g = c.createGain(); g.gain.value = 0.5;
+    o.connect(g).connect(saida); o.start(); partes.push(o);
+    const o2 = c.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 82.5; const g2 = c.createGain(); g2.gain.value = 0.18;
+    o2.connect(g2).connect(saida); o2.start(); partes.push(o2);
+    oscilar(c, g2.gain, 0.15, 0.12, partes);
+    timers.push(setInterval(() => { if (Math.random() < 0.45) tocarNo(c, saida, radioDaBase); }, 2200));
+  }),
 };
 
 function tocarNo(c, saida, som) { try { som(c, saida); } catch { /* nada */ } }
@@ -258,6 +295,13 @@ const carroPassando = (c, s) => {
   g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.4);
   o.connect(filtro(c, 'lowpass', 400)).connect(g).connect(s); o.start(t0); o.stop(t0 + 1.5);
 };
+
+const ESCALA = [1047, 1175, 1319, 1568, 1760, 2093];
+const caixinhaDeMusica = (c, s) => { const n = 2 + Math.floor(Math.random() * 3); for (let k = 0; k < n; k++) bip(c, s, ESCALA[Math.floor(Math.random() * ESCALA.length)], k * 0.22, 0.5, { tipo: 'triangle', vol: 0.18 }); };
+const MELODIA = [[392, 494, 587], [440, 523, 659], [392, 494, 587], [349, 440, 523]];
+const orgao = (c, s, k) => { const acorde = MELODIA[k % MELODIA.length]; acorde.forEach((f, j) => { bip(c, s, f, j * 0.18, 0.3, { tipo: 'square', vol: 0.05 }); bip(c, s, f / 2, j * 0.18, 0.3, { tipo: 'triangle', vol: 0.1 }); }); };
+const sinoDeCamelo = (c, s) => [784, 659].forEach((f, k) => { bip(c, s, f, k * 0.35, 0.7, { tipo: 'triangle', vol: 0.18 }); bip(c, s, f * 2.7, k * 0.35, 0.3, { tipo: 'sine', vol: 0.05 }); });
+const radioDaBase = (c, s) => { const f = 1400 + Math.random() * 800; for (let k = 0; k < 3; k++) bip(c, s, k === 2 ? f * 1.5 : f, k * 0.12, 0.07, { vol: 0.22 }); };
 
 const ligados = new Map();
 export function ligarLaco(nome) {
