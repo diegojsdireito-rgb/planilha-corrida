@@ -47,24 +47,112 @@ export const COMIDAS = [
 
 // ---------- Roupinhas e acessórios ----------
 // Cada um ocupa um lugar do corpo; dá para usar um de cada lugar ao mesmo tempo.
-export const LUGARES = { cabeca: 'Chapéu', laco: 'Laço', olhos: 'Óculos', pescoco: 'Pescoço' };
+// As fantasias completas ficam no corpo e também ocupam outros lugares (as antenas da abelha
+// ficam na cabeça, as asinhas nas costas): vestir uma tira o que estava nesses lugares.
+export const LUGARES = { cabeca: 'Chapéu', laco: 'Laço', olhos: 'Óculos', pescoco: 'Pescoço', costas: 'Costas', corpo: 'Roupa' };
 export const ACESSORIOS = [
   { id: 'festa', nome: 'Chapéu de festa', lugar: 'cabeca', preco: 120 },
   { id: 'cartola', nome: 'Cartola', lugar: 'cabeca', preco: 200 },
   { id: 'coroa', nome: 'Coroa', lugar: 'cabeca', preco: 350 },
   { id: 'bone', nome: 'Boné', lugar: 'cabeca', preco: 150 },
+  { id: 'tiara-unicornio', nome: 'Tiara de unicórnio', lugar: 'cabeca', preco: 220 },
+  { id: 'pirata', nome: 'Chapéu de pirata', lugar: 'cabeca', preco: 240 },
+  { id: 'coroa-flores', nome: 'Coroa de flores', lugar: 'cabeca', preco: 180 },
+  { id: 'bruxinha', nome: 'Chapéu de bruxinha', lugar: 'cabeca', preco: 200 },
+  { id: 'gorro', nome: 'Gorro de pompom', lugar: 'cabeca', preco: 140 },
   { id: 'laco-rosa', nome: 'Laço rosa', lugar: 'laco', preco: 80 },
   { id: 'laco-azul', nome: 'Laço de bolinhas', lugar: 'laco', preco: 100 },
   { id: 'flor', nome: 'Florzinha', lugar: 'laco', preco: 90 },
+  { id: 'estrela', nome: 'Presilha de estrela', lugar: 'laco', preco: 90 },
   { id: 'oculos-sol', nome: 'Óculos de sol', lugar: 'olhos', preco: 150 },
   { id: 'oculos-coracao', nome: 'Óculos de coração', lugar: 'olhos', preco: 180 },
+  { id: 'oculos-redondos', nome: 'Óculos redondinhos', lugar: 'olhos', preco: 130 },
+  { id: 'tapa-olho', nome: 'Tapa-olho de pirata', lugar: 'olhos', preco: 100 },
   { id: 'cachecol', nome: 'Cachecol listrado', lugar: 'pescoco', preco: 120 },
   { id: 'gravata', nome: 'Gravatinha', lugar: 'pescoco', preco: 90 },
   { id: 'colar', nome: 'Colar de pérolas', lugar: 'pescoco', preco: 250 },
+  { id: 'bandana', nome: 'Lencinho', lugar: 'pescoco', preco: 100 },
+  { id: 'colar-havaiano', nome: 'Colar de flores', lugar: 'pescoco', preco: 150 },
+  { id: 'asas-borboleta', nome: 'Asas de borboleta', lugar: 'costas', preco: 280 },
+  { id: 'asas-fada', nome: 'Asinhas de fada', lugar: 'costas', preco: 300 },
+  { id: 'capa', nome: 'Capa de herói', lugar: 'costas', preco: 260 },
+  { id: 'mochila', nome: 'Mochilinha', lugar: 'costas', preco: 160 },
+  { id: 'tutu', nome: 'Tutu de bailarina', lugar: 'corpo', preco: 220 },
+  { id: 'marinheiro', nome: 'Blusa de marinheiro', lugar: 'corpo', preco: 150 },
+  { id: 'sueter', nome: 'Suéter de coração', lugar: 'corpo', preco: 170 },
+  { id: 'abelha', nome: 'Fantasia de abelha', lugar: 'corpo', preco: 320, fantasia: true, ocupa: ['cabeca', 'costas'] },
+  { id: 'joaninha', nome: 'Fantasia de joaninha', lugar: 'corpo', preco: 320, fantasia: true, ocupa: ['cabeca', 'costas'] },
+  { id: 'astronauta', nome: 'Fantasia de astronauta', lugar: 'corpo', preco: 350, fantasia: true, ocupa: ['cabeca', 'costas', 'pescoco'] },
+];
+// Lugares que um acessório ocupa (o dele e, nas fantasias, os outros).
+export const ocupados = (item) => [item.lugar, ...(item.ocupa ?? [])];
+
+// ---------- Quarto ----------
+// Cada lugar do quarto mostra um item escolhido (ou o de sempre, se nenhum). Um tema troca o
+// quarto inteiro; os brinquedos continuam aparecendo.
+export const LUGARES_QUARTO = { tema: 'Tema', parede: 'Papel de parede', cortina: 'Janela', cama: 'Caminha', tapete: 'Tapete', quadro: 'Quadro', abajur: 'Abajur', planta: 'Plantinha' };
+export const QUARTO = [
+  { id: 'tema-praia', nome: 'Quarto praia', lugar: 'tema', preco: 600 },
+  { id: 'tema-espaco', nome: 'Quarto espacial', lugar: 'tema', preco: 600 },
+  { id: 'tema-jardim', nome: 'Jardim encantado', lugar: 'tema', preco: 600 },
+  { id: 'parede-listras', nome: 'Listrinhas', lugar: 'parede', preco: 150 },
+  { id: 'parede-estrelas', nome: 'Estrelinhas', lugar: 'parede', preco: 180 },
+  { id: 'parede-coracoes', nome: 'Coraçõezinhos', lugar: 'parede', preco: 180 },
+  { id: 'parede-nuvens', nome: 'Nuvens', lugar: 'parede', preco: 200 },
+  { id: 'cortina-estrelas', nome: 'Cortina de estrelas', lugar: 'cortina', preco: 160 },
+  { id: 'cortina-babado', nome: 'Cortina de babado', lugar: 'cortina', preco: 180 },
+  { id: 'janela-redonda', nome: 'Janela redonda', lugar: 'cortina', preco: 260 },
+  { id: 'cama-almofada', nome: 'Almofadão', lugar: 'cama', preco: 200 },
+  { id: 'cama-nuvem', nome: 'Cama de nuvem', lugar: 'cama', preco: 350 },
+  { id: 'cama-dossel', nome: 'Cama de princesa', lugar: 'cama', preco: 450 },
+  { id: 'tapete-arco-iris', nome: 'Tapete arco-íris', lugar: 'tapete', preco: 180 },
+  { id: 'tapete-flor', nome: 'Tapete de flor', lugar: 'tapete', preco: 160 },
+  { id: 'tapete-patinhas', nome: 'Tapete de patinhas', lugar: 'tapete', preco: 140 },
+  { id: 'quadro-arco-iris', nome: 'Quadro de arco-íris', lugar: 'quadro', preco: 120 },
+  { id: 'quadro-montanha', nome: 'Paisagem', lugar: 'quadro', preco: 140 },
+  { id: 'quadro-retrato', nome: 'Retrato do bichinho', lugar: 'quadro', preco: 200 },
+  { id: 'abajur-lua', nome: 'Abajur de lua', lugar: 'abajur', preco: 220 },
+  { id: 'abajur-cogumelo', nome: 'Abajur cogumelo', lugar: 'abajur', preco: 200 },
+  { id: 'planta-flor', nome: 'Vasinho de flor', lugar: 'planta', preco: 100 },
+  { id: 'planta-cacto', nome: 'Cacto fofinho', lugar: 'planta', preco: 90 },
+  { id: 'planta-girassol', nome: 'Girassol', lugar: 'planta', preco: 130 },
+];
+
+// ---------- Brinquedos ----------
+// Ficam no quarto; cada um faz a alegria cair um pouco mais devagar (o efeito somado tem limite).
+// Os que são esconderijo aparecem no esconde-esconde.
+export const BRINQUEDOS = [
+  { id: 'bola-praia', nome: 'Bola de praia', preco: 60, efeito: 0.05 },
+  { id: 'patinho', nome: 'Patinho de borracha', preco: 60, efeito: 0.05 },
+  { id: 'blocos', nome: 'Blocos de montar', preco: 90, efeito: 0.06 },
+  { id: 'piao', nome: 'Pião colorido', preco: 100, efeito: 0.06 },
+  { id: 'carrinho', nome: 'Carrinho', preco: 120, efeito: 0.08 },
+  { id: 'ursinho', nome: 'Ursão de pelúcia', preco: 160, efeito: 0.1, esconderijo: true },
+  { id: 'robo', nome: 'Robozinho', preco: 200, efeito: 0.1 },
+  { id: 'casinha', nome: 'Casinha de papelão', preco: 250, efeito: 0.12, esconderijo: true },
+];
+export const LIMITE_EFEITO_BRINQUEDOS = 0.4; // no máximo a alegria cai 40% mais devagar
+
+// Quanto da queda da alegria continua valendo (1 = sem brinquedos).
+export function fatorAlegria(b) {
+  const soma = (b?.brinquedos ?? []).reduce((t, id) => t + (BRINQUEDOS.find((x) => x.id === id)?.efeito ?? 0), 0);
+  return 1 - Math.min(LIMITE_EFEITO_BRINQUEDOS, soma);
+}
+
+// ---------- Brincadeiras ----------
+// meta: pontos para ganhar MOEDAS_BRINCAR; super: pontos para ganhar MOEDAS_SUPER.
+export const BRINCADEIRAS = [
+  { id: 'bola', nome: 'Pega a bolinha', icone: '⚽', meta: 5, super: 12, texto: 'Toque na bolinha que quica.' },
+  { id: 'bolhas', nome: 'Bolhas de sabão', icone: '🫧', meta: 18, super: 32, texto: 'Estoure! As douradas valem 3.' },
+  { id: 'esconde', nome: 'Esconde-esconde', icone: '🙈', meta: 7, super: 11, texto: 'Ache onde ele se escondeu.' },
+  { id: 'danca', nome: 'Dança', icone: '💃', meta: 36, super: 58, texto: 'Setinhas no ritmo da música.' },
+  { id: 'petisco', nome: 'Pega o petisco', icone: '🦴', meta: 12, super: 22, texto: 'Arraste e pegue a comida.' },
+  { id: 'siga', nome: 'Siga o bichinho', icone: '🧩', meta: 5, super: 8, texto: 'Repita as cores que ele mostra.' },
 ];
 
 // ---------- Moedas por cuidar ----------
 export const MOEDAS_BRINCAR = 5; // por brincadeira bem-sucedida
+export const MOEDAS_SUPER = 8; // brincadeira muito bem jogada
 export const META_BRINCAR = 5; // bolinhas pegas para ganhar as moedas
 export const MOEDAS_BANHO = 2; // banho quando estava sujinho
 export const LIMITE_MOEDAS_DIA = 30;
@@ -88,7 +176,7 @@ export function novoBichinho(especie, nome, agora = Date.now(), anterior = null)
   const n = limparNome(nome);
   if (!n) return erro('Dê um nome para o seu bichinho.');
   const base = {
-    versao: 1,
+    versao: 2,
     especie,
     nome: n,
     criado: agora,
@@ -96,15 +184,18 @@ export function novoBichinho(especie, nome, agora = Date.now(), anterior = null)
     barras: { fome: 70, limpeza: 80, alegria: 75, energia: 80 },
     dormindo: false,
     acessorios: [],
-    vestindo: { cabeca: null, laco: null, olhos: null, pescoco: null },
+    vestindo: Object.fromEntries(Object.keys(LUGARES).map((l) => [l, null])),
     despensa: {},
     moedasDia: { dia: null, ganhas: 0 },
     cuidados: 0,
+    quarto: { itens: [], usando: Object.fromEntries(Object.keys(LUGARES_QUARTO).map((l) => [l, null])) },
+    brinquedos: [],
+    recordes: {},
   };
-  // Adotar outro bichinho não perde as roupinhas, a despensa nem o limite de moedas do dia.
+  // Adotar outro bichinho não perde as roupinhas, o quarto, os brinquedos, a despensa nem o limite de moedas do dia.
   if (anterior) {
     const a = normalizarBichinho(anterior);
-    if (a) Object.assign(base, { acessorios: a.acessorios, vestindo: a.vestindo, despensa: a.despensa, moedasDia: a.moedasDia });
+    if (a) Object.assign(base, { acessorios: a.acessorios, vestindo: a.vestindo, despensa: a.despensa, moedasDia: a.moedasDia, quarto: a.quarto, brinquedos: a.brinquedos });
   }
   return { bichinho: base };
 }
@@ -124,6 +215,23 @@ export function normalizarBichinho(b) {
     const v = b.vestindo?.[lugar];
     vestindo[lugar] = acessorios.includes(v) && ACESSORIOS.find((x) => x.id === v).lugar === lugar ? v : null;
   }
+  // Uma fantasia vestida ocupa outros lugares: o que estivesse neles (estado estranho) sai.
+  for (const lugar of Object.keys(LUGARES)) {
+    const item = ACESSORIOS.find((x) => x.id === vestindo[lugar]);
+    for (const outro of item?.ocupa ?? []) vestindo[outro] = null;
+  }
+  const lista = (v, catalogo) => (Array.isArray(v) ? Array.from(new Set(v.filter((id) => catalogo.some((x) => x.id === id)))) : []);
+  const itensQuarto = lista(b.quarto?.itens, QUARTO);
+  const usandoQuarto = {};
+  for (const lugar of Object.keys(LUGARES_QUARTO)) {
+    const v = b.quarto?.usando?.[lugar];
+    usandoQuarto[lugar] = itensQuarto.includes(v) && QUARTO.find((x) => x.id === v).lugar === lugar ? v : null;
+  }
+  const recordes = {};
+  for (const { id } of BRINCADEIRAS) {
+    const n = Math.floor(Number(b.recordes?.[id]));
+    if (n > 0) recordes[id] = n;
+  }
   const despensa = {};
   for (const c of COMIDAS) {
     const n = Math.floor(Number(b.despensa?.[c.id]));
@@ -132,7 +240,7 @@ export function normalizarBichinho(b) {
   const agora = Date.now();
   const atualizado = Number.isFinite(b.atualizado) ? b.atualizado : agora;
   return {
-    versao: 1,
+    versao: 2,
     especie: b.especie,
     nome,
     criado: Number.isFinite(b.criado) ? b.criado : atualizado,
@@ -144,12 +252,15 @@ export function normalizarBichinho(b) {
     despensa,
     moedasDia: { dia: typeof b.moedasDia?.dia === 'string' ? b.moedasDia.dia : null, ganhas: Math.max(0, Number(b.moedasDia?.ganhas) || 0) },
     cuidados: Math.max(0, Number(b.cuidados) || 0),
+    quarto: { itens: itensQuarto, usando: usandoQuarto },
+    brinquedos: lista(b.brinquedos, BRINQUEDOS),
+    recordes,
   };
 }
 
-function aplicarTaxas(barras, taxas, horas) {
+function aplicarTaxas(barras, taxas, horas, alegria = 1) {
   const r = {};
-  for (const { id } of BARRAS) r[id] = cair(barras[id], taxas[id] * horas);
+  for (const { id } of BARRAS) r[id] = cair(barras[id], taxas[id] * horas * (id === 'alegria' ? alegria : 1));
   return r;
 }
 
@@ -168,7 +279,7 @@ export function atualizar(b, agora = Date.now()) {
     dt -= dormido;
     if (barras.energia >= MAXIMO - 1e-9) { barras.energia = MAXIMO; dormindo = false; }
   }
-  if (dt > 0) barras = aplicarTaxas(barras, TAXAS.acordado, dt / HORA);
+  if (dt > 0) barras = aplicarTaxas(barras, TAXAS.acordado, dt / HORA, fatorAlegria(b));
   return { ...b, barras, dormindo, atualizado: agora };
 }
 
@@ -263,6 +374,37 @@ export function brincar(b, carteira, pegou, agora = Date.now()) {
   return ganharMoedas(novo, carteira, MOEDAS_BRINCAR, agora);
 }
 
+// Fim de qualquer brincadeira: alegria conforme os pontos, gasta energia e vale moedas
+// (MOEDAS_BRINCAR na meta, MOEDAS_SUPER no "muito bem"), sempre dentro do limite do dia.
+// Também guarda o recorde de cada brincadeira.
+export function terminarBrincadeira(b, carteira, id, pontos, agora = Date.now()) {
+  const br = BRINCADEIRAS.find((x) => x.id === id);
+  if (!br) return erro('Brincadeira desconhecida.');
+  const pode = podeBrincar(b);
+  if (pode.erro) return pode;
+  const n = Math.max(0, Math.floor(pontos) || 0);
+  const alegria = id === 'bola' ? Math.min(40, 8 + n * 3) : 8 + Math.round(32 * Math.min(1, n / br.super));
+  const gasto = { energia: id === 'danca' ? -15 : -12, fome: -6, limpeza: -5 };
+  if (id === 'petisco') gasto.fome = Math.min(15, n); // comeu os petiscos
+  if (id === 'bolhas') gasto.limpeza = 0; // bolha de sabão não suja
+  const recorde = n > (b.recordes?.[id] ?? 0);
+  let novo = mexer(b, { alegria, ...gasto });
+  if (recorde) novo = { ...novo, recordes: { ...(b.recordes ?? {}), [id]: n } };
+  const nivel = n >= br.super ? 'super' : n >= br.meta ? 'meta' : 'pouco';
+  if (nivel === 'pouco') return { bichinho: novo, carteira, ganhas: 0, nivel, recorde };
+  return { ...ganharMoedas(novo, carteira, nivel === 'super' ? MOEDAS_SUPER : MOEDAS_BRINCAR, agora), nivel, recorde };
+}
+
+// Tocar num brinquedo do quarto: o bichinho brinca um pouquinho com ele.
+export function brincarComBrinquedo(b, id) {
+  const br = BRINQUEDOS.find((x) => x.id === id);
+  if (!br) return erro('Brinquedo desconhecido.');
+  if (!(b.brinquedos ?? []).includes(id)) return erro('Compre este brinquedo primeiro.');
+  if (b.dormindo) return erro('Shhh... está dormindo.');
+  if (b.barras.energia < 8) return erro('Estou cansadinho... 💤');
+  return { bichinho: mexer(b, { alegria: 4, energia: -1 }), brinquedo: br };
+}
+
 export function banho(b, carteira, agora = Date.now()) {
   if (b.dormindo) return erro('Shhh... está dormindo.');
   const estavaSujo = b.barras.limpeza < 60;
@@ -289,9 +431,22 @@ export function comprarAcessorio(b, carteira, id) {
   if (b.acessorios.includes(id)) return erro('Você já tem este.');
   if ((carteira.moedas ?? 0) < item.preco) return erro(`Faltam ${item.preco - (carteira.moedas ?? 0)} moedas.`);
   return {
-    bichinho: { ...b, acessorios: [...b.acessorios, id], vestindo: { ...b.vestindo, [item.lugar]: id } },
+    bichinho: { ...b, acessorios: [...b.acessorios, id], vestindo: vestirItem(b.vestindo, item) },
     carteira: { ...carteira, moedas: carteira.moedas - item.preco },
   };
+}
+
+// Põe o item no lugar dele, tirando o que estava nos lugares que ele ocupa e as fantasias que
+// ocupavam o lugar dele.
+function vestirItem(vestindo, item) {
+  const novo = { ...vestindo };
+  for (const lugar of ocupados(item)) novo[lugar] = null;
+  for (const [lugar, id] of Object.entries(novo)) {
+    const outro = ACESSORIOS.find((x) => x.id === id);
+    if (outro && ocupados(outro).some((l) => ocupados(item).includes(l))) novo[lugar] = null;
+  }
+  novo[item.lugar] = item.id;
+  return novo;
 }
 
 // Veste o acessório (tirando o que estava no mesmo lugar) ou tira, se já estava vestido.
@@ -300,7 +455,45 @@ export function vestir(b, id) {
   if (!item) return erro('Item desconhecido.');
   if (!b.acessorios.includes(id)) return erro('Compre este primeiro.');
   const tirar = b.vestindo[item.lugar] === id;
-  return { bichinho: { ...b, vestindo: { ...b.vestindo, [item.lugar]: tirar ? null : id } }, tirou: tirar };
+  return { bichinho: { ...b, vestindo: tirar ? { ...b.vestindo, [item.lugar]: null } : vestirItem(b.vestindo, item) }, tirou: tirar };
+}
+
+// Fantasia ou item que impede este de aparecer (por exemplo, o capacete do astronauta no lugar do chapéu).
+export function tiraria(b, id) {
+  const item = ACESSORIOS.find((x) => x.id === id);
+  if (!item) return [];
+  const depois = vestirItem(b.vestindo, item);
+  return Object.values(b.vestindo).filter((v) => v && v !== id && !Object.values(depois).includes(v));
+}
+
+const faltam = (preco, carteira) => erro(`Faltam ${preco - (carteira.moedas ?? 0)} moedas.`);
+
+export function comprarQuarto(b, carteira, id) {
+  const item = QUARTO.find((x) => x.id === id);
+  if (!item) return erro('Item desconhecido.');
+  if (b.quarto.itens.includes(id)) return erro('Você já tem este.');
+  if ((carteira.moedas ?? 0) < item.preco) return faltam(item.preco, carteira);
+  return {
+    bichinho: { ...b, quarto: { itens: [...b.quarto.itens, id], usando: { ...b.quarto.usando, [item.lugar]: id } } },
+    carteira: { ...carteira, moedas: carteira.moedas - item.preco },
+  };
+}
+
+// Usa o item do quarto (trocando o que estava no lugar) ou guarda, se já estava em uso.
+export function usarQuarto(b, id) {
+  const item = QUARTO.find((x) => x.id === id);
+  if (!item) return erro('Item desconhecido.');
+  if (!b.quarto.itens.includes(id)) return erro('Compre este primeiro.');
+  const guardar = b.quarto.usando[item.lugar] === id;
+  return { bichinho: { ...b, quarto: { ...b.quarto, usando: { ...b.quarto.usando, [item.lugar]: guardar ? null : id } } }, guardou: guardar };
+}
+
+export function comprarBrinquedo(b, carteira, id) {
+  const item = BRINQUEDOS.find((x) => x.id === id);
+  if (!item) return erro('Brinquedo desconhecido.');
+  if (b.brinquedos.includes(id)) return erro('Você já tem este.');
+  if ((carteira.moedas ?? 0) < item.preco) return faltam(item.preco, carteira);
+  return { bichinho: { ...b, brinquedos: [...b.brinquedos, id] }, carteira: { ...carteira, moedas: carteira.moedas - item.preco } };
 }
 
 export function comprarComida(b, carteira, id, n = 1) {

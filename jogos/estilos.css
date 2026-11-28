@@ -851,6 +851,22 @@ html.jogo-tela-cheia, html.jogo-tela-cheia body { overflow: hidden; overscroll-b
   background: linear-gradient(#ff8a1f, #e8452c); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); text-shadow: 0 1px 2px rgba(0, 0, 0, .3);
 }
 .aviso-acelera.mostra { animation: acelera 1.6s ease-out forwards; }
+/* aviso de obstáculo em movimento: o que vem, a faixa em que chega e como passar */
+.alerta-movel {
+  position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 84px); transform: translateX(-50%); z-index: 5; pointer-events: none;
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 10px; border-radius: 999px; white-space: nowrap;
+  background: linear-gradient(#ffd84a, #ff9a1f); border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+  color: #4a2400; font-weight: 900; animation: alerta-pisca .5s ease-in-out infinite alternate;
+}
+.alerta-movel[hidden] { display: none; }
+.alerta-movel b { font-size: 20px; line-height: 1; }
+.alerta-movel small { font-size: 14px; font-weight: 900; }
+.alerta-movel .faixas { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(90, 50, 0, .25); }
+.alerta-movel .faixas i { width: 30px; height: 30px; border-radius: 8px; background: rgba(255, 255, 255, .55); display: grid; place-items: center; font-style: normal; font-size: 18px; }
+.alerta-movel .faixas i.vem { background: #e8452c; box-shadow: 0 0 0 2px #fff inset; animation: alerta-faixa .25s steps(2) infinite; }
+@keyframes alerta-pisca { to { transform: translateX(-50%) scale(1.05); } }
+@keyframes alerta-faixa { 50% { background: #ffb020; } }
+@media (prefers-reduced-motion: reduce) { .alerta-movel, .alerta-movel .faixas i.vem { animation: none; } }
 @keyframes acelera { 0% { opacity: 0; transform: translate(-50%, 14px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 25% { transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -12px); } }
 .meta-ob { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-weight: 800; background: #dff3ff; color: #1d5e8a; font-size: 12px; }
 .meta-ob.ok { background: #d9f7e2; color: #1f7a3f; }
