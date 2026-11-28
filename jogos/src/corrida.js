@@ -6,6 +6,9 @@
 // baú de moedas, foguete (supercarga na hora), skate grátis, raio (enche a barra da supercarga),
 // capa de super-heroína (voa atraindo as moedas) e nave alienígena (um feixe de luz leva a menina
 // para dentro de um disco voador, que percorre um trecho pelo alto e a devolve à pista).
+// Depois do trecho inicial aparecem também obstáculos em movimento, cada cenário com os seus
+// (ônibus na contramão, bicicleta, cachorro, caranguejo, bola de praia, tronco, galho, bola de neve
+// e pinguim): sempre com aviso antes e sempre com uma passagem possível.
 
 export const LONGE = 70;
 const GRAVIDADE = 30;
@@ -57,11 +60,20 @@ export const duracao = (nivel = 0) => 8 + nivel * 2;
 const maisTempo = (s) => (s.dom === 'tempo' ? 1.25 : 1);
 const maisEnergia = (s) => (s.dom === 'explosao' ? 1.4 : 1);
 
+// Cenários: o escolhido fica fixo; no Passeio troca a cada TRECHO_PASSEIO metros.
+export const CENARIOS_IDS = ['cidade', 'praia', 'floresta', 'neve'];
+export const TRECHO_PASSEIO = 500;
+export function cenarioDaCorrida(escolha, dist) {
+  if (escolha !== 'passeio') return CENARIOS_IDS.includes(escolha) ? escolha : 'cidade';
+  return CENARIOS_IDS[Math.floor(dist / TRECHO_PASSEIO) % 4];
+}
+
+// cfg.cenario: o cenário escolhido ('cidade'... ou 'passeio'). Sem ele só há obstáculos parados.
 export function nova(nivel = 'medio', cfg = {}) {
   const poderes = { ima: 0, pulo: 0, maleta: 0, supercarga: 0, ...(cfg.poderes ?? {}) };
   const dom = cfg.dom ?? null;
   return {
-    nivel, t: 0, dist: 0, vel: VELOCIDADE[nivel].base,
+    nivel, t: 0, dist: 0, vel: VELOCIDADE[nivel].base, cenario: cfg.cenario ?? null, reserva: null,
     faixa: 1, x: 1, y: 0, vy: 0, deslizando: 0,
     moedas: 0, objetos: [], ultimaLinha: 0,
     ima: dom === 'ima' ? 10 : 0, superPulo: 0, voo: 0, vooTipo: 'mochila', supercarga: 0, energia: dom === 'turbo' ? 0.6 : 0, escudo: dom === 'escudo', invencivel: 0, dobro: 0, bonus: 0,
@@ -96,7 +108,8 @@ export function arcoDeMoedas(faixa, z, vel = 13, n = 7) {
 const fileira = (faixa, z, n, h = 0.5, passo = 1.6) => Array.from({ length: n }, (_, k) => ({ tipo: 'moeda', faixa, z: z + k * passo, h }));
 
 // Uma linha de obstáculos. Garante pelo menos uma faixa sem carrinho e nunca mais de um carrinho.
-export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false, vel = 13) {
+// evitar: faixa que precisa ficar vazia (reservada para um obstáculo na contramão que vem aí).
+export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false, vel = 13, evitar = null) {
   const r = aleatorio;
   if (voando) {
     // no ar não há obstáculos: só uma trilha de moedas lá em cima
@@ -105,10 +118,15 @@ export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false,
   const objetos = [];
   const tipos = ['cerca', 'faixa', 'carrinho'];
   const sorteio = r();
-  const faixas = [0, 1, 2].sort(() => r() - 0.5);
+  let faixas = [0, 1, 2].sort(() => r() - 0.5);
   let bloqueadas;
   if (dist < 60) bloqueadas = sorteio < 0.5 ? 0 : 1; // começo tranquilo
   else bloqueadas = sorteio < 0.12 ? 0 : sorteio < 0.55 ? 1 : sorteio < 0.9 ? 2 : 3;
+  if (evitar !== null && evitar !== undefined) {
+    // a faixa reservada vai por último, sempre livre e sem moedas
+    faixas = [...faixas.filter((f) => f !== evitar), evitar];
+    bloqueadas = Math.min(bloqueadas, 2);
+  }
   let carrinhos = 0;
   for (let k = 0; k < bloqueadas; k++) {
     let tipo = tipos[Math.floor(r() * 3)];
@@ -116,7 +134,7 @@ export function gerarLinha(z, aleatorio = Math.random, dist = 0, voando = false,
     if (tipo === 'carrinho') carrinhos++;
     objetos.push({ tipo, faixa: faixas[k], z, comp: tipo === 'carrinho' ? COMPRIMENTO_CARRINHO : 0.4 });
   }
-  const livres = faixas.slice(bloqueadas);
+  const livres = faixas.slice(bloqueadas).filter((f) => f !== evitar);
   const cerca = objetos.find((o) => o.tipo === 'cerca');
   if (cerca && r() < 0.35) {
     // arco de moedas por cima da cerca
@@ -139,6 +157,188 @@ export function sortearItem(x) {
   let soma = 0;
   for (const [tipo, chance] of ITENS) { soma += chance; if (x < soma) return tipo; }
   return 'raio';
+}
+
+// ---------- Obstáculos em movimento ----------
+// Cada cenário tem os seus. Todos se movem de um jeito que depende só da distância até a menina (z),
+// então chegam sempre do mesmo jeito, em qualquer velocidade, e o aviso mostra desde o começo
+// a faixa em que cada um vai estar quando chegar nela ("destino").
+// passa: como se passa por ele na chegada ('pular', 'deslizar' ou 'desviar' = trocar de faixa).
+// contramao: vem na direção dela, mais rápido que a corrida (só numa faixa reservada e vazia).
+export const INICIO_MOVEIS = 300; // metros de corrida sem nenhum obstáculo em movimento
+export const AVISO_MIN = 1.2; // segundos, no mínimo, entre o aviso aparecer e o obstáculo chegar
+const AVISO_CONTRAMAO = 1.8; // quanto tempo o ônibus e a bola de neve levam para chegar, se der
+const METROS_FAIXA = 1.6; // largura de uma faixa em metros (a mesma do 3D)
+export const GALHO = { pivo: 3.3, haste: 2.05, raio: 0.38, amplitude: 0.8, periodo: 16 };
+
+export const MOVEIS = {
+  onibus: { cenario: 'cidade', comp: 6, larg: 0.55, passa: 'desviar', contramao: true, altura: 2.1 },
+  bicicleta: { cenario: 'cidade', comp: 1.5, larg: 0.5, passa: 'desviar', vz: -2.5, altura: 1.7 },
+  cachorro: { cenario: 'cidade', comp: 0.5, larg: 0.42, passa: 'pular', altura: 0.6 },
+  caranguejo: { cenario: 'praia', comp: 0.5, larg: 0.42, passa: 'pular', altura: 0.45 },
+  bola: { cenario: 'praia', comp: 0.84, larg: 0.42 },
+  tronco: { cenario: 'floresta', comp: 1.8, larg: 0.42, passa: 'pular', altura: 0.6 },
+  galho: { cenario: 'floresta', comp: 0.5, larg: 0.42, passa: 'deslizar' },
+  boladeneve: { cenario: 'neve', comp: 1.9, larg: 0.55, passa: 'desviar', contramao: true },
+  pinguim: { cenario: 'neve', comp: 0.9, larg: 0.45, passa: 'pular', altura: 0.5 },
+};
+export const ehObstaculo = (o) => o.movel || o.tipo === 'cerca' || o.tipo === 'faixa' || o.tipo === 'carrinho';
+export const comoPassar = (o) => (o.tipo === 'bola' ? (o.modo === 'alto' ? 'deslizar' : 'pular') : MOVEIS[o.tipo]?.passa);
+
+// Chance de uma linha nova trazer um obstáculo em movimento: zero no trecho inicial e,
+// depois, sobe junto com a velocidade da corrida.
+export function chanceMovel(nivel, dist) {
+  if (dist < INICIO_MOVEIS) return 0;
+  const c = VELOCIDADE[nivel] ?? VELOCIDADE.medio;
+  const f = (velocidadeEm(nivel, dist) - c.base) / (c.topo - c.base);
+  return Math.min(0.32, 0.08 + 0.3 * f);
+}
+
+const suave = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
+
+// Coloca o obstáculo onde ele deve estar a essa distância (z) da menina.
+export function posicionar(o) {
+  const z = o.z;
+  switch (o.tipo) {
+    case 'cachorro':
+    case 'tronco': {
+      // atravessa a pista de lado e passa pela faixa de destino bem quando chega na menina
+      const borda = o.tipo === 'tronco' ? 0.95 : 1.35;
+      o.faixa = limitar(o.destino - o.dir * o.k * (z + o.comp / 2), -borda, 2 + borda);
+      o.andando = o.faixa > -borda && o.faixa < 2 + borda;
+      break;
+    }
+    case 'caranguejo':
+      // anda de lado, para lá e para cá, entre duas faixas vizinhas
+      o.faixa = o.base + 0.5 + 0.5 * Math.cos((2 * Math.PI * (z + o.comp / 2)) / o.periodo + o.fase);
+      break;
+    case 'bicicleta':
+    case 'pinguim': {
+      // troca de faixa entre zTroca + troca e zTroca; a bicicleta pisca a setinha antes
+      const u = suave((o.zTroca + o.troca - z) / o.troca);
+      o.faixa = o.origem + (o.destino - o.origem) * u;
+      o.pisca = u < 1;
+      o.trocando = u > 0 && u < 1;
+      break;
+    }
+    case 'bola': {
+      // quica: o ponto mais alto (modo 'alto') ou um quiquinho baixo ('baixo') cai bem na chegada
+      const zc = z + o.raio;
+      o.faixa = o.destino + o.dir * limitar((zc - 8) / 26, 0, 1);
+      o.h = o.raio + o.salto * Math.abs(Math.cos((Math.PI * zc) / o.periodo));
+      break;
+    }
+    case 'galho':
+      // pêndulo pendurado no meio da faixa de destino, balançando de um lado para o outro
+      o.angulo = GALHO.amplitude * Math.sin((2 * Math.PI * (z + o.comp / 2)) / GALHO.periodo + o.fase);
+      o.faixa = o.destino;
+      o.bolaX = o.destino - (GALHO.haste * Math.sin(o.angulo)) / METROS_FAIXA;
+      o.h = GALHO.pivo - GALHO.haste * Math.cos(o.angulo);
+      break;
+    case 'boladeneve':
+      // rola na direção dela e vai crescendo
+      o.raio = 0.35 + 0.6 * limitar(1 - z / LONGE, 0, 1);
+      o.comp = 2 * o.raio;
+      break;
+    default:
+  }
+  return o;
+}
+
+// Cria um obstáculo em movimento a z metros. opcoes.destino fixa a faixa de chegada; opcoes.vz,
+// a velocidade própria (na contramão); opcoes.modo, o jeito da bola de praia ('alto' ou 'baixo').
+export function criarMovel(tipo, z, aleatorio = Math.random, vel = 13, opcoes = {}) {
+  const r = aleatorio;
+  const def = MOVEIS[tipo];
+  const destino = opcoes.destino ?? Math.floor(r() * 3);
+  const o = { tipo, movel: true, z, comp: def.comp, larg: def.larg, destino, faixa: destino, vz: def.vz ?? 0, nasceu: z };
+  if (def.contramao) o.vz = opcoes.vz ?? limitar(LONGE / AVISO_CONTRAMAO - vel, 3, 12);
+  if (tipo === 'cachorro' || tipo === 'tronco') {
+    o.dir = opcoes.dir ?? (destino === 0 ? 1 : destino === 2 ? -1 : r() < 0.5 ? 1 : -1);
+    o.k = tipo === 'cachorro' ? 0.13 : 0.06; // faixas por metro
+  } else if (tipo === 'caranguejo') {
+    o.base = destino === 0 ? 0 : destino === 2 ? 1 : r() < 0.5 ? 0 : 1;
+    o.fase = destino === o.base + 1 ? 0 : Math.PI;
+    o.periodo = 9;
+  } else if (tipo === 'bicicleta' || tipo === 'pinguim') {
+    const longe = tipo === 'pinguim' && destino !== 1 && r() < 0.4;
+    const opc = [0, 1, 2].filter((f) => Math.abs(f - destino) === (longe ? 2 : 1));
+    o.origem = opcoes.origem ?? opc[Math.floor(r() * opc.length)];
+    o.zTroca = tipo === 'bicicleta' ? 20 : 18;
+    o.troca = tipo === 'bicicleta' ? 10 : 14;
+  } else if (tipo === 'bola') {
+    o.modo = opcoes.modo ?? (r() < 0.55 ? 'alto' : 'baixo');
+    o.raio = 0.42;
+    o.salto = o.modo === 'alto' ? 1.15 : 0.18;
+    o.periodo = o.modo === 'alto' ? 12 : 3;
+    const lados = [-1, 1].filter((d) => destino + d >= 0 && destino + d <= 2);
+    o.dir = lados[Math.floor(r() * lados.length)];
+  } else if (tipo === 'galho') {
+    o.fase = opcoes.fase ?? r() * Math.PI * 2;
+  }
+  return posicionar(o);
+}
+
+// Faixas por onde o obstáculo passa em algum momento do caminho (para as moedas não ficarem nelas).
+export function faixasDoTrajeto(o) {
+  const c = { ...o };
+  const tocadas = new Set();
+  for (let z = o.z; z > -3; z -= 0.5) {
+    c.z = z; posicionar(c);
+    const x = c.tipo === 'galho' ? c.bolaX : c.faixa;
+    for (const f of [0, 1, 2]) if (Math.abs(x - f) < c.larg + 0.15) tocadas.add(f);
+  }
+  return tocadas;
+}
+
+// Uma linha só com o obstáculo em movimento (e moedas onde ele nunca passa, ou um arco por cima dele).
+function linhaMovel(tipo, z, r, vel) {
+  const o = criarMovel(tipo, z, r, vel);
+  const objetos = [o];
+  const livres = [0, 1, 2].filter((f) => !faixasDoTrajeto(o).has(f));
+  const meio = z + o.comp / 2;
+  if (comoPassar(o) === 'pular' && r() < 0.5) objetos.push(...arcoDeMoedas(o.destino, meio, vel));
+  else if (tipo === 'galho' && r() < 0.6) objetos.push(...fileira(o.destino, meio - 1.9, 4, 0.45, 1.3)); // por baixo, deslizando
+  else if (livres.length && r() < 0.8) objetos.push(...fileira(livres[Math.floor(r() * livres.length)], z, 3 + Math.floor(r() * 4)));
+  return objetos;
+}
+
+// Na hora de uma linha nova: às vezes sorteia um obstáculo em movimento do cenário atual.
+// Os da contramão primeiro reservam uma faixa e só entram quando ela estiver vazia.
+function sortearMovel(s, r) {
+  if (!s.cenario || s.reserva || s.dist < INICIO_MOVEIS || s.objetos.some((o) => o.movel)) return null;
+  const tema = cenarioDaCorrida(s.cenario, s.dist);
+  if (tema !== cenarioDaCorrida(s.cenario, s.dist + LONGE + 30)) return null; // perto da troca de cenário, não
+  if (r() >= chanceMovel(s.nivel, s.dist)) return null;
+  const lista = Object.keys(MOVEIS).filter((k) => MOVEIS[k].cenario === tema);
+  const tipo = lista[Math.floor(r() * lista.length)];
+  if (MOVEIS[tipo].contramao) { s.reserva = { tipo, faixa: Math.floor(r() * 3), desde: s.t }; return null; }
+  return tipo;
+}
+
+// O da contramão entra quando a faixa reservada esvaziou e escolhe a própria velocidade para
+// chegar na menina num vão entre as linhas de obstáculos (nunca junto com outra linha).
+function soltarContramao(s, r, turbo) {
+  const { tipo, faixa } = s.reserva;
+  if (s.t - s.reserva.desde > 10) { s.reserva = null; return; }
+  if (s.objetos.some((o) => Math.abs(o.faixa - faixa) < 0.6 && o.z + (o.comp ?? 0) > -1)) return;
+  const v = s.vel;
+  const comp = tipo === 'boladeneve' ? 1.9 : MOVEIS[tipo].comp;
+  const folga = 0.3; // segundos
+  const janelas = s.objetos.filter(ehObstaculo).map((o) => [(o.z - 0.45) / v, (o.z + (o.comp ?? 0.4) + 0.45) / v]);
+  const maior = Math.max(3, Math.min(12, LONGE / AVISO_CONTRAMAO - v));
+  for (let vz = maior; vz >= 3; vz -= 0.5) {
+    const chega = (LONGE - 0.45) / (v + vz);
+    const sai = (LONGE + comp + 0.45) / (v + vz);
+    if (janelas.some(([a, b]) => !(sai + folga <= a || b + folga <= chega))) continue;
+    s.objetos.push(criarMovel(tipo, LONGE, r, v, { destino: faixa, vz }));
+    s.eventos.push(`alerta:${tipo}`);
+    s.reserva = null;
+    // a próxima linha só chega depois que ele passou
+    s.ultimaLinha = Math.max(s.ultimaLinha, v * (sai + folga) - intervalo(v / turbo) + 0.45);
+    return;
+  }
 }
 
 const skateAtivo = (s) => (s.skate > 0 ? SKATES[s.skateTipo] : null);
@@ -180,7 +380,8 @@ export function comando(s, acao) {
   }
 }
 
-function colide(s, o) {
+export function colide(s, o) {
+  if (o.movel) return colideMovel(s, o);
   if (Math.abs(o.faixa - s.x) > 0.55) return false;
   const frente = o.z;
   const tras = o.z + (o.comp ?? 0);
@@ -188,6 +389,19 @@ function colide(s, o) {
   if (o.tipo === 'cerca') return s.y < 0.6;
   if (o.tipo === 'faixa') return s.y < 2.0 && !(s.deslizando > 0 && s.y < 0.2);
   return s.y < 1.25; // carrinho (1,25 de altura): só passa por cima com super pulo
+}
+
+function colideMovel(s, o) {
+  const x = o.tipo === 'galho' ? o.bolaX : o.faixa;
+  if (Math.abs(x - s.x) > o.larg) return false;
+  // passo: quanto ele andou neste quadro (os da contramão são rápidos e não podem atravessá-la)
+  if (o.z > 0.45 || o.z + o.comp < -0.45 - (o.passo ?? 0)) return false;
+  const deitada = s.deslizando > 0 && s.y < 0.2;
+  const topo = s.y + (deitada ? 0.55 : 1.4);
+  if (o.tipo === 'bola') return topo > o.h - o.raio + 0.12 && s.y < o.h + o.raio - 0.12;
+  if (o.tipo === 'galho') return topo > o.h - GALHO.raio + 0.08 && s.y < o.h + GALHO.raio;
+  if (o.tipo === 'boladeneve') return s.y < 2 * o.raio - 0.1;
+  return s.y < MOVEIS[o.tipo].altura;
 }
 
 export function avancar(s, dt, aleatorio = Math.random) {
@@ -246,6 +460,11 @@ export function avancar(s, dt, aleatorio = Math.random) {
   // mundo
   for (const o of s.objetos) {
     o.z -= dz;
+    if (o.movel) {
+      o.z -= o.vz * dt;
+      o.passo = dz + o.vz * dt;
+      posicionar(o);
+    }
     if (s.ima > 0 && o.tipo === 'moeda' && o.z < 10 && o.z > -1) {
       o.faixa += (s.x - o.faixa) * Math.min(1, dt * 10);
       o.h += (s.y + 0.6 - o.h) * Math.min(1, dt * 10);
@@ -254,13 +473,25 @@ export function avancar(s, dt, aleatorio = Math.random) {
   s.objetos = s.objetos.filter((o) => o.z + (o.comp ?? 0) > -6 && !o.pego && !o.quebrado);
   s.ultimaLinha -= dz;
   if (s.ultimaLinha <= LONGE - intervalo(s.vel / turbo)) {
-    s.objetos.push(...gerarLinha(LONGE, aleatorio, s.dist, s.voo > 1.5, s.vel));
+    const voando = s.voo > 1.5;
+    const movel = voando ? null : sortearMovel(s, aleatorio);
     s.ultimaLinha = LONGE;
+    if (movel) {
+      s.objetos.push(...linhaMovel(movel, LONGE, aleatorio, s.vel));
+      s.eventos.push(`alerta:${movel}`);
+      const vz = MOVEIS[movel].vz ?? 0;
+      if (vz < 0) {
+        // a bicicleta anda para a frente: a linha seguinte espera para não alcançá-la
+        const v = velocidadeEm(s.nivel, s.dist);
+        s.ultimaLinha += (-vz * (LONGE + 6)) / Math.max(4, v + vz) + MOVEIS[movel].comp + 2;
+      }
+    } else s.objetos.push(...gerarLinha(LONGE, aleatorio, s.dist, voando, s.vel, s.reserva?.faixa ?? null));
   }
+  if (s.reserva && s.voo <= 0) soltarContramao(s, aleatorio, turbo);
 
   // coletas e batidas
   for (const o of s.objetos) {
-    if (!['cerca', 'faixa', 'carrinho'].includes(o.tipo)) {
+    if (!ehObstaculo(o)) {
       // a moeda conta se passou por ela neste quadro (mesmo num celular lento, que anda mais de uma vez por quadro)
       if (o.z < 0.7 && o.z > -0.7 - dz && Math.abs(o.faixa - s.x) < 0.6 && Math.abs((o.h ?? 0) - (s.y + 0.6)) < 1.1) {
         o.pego = true;
@@ -314,7 +545,8 @@ function voar(s, segundos, tipo = 'mochila') {
     s.y = ALTURA_VOO; // teletransportada: já aparece lá em cima, dentro da nave
   } else s.contagem.maletas++;
   // tira da frente os obstáculos que já estavam perto: ela decola por cima deles
-  s.objetos = s.objetos.filter((x) => x.z < 2 || !['cerca', 'faixa', 'carrinho'].includes(x.tipo));
+  s.objetos = s.objetos.filter((x) => x.z < 2 || !ehObstaculo(x));
+  s.reserva = null; // o da contramão que ia entrar fica para outra vez
   s.eventos.push({ mochila: 'decolar', capa: 'heroi', nave: 'teletransporte' }[tipo]);
 }
 

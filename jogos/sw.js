@@ -34,6 +34,7 @@ const ARQUIVOS = [
   'src/3d/cenarios.js',
   'src/3d/itens.js',
   'src/3d/menina.js',
+  'src/3d/moveis.js',
   'src/3d/perseguidores.js',
   'src/app.js',
   'src/batalha.js',

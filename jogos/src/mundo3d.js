@@ -7,6 +7,7 @@ import { montarCenario, criarObstaculo } from './3d/cenarios.js';
 import { criarPerseguidor, quemPersegue } from './3d/perseguidores.js';
 import { LONGE } from './corrida.js';
 import { criarItem, temItem3D, recursosDosItens } from './3d/itens.js';
+import { criarMovel, recursosDosMoveis } from './3d/moveis.js';
 
 let GEO_MOEDA; let MAT_MOEDA;
 
@@ -30,7 +31,7 @@ function prepararComuns() {
 }
 
 const suave = (x) => x * x * (3 - 2 * x);
-const COMUNS = () => new Set([GEO_MOEDA, ...MAT_MOEDA, ...recursosDosItens(), texBrilho()]);
+const COMUNS = () => new Set([GEO_MOEDA, ...MAT_MOEDA, ...recursosDosItens(), ...recursosDosMoveis(), texBrilho()]);
 
 function criarObjeto(o, tema) {
   if (o.tipo === 'moeda') {
@@ -67,6 +68,7 @@ function criarObjeto(o, tema) {
     g.userData.gira = true;
     return g;
   }
+  if (o.movel) return criarMovel(o);
   if (temItem3D(o.tipo)) return criarItem(o.tipo);
   return criarObstaculo(o, tema);
 }
@@ -203,7 +205,8 @@ export function criarMundo(canvas) {
       let m = objetos.get(o);
       if (!m) { m = criarObjeto(o, tema); objetos.set(o, m); cena.add(m); }
       vistos.add(o);
-      m.position.set(xDe(o.faixa), o.h ?? 0, o.z);
+      m.position.set(xDe(o.faixa), o.movel ? 0 : o.h ?? 0, o.z);
+      m.userData.animar?.(o, t);
       if (m.userData.gira) m.rotation.y = t * 2 + o.z * 0.3;
       if (m.userData.flutua) m.position.y = (o.h ?? 0.7) + Math.sin(t * 4 + o.z) * 0.08;
     }

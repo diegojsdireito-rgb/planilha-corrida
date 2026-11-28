@@ -15,13 +15,8 @@ const CENARIOS = [
   { id: 'neve', nome: 'Vila da Neve', icone: '❄️' },
   { id: 'passeio', nome: 'Passeio', icone: '🔄' },
 ];
-const TRECHO_PASSEIO = 500; // metros em cada cenário no modo Passeio
-
-// Cenário em que a corrida está agora.
-export function cenarioDaCorrida(escolha, dist) {
-  if (escolha !== 'passeio') return CENARIOS.some((c) => c.id === escolha && c.id !== 'passeio') ? escolha : 'cidade';
-  return CENARIOS[Math.floor(dist / TRECHO_PASSEIO) % 4].id;
-}
+// Cenário em que a corrida está agora (o Passeio troca a cada 500 m).
+export const { cenarioDaCorrida } = cor;
 
 export function recorde() {
   let r = 0;
@@ -69,6 +64,7 @@ export function montar(area, ctl) {
   let capturada = null; // segundos desde que quem persegue a alcançou (cena da captura)
   let temaVisto = null; let camera = 0; let s = null; let rodando = false; let pausado = false; let quadro = 0; let anterior = 0; let W = 0; let H = 0; let dpr = 1;
   let ativa = ctl.ativa();
+  let congelado = false; // só no ?demo, para capturas de tela
 
   // 3D quando o aparelho permite; senão, o desenho em 2D continua valendo.
   let mundo = null;
@@ -255,6 +251,7 @@ export function montar(area, ctl) {
     const x = X(o.faixa, z); const y = Y(z); const u = U(z); const lf = faixaL() * p(z);
     if (o.tipo === 'moeda') return moeda(x, y - (o.h ?? 0.5) * u, u * 0.17, t * 5 + o.z * 0.4);
     if (ICONE[o.tipo]) return bolha(x, y - (o.h ?? 0.7) * u, u * 0.24, o.tipo, t);
+    if (o.movel) return desenharMovel(o, t);
     if (o.tipo === 'cerca') {
       const w = lf * 0.86; const h = u * 0.5;
       ctx.fillStyle = '#fff';
@@ -310,6 +307,105 @@ export function montar(area, ctl) {
     ctx.fillText('🍦', x, y - h1 * 0.3);
     ctx.fillStyle = '#333';
     for (const dx of [-0.32, 0.32]) { ctx.beginPath(); ctx.arc(x + dx * w1, y - h1 * 0.05, h1 * 0.1, 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  // ---------- Obstáculos em movimento, no desenho 2D ----------
+  // trapézio no chão entre duas distâncias, numa faixa
+  function noChao(f, z1, z2, larg, cor_) {
+    ctx.fillStyle = cor_;
+    ctx.beginPath();
+    ctx.moveTo(X(f - larg, z1), Y(z1)); ctx.lineTo(X(f + larg, z1), Y(z1));
+    ctx.lineTo(X(f + larg, z2), Y(z2)); ctx.lineTo(X(f - larg, z2), Y(z2));
+    ctx.fill();
+  }
+  function emoji(txt, x, y, tam, espelhar = false) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (espelhar) ctx.scale(-1, 1);
+    ctx.fillStyle = '#000'; // figurinha colorida, sem transparência herdada
+    ctx.font = `${Math.round(tam)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(txt, 0, 0);
+    ctx.restore();
+  }
+  function desenharMovel(o, t) {
+    const z = Math.max(o.z, -C * 0.55);
+    const y = Y(z); const u = U(z); const lf = faixaL() * p(z);
+    const pulso = 0.5 + 0.5 * Math.sin(t * 10);
+    if (o.z > 1.5) {
+      // aviso no chão da faixa em que ele vai chegar
+      const longo = o.vz > 0;
+      noChao(o.destino, longo ? 1 : o.z - 0.8, longo ? o.z : o.z + o.comp + 0.8, 0.4, `rgba(255,140,20,${0.35 + 0.35 * pulso})`);
+      noChao(o.destino, longo ? 1 : o.z - 0.8, longo ? o.z : o.z + o.comp + 0.8, 0.06, `rgba(255,255,255,${0.5 + 0.4 * pulso})`);
+    }
+    const x = X(o.faixa, z);
+    const sombra = (rx) => { ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x, y, rx, rx * 0.28, 0, 0, Math.PI * 2); ctx.fill(); };
+    let topo = 1;
+    if (o.tipo === 'onibus') {
+      const w = lf * 0.86; const h = u * 2.05;
+      ctx.fillStyle = '#ffc21f'; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h, w, h * 0.94, w * 0.12); ctx.fill();
+      ctx.fillStyle = '#8fd3ff'; ctx.beginPath(); ctx.roundRect(x - w * 0.42, y - h * 0.9, w * 0.84, h * 0.4, w * 0.08); ctx.fill();
+      for (const dx of [-0.2, 0.2]) {
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x + dx * w, y - h * 0.7, w * 0.12, h * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2b2118'; ctx.beginPath(); ctx.arc(x + dx * w + w * 0.02, y - h * 0.67, w * 0.06, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = Math.max(1.5, w * 0.05); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x, y - h * 0.38, w * 0.2, 0.4, Math.PI - 0.4); ctx.stroke();
+      ctx.fillStyle = Math.floor(t * 4) % 2 ? '#ff7a1f' : '#fff3a0';
+      for (const dx of [-0.36, 0.36]) { ctx.beginPath(); ctx.arc(x + dx * w, y - h * 0.18, w * 0.07, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#2b2e38'; for (const dx of [-0.3, 0.3]) ctx.fillRect(x + dx * w - w * 0.08, y - h * 0.08, w * 0.16, h * 0.08);
+      topo = 2.1;
+    } else if (o.tipo === 'bola') {
+      sombra(u * 0.35 / (1 + (o.h - o.raio) * 0.6));
+      const cy = y - o.h * u; const r = o.raio * u;
+      const cores = ['#ff4d5e', '#ffffff', '#ffc21f', '#ffffff', '#2f8fff', '#ffffff'];
+      const giro = t * 4;
+      for (let k = 0; k < 6; k++) { ctx.fillStyle = cores[k]; ctx.beginPath(); ctx.moveTo(x, cy); ctx.arc(x, cy, r, giro + (k * Math.PI) / 3, giro + ((k + 1) * Math.PI) / 3); ctx.fill(); }
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, cy, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      topo = o.h + o.raio + 0.1;
+    } else if (o.tipo === 'tronco') {
+      sombra(u * 0.35);
+      const r = u * 0.3; const cy = y - r;
+      ctx.fillStyle = '#8a5a34'; ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e9c08a'; ctx.beginPath(); ctx.arc(x, cy, r * 0.82, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#c28a52'; ctx.lineWidth = Math.max(1, r * 0.08);
+      for (const k of [0.25, 0.5, 0.7]) { ctx.beginPath(); ctx.arc(x, cy, r * k, 0, Math.PI * 2); ctx.stroke(); }
+      const a = -o.faixa * 5; ctx.beginPath(); ctx.moveTo(x, cy); ctx.lineTo(x + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8); ctx.stroke();
+    } else if (o.tipo === 'galho') {
+      const piv = { x: X(o.destino, z), y: y - cor.GALHO.pivo * u };
+      ctx.strokeStyle = '#6e4426'; ctx.lineWidth = u * 0.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(X(-0.8, z), piv.y); ctx.lineTo(X(2.8, z), piv.y); ctx.stroke();
+      const bx = X(o.bolaX, z); const by = y - o.h * u;
+      ctx.strokeStyle = '#3f8a3a'; ctx.lineWidth = Math.max(1.5, u * 0.04);
+      ctx.beginPath(); ctx.moveTo(piv.x, piv.y); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(bx, y, u * 0.4, u * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+      for (const [dx, dy, c] of [[-0.25, 0, '#2f9a4a'], [0.25, 0, '#2f9a4a'], [0, -0.12, '#3fae5a'], [-0.12, 0.12, '#5ab84a'], [0.12, 0.12, '#5ab84a']]) {
+        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(bx + dx * u, by + dy * u, u * 0.2, 0, Math.PI * 2); ctx.fill();
+      }
+      emoji('🐦', bx, by - u * 0.12, u * 0.3);
+      topo = cor.GALHO.pivo + 0.3;
+    } else if (o.tipo === 'boladeneve') {
+      sombra(o.raio * u);
+      const cy = y - o.raio * u; const r = o.raio * u;
+      const g = ctx.createRadialGradient(x - r * 0.35, cy - r * 0.35, r * 0.1, x, cy, r);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.7, '#eef6ff'); g.addColorStop(1, '#b9d3ee');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
+      const a = (o.nasceu - o.z) / Math.max(0.3, o.raio);
+      ctx.fillStyle = '#e5484d'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6, r * 0.14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6e4426'; ctx.beginPath(); ctx.arc(x + Math.cos(a + 2.5) * r * 0.55, cy + Math.sin(a + 2.5) * r * 0.55, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      topo = o.raio * 2 + 0.1;
+    } else {
+      // os bichos e a bicicleta: figurinhas grandes, saltitando
+      const fig = { bicicleta: '🚴', cachorro: '🐕', caranguejo: '🦀', pinguim: '🐧' }[o.tipo];
+      const tam = u * { bicicleta: 1.5, cachorro: 0.95, caranguejo: 0.8, pinguim: 0.85 }[o.tipo];
+      sombra(tam * 0.35);
+      const pula = Math.abs(Math.sin(t * 14)) * u * 0.05;
+      // o cachorro olha para onde corre; a bicicleta, de costas, vai para a frente
+      const espelhar = o.tipo === 'cachorro' ? o.dir > 0 : o.tipo === 'pinguim' ? o.destino > o.origem : false;
+      emoji(fig, x, y + tam * 0.08 - pula, tam, espelhar);
+      if (o.tipo === 'bicicleta' && o.pisca && Math.floor(t * 5) % 2 === 0) emoji(o.destino > o.origem ? '➡️' : '⬅️', x, y - tam * 0.95, u * 0.45);
+      topo = { bicicleta: 1.9, cachorro: 0.9, caranguejo: 0.75, pinguim: 0.8 }[o.tipo];
+    }
+    if (o.z > 1.5) emoji('⚠️', x, y - (topo + 0.15) * u - pulso * u * 0.06, u * 0.55);
   }
 
   function desenhar(t) {
@@ -469,6 +565,7 @@ export function montar(area, ctl) {
     sairEl.hidden = emCorrida;
     somEl.hidden = emCorrida;
     pausaEl.hidden = !emCorrida;
+    if (!emCorrida || capturada !== null) desenharAlerta();
     if (!s) { hud.innerHTML = ''; decolarEl.hidden = true; return; }
     if (capturada !== null) { hud.innerHTML = ''; decolarEl.hidden = true; pausaEl.hidden = true; dicaGestos.hidden = true; return; } // a cena da captura fica limpa
     const tempo = (v, icone) => (v > 0 ? `<span class="poder">${icone} ${Math.ceil(v)}s</span>` : '');
@@ -487,6 +584,26 @@ export function montar(area, ctl) {
     'skate-quebrou': 'quebra', quebra: 'quebra', dobro: 'dobro', bau: 'bau', 'poder-fim': 'poder-fim',
   };
 
+  // aviso no alto da tela: o que vem em movimento, em que faixa ele chega e como passar
+  const alertaEl = el('div', 'alerta-movel');
+  alertaEl.hidden = true;
+  alertaEl.setAttribute('aria-live', 'polite');
+  palco.append(alertaEl);
+  const FIG_MOVEL = { onibus: '🚌', bicicleta: '🚲', cachorro: '🐕', caranguejo: '🦀', bola: '🏐', tronco: '🪵', galho: '🌿', boladeneve: '❄️', pinguim: '🐧' };
+  const NOME_MOVEL = { onibus: 'Ônibus', bicicleta: 'Bicicleta', cachorro: 'Cachorro', caranguejo: 'Caranguejo', bola: 'Bola', tronco: 'Tronco', galho: 'Galho', boladeneve: 'Bola de neve', pinguim: 'Pinguim' };
+  const JEITO_MOVEL = { pular: '⬆️ pule', deslizar: '⬇️ deslize', desviar: '↔️ desvie' };
+  let alertaVisto = null;
+  function desenharAlerta() {
+    const o = s && rodando && capturada === null ? s.objetos.filter((x) => x.movel && x.z > 1.5 && !x.quebrado).sort((a, b) => a.z - b.z)[0] : null;
+    if (!o) { alertaEl.hidden = true; alertaVisto = null; return; }
+    if (alertaVisto !== o) {
+      alertaVisto = o;
+      alertaEl.innerHTML = `<b>⚠️ ${FIG_MOVEL[o.tipo]}</b><span class="faixas">${[0, 1, 2].map((f) => `<i class="${f === o.destino ? 'vem' : ''}">${f === o.destino ? FIG_MOVEL[o.tipo] : ''}</i>`).join('')}</span><small>${JEITO_MOVEL[cor.comoPassar(o)]}</small>`;
+      alertaEl.setAttribute('aria-label', `${NOME_MOVEL[o.tipo]} chegando: ${JEITO_MOVEL[cor.comoPassar(o)].slice(3)}`);
+    }
+    alertaEl.hidden = false;
+  }
+
   // aviso rápido no meio da tela quando a corrida fica mais rápida
   const avisoAcelera = el('div', 'aviso-acelera');
   avisoAcelera.hidden = true;
@@ -503,16 +620,17 @@ export function montar(area, ctl) {
     if (!rodando || !ativa()) { rodando = false; return; }
     const dt = anterior ? (agora - anterior) / 1000 : 0;
     anterior = agora;
-    if (!pausado) {
+    if (!pausado && !congelado) {
       cor.avancar(s, dt);
       for (const e of s.eventos) {
         if (e === 'perseguidor') ctl.som(SOM_PERSEGUIDOR[perseguidorAgora()]);
         else if (e === 'acelera') { ctl.som('turbo'); mostrarAcelera(); }
+        else if (e.startsWith?.('alerta:')) ctl.som(e === 'alerta:caranguejo' ? 'caranguejo' : 'xeque');
         else if (SOM[e]) ctl.som(SOM[e]);
       }
       s.eventos.length = 0;
       if (quadro % 10 === 0) sonsContinuos();
-      if (++quadro % 6 === 0) desenharHud();
+      if (++quadro % 6 === 0) { desenharHud(); desenharAlerta(); }
     }
     if (!s.vivo) {
       // a batida: quem persegue alcança a menina antes da tela de fim
@@ -558,7 +676,7 @@ export function montar(area, ctl) {
     ctl.som('clique');
     ativa = ctl.ativa();
     const c = prefs.carteira;
-    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas, dom: personagemDe(c.personagem).dom });
+    s = cor.nova(ctl.nivel(), { poderes: c.poderes, skate: c.skate, cargas: c.cargas, arrancadas: c.arrancadas, dom: personagemDe(c.personagem).dom, cenario: prefs.cenario ?? 'passeio' });
     temaVisto = null;
     pegando = 0;
     capturada = null;
@@ -905,7 +1023,7 @@ export function montar(area, ctl) {
   document.addEventListener('keydown', teclas);
 
   // Só para capturas de tela e testes: com ?demo no endereço, o estado da corrida fica acessível.
-  if (new URLSearchParams(location.search).has('demo')) window.corridaDemo = { estado: () => s };
+  if (new URLSearchParams(location.search).has('demo')) window.corridaDemo = { estado: () => s, congelar: (sim = true) => { congelado = sim; desenharHud(); desenharAlerta(); } };
 
   telaInicial();
   return { reiniciar: () => telaInicial() };
